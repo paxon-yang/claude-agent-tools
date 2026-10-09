@@ -109,46 +109,94 @@ main { padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 18px
 .panel > h2 > :first-child { white-space: nowrap; }
 .panel > h2 small { font-weight: 500; color: var(--muted); font-size: 12.5px; }
 
-/* 流程：主会话在左，子代理在右 */
-.flow { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 0; align-items: start; }
-.node { border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
-.mainnode { border: 1.5px solid var(--c); box-shadow: 0 0 0 4px var(--t); padding: 16px; }
-.mainnode .top { display: flex; align-items: center; gap: 8px; }
-.mainnode .model { font-size: 18px; font-weight: 800; color: var(--c); }
-.mainnode .role { color: var(--muted); font-size: 12.5px; margin: 2px 0 12px; }
 .kv { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; color: var(--ink2); }
 .kv b { color: var(--ink); font-weight: 600; }
 .meter { display: inline-flex; gap: 3px; align-items: center; }
 .meter i { width: 12px; height: 6px; border-radius: 2px; background: var(--line); }
 .meter i.on { background: var(--c); }
 .meter span { margin-left: 6px; color: var(--ink); font-weight: 600; }
-.ctx { height: 6px; background: var(--line2); border-radius: 4px; overflow: hidden; margin: 2px 0 6px; }
-.ctx i { display: block; height: 100%; background: var(--c); border-radius: 4px; }
-.ctx.warn i { background: var(--opus); } .ctx.bad i { background: var(--alert); }
-.doing { margin-top: 8px; padding: 8px 10px; background: var(--sunk); border-radius: 8px; font-size: 12.5px; color: var(--ink2); display: flex; gap: 8px; align-items: baseline; }
-.doing .mono { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 分工图：主会话 → 子代理，连线由脚本按实际位置画出 */
+.flowwrap { position: relative; }
+.fsvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 2; }
+.fsvg path { fill: none; stroke-width: 1.75; }
+.fsvg .e-done { stroke: #CBD3DD; }
+.fsvg .e-run { stroke: var(--c); stroke-dasharray: 5 6; }
+.fsvg .e-fail { stroke: var(--alert); stroke-dasharray: 2 4; }
+.fsvg .e-adv { stroke: var(--fable); stroke-dasharray: 2 4; opacity: .7; }
+.fsvg circle.dot0 { fill: var(--surface); stroke: #AEB8C5; stroke-width: 1.5; }
+.fsvg circle.dot1 { stroke: var(--surface); stroke-width: 2; }
+@media (prefers-reduced-motion: no-preference) { .fsvg .e-run { animation: flow 0.9s linear infinite; } }
+@keyframes flow { to { stroke-dashoffset: -11; } }
+
+.flowgrid { display: grid; grid-template-columns: minmax(300px, 380px) 120px minmax(0, 520px); align-items: center; position: relative; z-index: 1; }
+.flowgrid.solo { grid-template-columns: minmax(300px, 380px) 1fr; }
+.leftcol { display: flex; flex-direction: column; gap: 14px; }
+
+.mn { position: relative; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); padding: 18px 18px 14px; box-shadow: 0 1px 0 rgba(21, 32, 48, .04), 0 8px 24px -12px rgba(21, 32, 48, .18); }
+.mn::before { content: ""; position: absolute; left: 18px; right: 18px; top: -1px; height: 3px; border-radius: 0 0 3px 3px; background: var(--c); }
+.mn .hd { display: flex; align-items: center; gap: 10px; }
+.mn .badge { width: 34px; height: 34px; border-radius: 10px; background: var(--t); color: var(--c); display: grid; place-items: center; font-weight: 800; font-size: 15px; flex: none; }
+.mn .ttl { min-width: 0; }
+.mn .ttl b { display: block; font-size: 17px; font-weight: 800; color: var(--ink); line-height: 1.2; }
+.mn .ttl span { font-size: 12.5px; color: var(--muted); }
+.state { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.state.running { background: var(--run-t); color: #0B6B35; }
+.state.need { background: var(--alert-t); color: var(--alert); }
+.state.idle, .state.ended { background: var(--line2); color: var(--ink2); }
+.state i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+@media (prefers-reduced-motion: no-preference) { .state.running i { animation: blink 1.2s ease-in-out infinite; } }
+@keyframes blink { 50% { opacity: .25; } }
+.gauges { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; margin: 16px 0 12px; padding: 12px 14px; border-radius: 12px; background: var(--sunk); }
+.gauges .g-l { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.gauges .g-l > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.gauges .g-l b { color: var(--ink); font-weight: 700; }
+.ring { position: relative; width: 58px; height: 58px; }
+.ring svg { transform: rotate(-90deg); }
+.ring .rbg { stroke: var(--line); }
+.ring .rfg { stroke: var(--c); stroke-linecap: round; }
+.ring.warn .rfg { stroke: var(--opus); } .ring.bad .rfg { stroke: var(--alert); }
+.ring span { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: var(--ink); text-align: center; line-height: 1.1; }
+.ring span small { display: block; font-size: 9.5px; font-weight: 600; color: var(--muted); }
+.now { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink2); min-height: 22px; }
+.now .mono { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.now .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--run); flex: none; }
+.now .pulse.off { background: var(--line); }
+.now .pulse.need { background: var(--alert); }
+@media (prefers-reduced-motion: no-preference) { .now .pulse:not(.off) { animation: blink 1s ease-in-out infinite; } }
+.stats { display: flex; gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line2); font-size: 12px; color: var(--muted); }
+.stats b { color: var(--ink); font-weight: 700; }
 .test { margin-top: 8px; font-size: 12.5px; font-weight: 700; }
 .test.good { color: #0B6B35; } .test.bad { color: var(--alert); }
-.advice { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--fable-t); font-size: 12.5px; color: var(--ink2); }
-.advice b { color: var(--fable); }
 
-.agents { position: relative; padding-left: 34px; }
-.agents::before { content: ""; position: absolute; left: 0; top: 30px; width: 34px; border-top: 1.5px solid var(--line); }
-.agents.live::before { border-color: var(--run); }
-.agents-h { font-size: 12.5px; color: var(--muted); margin: 0 0 8px 14px; min-height: 20px; }
-.agents-h b { color: var(--ink); }
-.agrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; padding-left: 14px; }
-.agent { padding: 12px 14px; border-left: 4px solid var(--c); position: relative; }
-.agent .top { display: flex; align-items: center; gap: 8px; }
-.agent .type { font-weight: 800; }
-.agent .sstate { margin-left: auto; font-size: 12px; color: var(--muted); }
-.agent.running .sstate { color: #0B6B35; font-weight: 700; }
-.agent.failed .sstate { color: var(--alert); font-weight: 700; }
-.agent .mline { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12.5px; color: var(--muted); }
-.agent .desc { font-size: 13px; color: var(--ink); margin: 4px 0 8px; }
-.agent .foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
-.agent .back { margin-top: 8px; font-size: 12px; color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.noagents { margin-left: 14px; padding: 14px 16px; border: 1.5px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 13px; }
+.adv { border-radius: 12px; border: 1px dashed #D8C3EE; background: #FBF7FE; padding: 10px 12px; font-size: 12.5px; color: var(--ink2); margin-left: 28px; }
+.adv b { color: var(--fable); }
+
+.agcol { display: flex; flex-direction: column; gap: 10px; }
+.agcol-h { font-size: 12.5px; color: var(--muted); margin: 0 0 2px 2px; }
+.agcol-h b { color: var(--ink); }
+.ag { position: relative; display: grid; grid-template-columns: 4px 1fr; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
+.ag > .bar { background: var(--c); }
+.ag .in { padding: 10px 14px 10px 12px; min-width: 0; }
+.ag .r1 { display: flex; align-items: center; gap: 8px; }
+.ag .ty { font-weight: 800; }
+.ag .tm { margin-left: auto; font-size: 12px; color: var(--muted); }
+.ag .r2 { display: flex; align-items: center; gap: 10px; margin: 6px 0 4px; }
+.ag .ds { font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag .r3 { margin-top: 6px; font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.ag .r3 .mono { color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag .r3.ret { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink2); }
+.ag.running { border-color: color-mix(in srgb, var(--c) 45%, var(--line)); box-shadow: 0 0 0 3px var(--t); }
+.ag.failed { border-color: #F2B8AE; }
+.si { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 10px; font-weight: 800; color: #fff; }
+.si.done { background: var(--run); }
+.si.failed { background: var(--alert); }
+.si.stopped { background: var(--muted); }
+.si.running { border: 2px solid var(--t); border-top-color: var(--c); }
+@media (prefers-reduced-motion: no-preference) { .si.running { animation: spin .8s linear infinite; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.more { font-size: 12.5px; color: var(--muted); padding: 4px 2px; }
+.solo-note { margin-left: 32px; padding: 16px 18px; border: 1.5px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 13px; max-width: 420px; }
 
 /* 时间轴：这块是看板的主角 */
 .tl { position: relative; }
@@ -208,11 +256,14 @@ details.log summary small { font-weight: 500; color: var(--muted); margin-left: 
 .empty code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); padding: 2px 6px; border-radius: 6px; }
 
 @media (max-width: 1180px) {
-  .flow { grid-template-columns: 1fr; }
-  .agents { padding-left: 0; margin-top: 14px; }
-  .agents::before { display: none; }
-  .agents-h, .agrid, .noagents { margin-left: 0; padding-left: 0; }
   .split { grid-template-columns: 1fr; }
+}
+@media (max-width: 1000px) {
+  .flowgrid, .flowgrid.solo { grid-template-columns: 1fr; align-items: stretch; }
+  .flowgrid .gap { height: 18px; }
+  .agcol, .solo-note { margin-left: 30px; }
+  .solo-note { margin-top: 14px; }
+  .adv { margin-left: 30px; }
 }
 @media (max-width: 860px) {
   .app { grid-template-columns: 1fr; }
@@ -404,38 +455,91 @@ function renderHead(s) {
       ${r ? `<span class="reason"><em>为什么选它：</em>${esc(r.reason)}${s.route.mode && s.route.mode !== 'auto' ? `（模式：${esc(s.route.mode)}）` : ''}${s.route.pendingDown ? `；下一轮还简单就换 ${esc(NAMES[s.route.pendingDown] || s.route.pendingDown)}` : ''}</span>` : ''}</div>`);
 }
 
+const SI = { done: '✓', failed: '✕', stopped: '■', running: '' };
+function ring(pct, fam) {
+  const r = 24, c = 2 * Math.PI * r, v = Math.min(1, Math.max(0, pct));
+  const cls = pct > .85 ? 'bad' : pct > .6 ? 'warn' : '';
+  return `<div class="ring ${f(fam)} ${cls}" title="上下文占用 ${(pct * 100).toFixed(1)}%"><svg width="58" height="58" viewBox="0 0 58 58"><circle class="rbg" cx="29" cy="29" r="${r}" fill="none" stroke-width="5"/><circle class="rfg" cx="29" cy="29" r="${r}" fill="none" stroke-width="5" stroke-dasharray="${(c * v).toFixed(1)} ${c.toFixed(1)}"/></svg><span>${pct < .1 ? (pct * 100).toFixed(1) : Math.round(pct * 100)}%</span></div>`;
+}
 function renderFlow(s) {
   const k = stKey(s);
   const pct = s.contextLimit ? s.context / s.contextLimit : 0;
-  const ctxCls = pct > .85 ? 'bad' : pct > .6 ? 'warn' : '';
   const a = s.advisor || {};
-  const doing = s.currentTool ? `<span>正在</span><span class="mono">${esc(s.currentTool)}</span>` : k === 'running' ? '<span>思考中…</span>' : k === 'need' ? `<span style="color:var(--alert);font-weight:700">等你在终端里确认</span>` : s.lastTool ? `<span>上一步</span><span class="mono">${esc(s.lastTool)}</span>` : '<span>空闲</span>';
-  const main = `<div class="node mainnode ${f(s.family)}">
-    <div class="top"><span class="model">${esc(s.model || '主会话')}</span><span style="color:var(--muted);font-size:13px">主会话</span></div>
-    <div class="role">负责计划、派活、汇总和最后检查</div>
-    <div class="kv"><span>effort</span>${meter(s.effort, s.family)}</div>
-    <div class="kv"><span>上下文</span><b class="num">${kfmt(s.context)} / ${kfmt(s.contextLimit)}</b></div>
-    <div class="ctx ${ctxCls}"><i style="width:${Math.min(100, pct * 100).toFixed(1)}%"></i></div>
-    <div class="kv"><span>工具调用</span><b class="num">${s.toolCount} 次</b></div>
-    <div class="doing">${doing}</div>
-    ${s.test ? `<div class="test ${s.test.failed ? 'bad' : 'good'}">${s.test.failed ? '测试有失败' : '测试通过'}：${s.test.passed}/${s.test.total}</div>` : ''}
-    ${a.calls ? `<div class="advice"><b>顾问已介入 ${a.calls} 次</b>${a.last ? '：' + esc(a.last.slice(0, 160)) + (a.last.length > 160 ? '…' : '') : ''}</div>` : ''}
-  </div>`;
   const kids = s.agents || [];
   const live = kids.filter(x => x.status === 'running').length;
-  const agents = kids.length ? `<div class="agents ${live ? 'live' : ''}">
-      <div class="agents-h">派出 <b>${kids.length}</b> 个子代理${live ? `，<b>${live}</b> 个在跑` : '，都已交回结果'}</div>
-      <div class="agrid">${kids.map(x => `<div class="node agent ${f(x.family)} ${esc(x.status)}">
-        <div class="top"><span class="type">${esc(x.type)}</span><span class="sstate">${esc(STATUS[x.status] || x.status)}</span></div>
-        <div class="mline">${chip(x.family, x.model)}${meter(x.effort, x.family)}</div>
-        <div class="desc">${esc(x.description || '（没有取到任务描述）')}</div>
-        <div class="foot"><span>${x.status === 'running' ? (x.currentTool ? `<span class="mono">${esc(x.currentTool)}</span>` : '思考中…') : `用了 ${x.toolCount} 次工具`}</span><span class="num">${timer(x.startedAt, x.endedAt)}</span></div>
-        ${x.lastMessage && x.status !== 'running' ? `<div class="back">交回：${esc(x.lastMessage)}</div>` : ''}
-      </div>`).join('')}</div></div>`
-    : `<div class="agents"><div class="noagents">这一轮没有派子代理，主会话自己在做。</div></div>`;
+  const stLabel = { running: '运行中', need: '等你确认', idle: '等你下一步', ended: '已结束' }[k];
+  const nowLine = s.currentTool ? `<span class="pulse"></span><span>正在</span><span class="mono">${esc(s.currentTool)}</span>`
+    : k === 'running' ? (live ? `<span class="pulse"></span><span>等 ${live} 个子代理交回结果</span>` : '<span class="pulse"></span><span>思考中…</span>')
+    : k === 'need' ? '<span class="pulse need"></span><span style="color:var(--alert);font-weight:700">等你在终端里确认</span>'
+    : s.lastTool ? `<span class="pulse off"></span><span>上一步</span><span class="mono">${esc(s.lastTool)}</span>` : '<span class="pulse off"></span><span>空闲</span>';
+  const name = s.model || '主会话';
+  const main = `<div class="mn ${f(s.family)}" id="fmain">
+      <div class="hd"><span class="badge">${esc((NAMES[s.family] || name)[0])}</span><div class="ttl"><b>${esc(name)}</b><span>主会话 · 计划、派活、汇总、检查</span></div><span class="state ${k}"><i></i>${stLabel}</span></div>
+      <div class="gauges"><div class="g-l"><div><span>effort</span>${meter(s.effort, s.family)}</div><div><span>上下文</span><b class="num">${kfmt(s.context)} / ${kfmt(s.contextLimit)}</b></div></div>${ring(pct, s.family)}</div>
+      <div class="now">${nowLine}</div>
+      ${s.test ? `<div class="test ${s.test.failed ? 'bad' : 'good'}">${s.test.failed ? '测试有失败' : '测试通过'}：${s.test.passed}/${s.test.total}</div>` : ''}
+      <div class="stats"><span>工具 <b class="num">${s.toolCount}</b> 次</span><span>子代理 <b class="num">${s.totalAgents}</b> 个</span><span>完成 <b class="num">${s.tasksDone}</b> 轮</span></div>
+    </div>`;
+  const adv = a.calls ? `<div class="adv" id="fadv"><b>Fable 顾问 · 已介入 ${a.calls} 次</b>${a.last ? '<br>' + esc(a.last.slice(0, 150)) + (a.last.length > 150 ? '…' : '') : ''}</div>` : '';
+  const shown = kids.slice(-6), hidden = kids.length - shown.length;
+  const cards = shown.map(x => `<div class="ag ${f(x.family)} ${esc(x.status)}" data-aid="${esc(x.id)}" data-st="${esc(x.status)}"><span class="bar"></span><div class="in">
+      <div class="r1"><span class="si ${esc(x.status)}">${SI[x.status] || ''}</span><span class="ty">${esc(x.type)}</span><span class="tm num">${timer(x.startedAt, x.endedAt)}</span></div>
+      <div class="r2">${chip(x.family, x.model)}${meter(x.effort, x.family)}</div>
+      <div class="ds" title="${esc(x.description || '')}">${esc(x.description || '（没有取到任务描述）')}</div>
+      ${x.status === 'running' ? `<div class="r3"><span>${x.currentTool ? '正在' : '思考中…'}</span>${x.currentTool ? `<span class="mono">${esc(x.currentTool)}</span>` : ''}</div>`
+        : x.lastMessage ? `<div class="r3 ret" title="${esc(x.lastMessage)}">交回：${esc(x.lastMessage)}</div>` : `<div class="r3">用了 ${x.toolCount} 次工具</div>`}
+    </div></div>`).join('');
+  const right = kids.length
+    ? `<span class="gap"></span><div class="agcol"><div class="agcol-h">派出 <b>${kids.length}</b> 个子代理${live ? `，<b>${live}</b> 个在跑` : '，都已交回'}</div>${cards}${hidden ? `<div class="more">还有 ${hidden} 个更早派出的</div>` : ''}</div>`
+    : `<div class="solo-note">这一轮没有派子代理，主会话自己在做。</div>`;
   put('flowsub', s.earlierAgents ? `这个会话更早还派过 ${s.earlierAgents} 个子代理` : '');
-  put('flow', `<div class="flow">${main}${agents}</div>`);
+  put('flow', `<div class="flowwrap" id="fwrap"><svg class="fsvg" id="fsvg" aria-hidden="true"></svg><div class="flowgrid ${kids.length ? '' : 'solo'}"><div class="leftcol">${main}${adv}</div>${right}</div></div>`);
+  requestAnimationFrame(drawEdges);
 }
+
+// 按卡片的实际位置画连线：并排时从主会话右侧画曲线到每个子代理左侧；窄屏上下排列时从左边竖线分出去
+function drawEdges() {
+  const wrap = document.getElementById('fwrap'), svg = document.getElementById('fsvg'), mainEl = document.getElementById('fmain');
+  if (!wrap || !svg || !mainEl) return;
+  const W = wrap.getBoundingClientRect();
+  const M = mainEl.getBoundingClientRect();
+  const famVar = el => { const m = (el.className.match(/f-(\w+)/) || [])[1] || 'none'; return `var(--${m === 'mythos' ? 'fable' : m})`; };
+  let out = '';
+  const cards = [...wrap.querySelectorAll('.ag')];
+  const stacked = cards.length && cards[0].getBoundingClientRect().top > M.bottom - 2;
+  cards.forEach(el => {
+    const R = el.getBoundingClientRect();
+    const st = el.dataset.st;
+    const cls = st === 'running' ? 'e-run' : st === 'failed' ? 'e-fail' : 'e-done';
+    const color = famVar(el);
+    let d, x0, y0, x1, y1;
+    if (!stacked) {
+      x0 = M.right - W.left; y0 = M.top + M.height / 2 - W.top;
+      x1 = R.left - W.left; y1 = R.top + R.height / 2 - W.top;
+      const dx = (x1 - x0) * 0.55;
+      d = `M${x0},${y0} C${x0 + dx},${y0} ${x1 - dx},${y1} ${x1},${y1}`;
+    } else {
+      x0 = M.left - W.left + 14; y0 = M.bottom - W.top;
+      x1 = R.left - W.left; y1 = R.top + R.height / 2 - W.top;
+      d = `M${x0},${y0} L${x0},${y1 - 10} Q${x0},${y1} ${x0 + 10},${y1} L${x1},${y1}`;
+    }
+    out += `<path class="${cls}" style="--c:${color}" d="${d}"/><circle class="dot1" cx="${x1}" cy="${y1}" r="4.5" fill="${st === 'running' ? color : st === 'failed' ? 'var(--alert)' : '#AEB8C5'}"/>`;
+  });
+  if (cards.length) {
+    const x0 = stacked ? M.left - W.left + 14 : M.right - W.left, y0 = stacked ? M.bottom - W.top : M.top + M.height / 2 - W.top;
+    out += `<circle class="dot0" cx="${x0}" cy="${y0}" r="5"/>`;
+  }
+  const adv = document.getElementById('fadv');
+  if (adv) {
+    const A = adv.getBoundingClientRect();
+    const x = A.left - W.left - (stacked ? 0 : 14), y0 = M.bottom - W.top - 18, y1 = A.top + A.height / 2 - W.top;
+    if (!stacked) out += `<path class="e-adv" d="M${M.left - W.left + 14},${M.bottom - W.top} L${M.left - W.left + 14},${y1 - 8} Q${M.left - W.left + 14},${y1} ${M.left - W.left + 22},${y1} L${A.left - W.left},${y1}"/>`;
+    void x; void y0;
+  }
+  svg.innerHTML = out;
+}
+window.addEventListener('resize', () => requestAnimationFrame(drawEdges));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => requestAnimationFrame(drawEdges));
 
 // ---------- 模型时间轴 ----------
 function renderTimeline(s) {
