@@ -660,7 +660,8 @@ const INDEX = path.join(APP, 'public', 'index.html');
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
   if (url === '/api/stream') {
-    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    // no-transform / X-Accel-Buffering：经过 Cloudflare 隧道时不要缓冲，事件要立刻送到浏览器
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no', Connection: 'keep-alive' });
     res.write('retry: 2000\n\n');
     res.write('data: ' + JSON.stringify(snapshot()) + '\n\n');
     clients.add(res);
@@ -741,6 +742,9 @@ function syncRemote() {
   }
 }
 function remoteInfo() {
+  // cloudflare.sh 配好隧道后会写下公网地址
+  const pub = readJSON(path.join(VIZ, 'remote.json'));
+  if (pub && pub.url) return { mode: 'cloudflare', urls: [pub.url], public: true, tailscale: remote.ips.size > 0 };
   if (REMOTE === 'off') return { mode: 'off', urls: [] };
   const urls = [];
   if (remote.ips.size) {

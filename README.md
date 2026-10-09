@@ -27,6 +27,16 @@ bash ~/claude-agent-tools/update.sh
 
 在 Mac 和其他设备上都装 Tailscale 并登录同一个账号，看板左下角会显示远程地址（比如 `http://你的Mac名.xxx.ts.net:4321`），在其他设备的浏览器里打开即可。只有你自己的设备能访问。不想开放：把 `~/.claude/viz/app/config.json` 里的 `remote` 改成 `off`。
 
+## 用 Cloudflare 挂到自己的域名（任何设备都能打开）
+
+先在 Cloudflare Zero Trust 里给这个网址加一个 Access 应用（只允许你的邮箱用验证码登录），再运行：
+
+```bash
+bash ~/claude-agent-tools/agent-viz/cloudflare.sh board.你的域名
+```
+
+脚本只新建一条名为 agent-board 的隧道和它自己的配置文件，不会动你其他的 cloudflared 设置。停止对外开放：`bash ~/claude-agent-tools/agent-viz/cloudflare.sh --remove`。
+
 ## 日常用法
 
 - `/route` 查看当前模型和最近的选择；`/route rules` 查看规则

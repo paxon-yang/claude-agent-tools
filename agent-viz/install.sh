@@ -47,7 +47,7 @@ echo ""
 echo "[2/4] 复制看板程序到 $APP"
 mkdir -p "$APP/public" || fail "无法创建文件夹 $APP"
 if [ "$SRC" != "$APP" ]; then
-  cp "$SRC/server.js" "$SRC/capture.js" "$SRC/setup-hooks.js" "$SRC/install.sh" "$SRC/uninstall.sh" "$SRC/demo-events.jsonl" "$APP/" || fail "复制文件失败"
+  cp "$SRC/server.js" "$SRC/capture.js" "$SRC/setup-hooks.js" "$SRC/install.sh" "$SRC/uninstall.sh" "$SRC/cloudflare.sh" "$SRC/demo-events.jsonl" "$APP/" || fail "复制文件失败"
   cp "$SRC/public/index.html" "$APP/public/" || fail "复制网页文件失败"
   if [ -f "$APP/config.json" ]; then ok "保留你已有的 config.json"; else cp "$SRC/config.json" "$APP/"; fi
   ok "程序已就位"

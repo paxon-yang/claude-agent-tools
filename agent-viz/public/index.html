@@ -428,7 +428,8 @@ function renderProjects(sel) {
 function renderRemote() {
   const r = state.remote || {};
   let html = '<h3>在其他设备上看</h3>';
-  if (r.mode === 'off') html += '远程访问已关闭（config.json 里 remote 设为 off）。';
+  if (r.public) html += `任何设备的浏览器都能打开，用你的邮箱收验证码登录：<div class="url"><code>${esc(r.urls[0])}</code><button class="btn" onclick="copyUrl('${esc(r.urls[0])}', this)">复制</button></div>`;
+  else if (r.mode === 'off') html += '远程访问已关闭（config.json 里 remote 设为 off）。';
   else if (r.urls && r.urls.length) {
     html += `你的其他电脑和手机登录同一个 Tailscale 账号后，打开：` + r.urls.slice(0, 2).map((u, i) =>
       `<div class="url"><code>${esc(u)}</code>${i === 0 ? `<button class="btn" onclick="copyUrl('${esc(u)}', this)">复制</button>` : ''}</div>`).join('');
