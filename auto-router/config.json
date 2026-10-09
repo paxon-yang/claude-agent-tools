@@ -1,0 +1,53 @@
+{
+  "models": {
+    "haiku": "claude-haiku-5-5",
+    "sonnet": "claude-sonnet-5-5",
+    "opus": "claude-opus-5-5",
+    "fable": "claude-fable-5-1"
+  },
+  "defaultTier": "sonnet",
+  "effort": {
+    "haiku": "low",
+    "sonnet": "medium",
+    "opus": "high",
+    "fable": "high"
+  },
+  "autoFable": false,
+  "classifierModel": "claude-haiku-5-5",
+  "classifierTimeoutMs": 6000,
+  "noDowngradeAboveTokens": 80000,
+  "escalateAfterToolErrors": 3,
+  "midTurnEscalateAfterErrors": 3,
+  "downgradeConfirmations": 2,
+  "windows": {
+    "haiku": 200000,
+    "sonnet": null,
+    "opus": null,
+    "fable": null
+  },
+  "bigTaskTier": "opus",
+  "planTier": "opus",
+  "executeTier": "sonnet",
+  "haikuGuard": {
+    "maxFiles": 3,
+    "escalateTo": "sonnet"
+  },
+  "subagents": {
+    "explorer": "haiku",
+    "researcher": "haiku",
+    "Explore": "haiku",
+    "claude-code-guide": "haiku",
+    "statusline-setup": "haiku",
+    "quick-worker": "sonnet",
+    "worker": "sonnet",
+    "general-purpose": "sonnet",
+    "Plan": "main"
+  },
+  "subagentDefault": "sonnet",
+  "subagentEffort": {
+    "haiku": "low",
+    "sonnet": "medium",
+    "opus": "medium",
+    "fable": "medium"
+  }
+}

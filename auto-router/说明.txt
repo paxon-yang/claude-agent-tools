@@ -1,0 +1,36 @@
+auto-router v0.2 · 让 Claude Code 自动选模型、自动派活
+
+安装：打开终端，粘贴下面这行，按回车
+    bash ~/claude-agent-tools/install.sh
+装好后关掉 Claude Code 重新打开。
+（安装会顺带：在 ~/.claude/CLAUDE.md 末尾加一段"派活规则"，并在 ~/.claude/agents/ 里建 4 个子代理；
+  原来的 CLAUDE.md 会备份成 CLAUDE.md.bak-auto-router，已有的同名子代理不会被覆盖。）
+
+谁干什么
+    Haiku 5.5   解释、查找、总结、小改动（最多改 3 个文件；碰到危险命令自动换 Sonnet）
+    Sonnet 5.5  日常开发（默认）、按计划执行
+    Opus 5.5    架构、重构、疑难、大任务统筹、计划模式
+    Fable 5.1   当顾问（/advisor fable），或者你写 #fable 时亲自上
+
+大任务怎么协作
+    你说"按照这个文档改"这类大活 → 主会话用 Opus 统筹
+    → 派 explorer（Haiku）去读代码 → 派 worker / quick-worker（Sonnet）去写代码 → Opus 汇总检查
+
+三道保护
+    1. Haiku 改到第 4 个文件，或要跑 rm -rf / git push / 部署 这类命令 → 当场换 Sonnet 接手
+    2. 同一轮里工具连续失败 3 次 → 当场升一级模型（Haiku→Sonnet→Opus）
+    3. 降级要连续两轮都判断为"简单"才会降；上下文太长时不降到窗口小的模型
+
+计划模式（推荐给大任务）
+    Shift+Tab 切到计划模式 → Opus 出方案 → 你批准 / 回一句"执行" → 换 Sonnet 干活
+
+在 Claude Code 里：
+    /route          查看现在用哪个模型、最近的选择
+    /route rules    查看自动选择的规则
+    /route opus     固定用某个模型（haiku / sonnet / opus / fable）
+    /route auto     恢复自动
+    /route off      关闭自动选择
+    在提示里写 #opus / #fable / #haiku 等，只对这一句生效
+
+改规则：编辑 ~/.claude/auto-router/config.json，然后重开 Claude Code
+卸载：bash ~/.claude/auto-router/uninstall.sh

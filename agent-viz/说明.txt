@@ -1,0 +1,16 @@
+Claude Code 代理看板 · 安装包
+
+安装（只需要做一次）：
+  1. 打开"终端"（按 Command+空格，输入 终端，回车）
+  2. 粘贴下面这行，按回车：
+       bash ~/claude-agent-tools/install.sh
+  3. 看到"安装完成"，浏览器会自动打开 http://localhost:4321
+
+先看演示效果（可选）：
+  node ~/.claude/viz/app/server.js --demo --port 4322
+  然后浏览器打开 http://localhost:4322 ，看完回到终端按 Control+C 结束
+
+卸载：
+  bash ~/.claude/viz/app/uninstall.sh
+
+详细图文教程见对话里的"Claude Code 代理看板 · 搭建教程"文档。

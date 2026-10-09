@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code 代理看板</title>
+<style>
+:root{
+  --bg:#0b0e14; --win:#0f131b; --panel:#131924; --panel2:#171e2b; --line:#273042; --line2:#334056;
+  --ink:#e6edf3; --dim:#8b96a8; --faint:#5b6577;
+  --opus:#f0883e; --sonnet:#58a6ff; --haiku:#3fb9a0; --fable:#bc8cff; --none:#8b96a8;
+  --run:#3fb950; --warn:#d29922; --bad:#f85149;
+  --mono: ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,"PingFang SC","Microsoft YaHei",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.5}
+.f-opus{--c:var(--opus)} .f-sonnet{--c:var(--sonnet)} .f-haiku{--c:var(--haiku)}
+.f-fable,.f-mythos{--c:var(--fable)} .f-none{--c:var(--none)}
+.shell{max-width:1480px;margin:18px auto;padding:0 18px}
+.window{background:var(--win);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.chrome{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#0d1118}
+.chrome i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.chrome .t{flex:1;text-align:center;color:var(--faint);font-size:11.5px}
+.conn{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.conn b{width:7px;height:7px;border-radius:50%;background:var(--bad);display:inline-block}
+.conn.ok b{background:var(--run);box-shadow:0 0 8px var(--run)}
+.body{padding:18px 22px 14px}
+.title{text-align:center;letter-spacing:.14em;font-weight:700;font-size:13.5px;padding:2px 0 12px;border-bottom:1px solid var(--line)}
+.title .m{color:var(--c)} .title .sep{color:var(--faint);margin:0 10px}
+.title .demo{display:inline-block;margin-left:12px;padding:1px 8px;border:1px solid var(--warn);color:var(--warn);border-radius:4px;letter-spacing:0;font-weight:500;font-size:11.5px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 6px}
+.tab{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:7px;padding:6px 11px;display:flex;align-items:center;gap:8px;font:inherit}
+.tab:hover{border-color:var(--line2);color:var(--ink)}
+.tab.sel{border-color:var(--c);color:var(--ink);background:var(--panel2)}
+.tab small{color:var(--faint)}
+.legend{display:flex;justify-content:center;gap:22px;color:var(--dim);font-size:12px;padding:8px 0 14px}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;background:var(--c);margin-right:7px;border-radius:2px;vertical-align:-1px}
+.grid{display:grid;grid-template-columns:270px 1fr;gap:22px;align-items:start}
+.panel{border:1.5px solid var(--c,var(--line2));border-radius:8px;background:var(--panel);padding:14px 14px 12px}
+.panel.plain{border-color:var(--line)}
+.ph{color:var(--c);font-weight:700;letter-spacing:.12em;text-align:center}
+.sub{color:var(--c);opacity:.85;text-align:center;font-size:12px;margin-bottom:10px}
+.moments{list-style:none;margin:0 0 10px;padding:0;border-left:1px dashed var(--line2);padding-left:10px}
+.moments li{color:var(--dim);padding:3px 0}
+.moments li.on{color:var(--c)} .moments li.on::after{content:"  ← 最近一次";color:var(--faint);font-size:11px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:2px 0;color:var(--dim)}
+.kv b{color:var(--ink);font-weight:600;text-align:right}
+.advice{margin-top:10px;padding:9px 10px;border-radius:6px;background:rgba(188,140,255,.07);border:1px solid rgba(188,140,255,.25);color:var(--ink);font-size:12.5px;white-space:pre-wrap;max-height:220px;overflow:auto}
+.advice .lbl{color:var(--fable);display:block;margin-bottom:4px;font-size:11.5px}
+.note{color:var(--faint);font-size:11.5px;margin-top:10px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.tree{display:flex;flex-direction:column;align-items:center;min-width:0}
+.task{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:10px 14px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start}
+.task .k{color:var(--faint);white-space:nowrap}
+.task .v{flex:1;color:var(--ink)}
+.task .tm{color:var(--dim);white-space:nowrap}
+.node{position:relative;border:1.5px solid var(--c);border-radius:8px;background:var(--panel);padding:11px 13px}
+.node.main{width:380px}
+.node .hd{display:flex;align-items:center;gap:8px;font-weight:700}
+.node .hd .name{color:var(--c)}
+.node .hd .who{color:var(--ink);font-weight:600}
+.node .hd .st{margin-left:auto;font-weight:500;font-size:11.5px;color:var(--dim)}
+.node .role{color:var(--dim);font-size:12px;margin:2px 0 8px}
+.route{color:var(--haiku);font-size:12px;margin:-4px 0 8px}
+.row.k-route .x{color:var(--haiku)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+.running .dot{background:var(--run);box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:ping 1.6s infinite}
+.needs-you .dot{background:var(--warn);animation:ping 1.2s infinite}
+.done .dot{background:var(--dim)} .failed .dot{background:var(--bad)} .stopped .dot{background:var(--warn)}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(63,185,80,.55)}80%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+.node.running{box-shadow:0 0 0 1px rgba(63,185,80,.0),0 0 18px -6px var(--c)}
+.node.done{opacity:.78}
+.node.failed{border-color:var(--bad)}
+.effort{letter-spacing:1px}
+.effort .on{color:var(--c)} .effort .off{color:#2b3445}
+.bar{height:6px;border-radius:3px;background:#1f2735;overflow:hidden;margin:3px 0 6px}
+.bar i{display:block;height:100%;background:var(--c);border-radius:3px;transition:width .6s}
+.bar.warn i{background:var(--warn)} .bar.bad i{background:var(--bad)}
+.tool{color:var(--ink);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tool.idle{color:var(--faint)}
+.test{font-size:12px;margin-top:4px}
+.test.good{color:var(--run)} .test.bad{color:var(--warn)}
+.stem{width:1.5px;height:26px;background:var(--line2);position:relative}
+.stem.live{background:repeating-linear-gradient(180deg,var(--run) 0 5px,transparent 5px 9px);background-size:100% 18px;animation:flow 0.9s linear infinite}
+@keyframes flow{from{background-position:0 0}to{background-position:0 18px}}
+.delegate{color:var(--dim);font-size:12px;padding:2px 0}
+.delegate b{color:var(--sonnet);font-weight:500}
+.children{display:flex;justify-content:center;max-width:100%;overflow-x:auto;padding-bottom:4px}
+.child{position:relative;padding:26px 7px 0;display:flex;flex-direction:column;align-items:center}
+.children{align-items:stretch}
+.child::before,.child::after{content:"";position:absolute;top:0;right:50%;width:50%;height:26px;border-top:1.5px solid var(--line2)}
+.child::after{right:auto;left:50%;border-left:1.5px solid var(--line2)}
+.child:first-child::before,.child:last-child::after{border-top:none}
+.child:only-child::after{border-top:none}
+.child:only-child::before{display:none}
+.child.live::after{border-left-color:var(--run)}
+.jn{position:relative;height:22px;width:calc(100% + 14px);margin:auto -7px 0}
+.jn::before,.jn::after{content:"";position:absolute;bottom:0;height:22px;width:50%;border-bottom:1.5px solid var(--line2)}
+.jn::before{right:50%}
+.jn::after{left:50%;border-left:1.5px solid var(--line2)}
+.child:first-child .jn::before,.child:last-child .jn::after{border-bottom:none}
+.child:only-child .jn::before{display:none}
+.lasttool{color:var(--faint);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node.sub{width:226px}
+.node.sub .desc{color:var(--ink);font-size:12px;margin:4px 0 6px;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.node.sub .msg{color:var(--dim);font-size:11.5px;margin-top:6px;border-top:1px dashed var(--line);padding-top:6px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.node.sub .src{color:var(--faint);font-size:10.5px}
+.earlier{color:var(--faint);font-size:11.5px;margin-top:8px}
+.back{border:1.5px dashed var(--opus);border-radius:8px;padding:8px 16px;text-align:center;color:var(--opus);min-width:300px}
+.back .s{color:var(--ink);font-size:12px}
+.back.on{border-style:solid;box-shadow:0 0 18px -6px var(--opus)}
+.nochild{color:var(--faint);border:1px dashed var(--line);border-radius:8px;padding:12px 18px;margin-top:4px;text-align:center}
+.log{margin-top:20px;border:1px solid var(--line);border-radius:8px;padding:8px 14px 10px;background:#0d1118}
+.log .lt{color:var(--faint);font-size:11.5px;margin-bottom:4px}
+.row{display:grid;grid-template-columns:78px 120px 1fr;gap:10px;padding:2px 0;font-size:12.5px}
+.row .t{color:var(--faint)} .row .w{color:var(--c);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.k-good .x{color:var(--run)} .row.k-warn .x{color:var(--warn)} .row.k-bad .x{color:var(--bad)}
+.row.k-advisor .x{color:var(--fable)} .row.k-task .x{color:var(--ink);font-weight:600} .row.k-session .x{color:var(--dim)}
+.row.fresh{animation:fresh 1.4s ease-out}
+@keyframes fresh{from{background:rgba(88,166,255,.16)}to{background:transparent}}
+.status{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);color:var(--dim);font-size:12px;display:flex;gap:18px;flex-wrap:wrap}
+.status .p{color:var(--run)} .status b{color:var(--sonnet);font-weight:500}
+.empty{padding:70px 20px;text-align:center;color:var(--dim)}
+.empty h2{color:var(--ink);font-size:16px;margin:0 0 10px}
+.empty code{color:var(--run)}
+@media (max-width:980px){.grid{grid-template-columns:1fr}.node.main{width:100%}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell"><div class="window">
+  <div class="chrome"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+    <span class="t">~/agent-tree — Claude Code 代理看板 — localhost</span>
+    <span class="conn" id="conn"><b></b><span>连接中…</span></span></div>
+  <div class="body">
+    <div class="title" id="title">CLAUDE CODE AGENT TREE</div>
+    <div class="tabs" id="tabs"></div>
+    <div class="legend">
+      <span class="f-opus">Opus</span><span class="f-sonnet">Sonnet</span><span class="f-haiku">Haiku</span><span class="f-fable">Fable · 顾问</span>
+      <span style="--c:var(--run)">运行中</span>
+    </div>
+    <div id="main"></div>
+  </div>
+</div></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let state = null, selected = null, pinned = false, lastLogKey = new Set(), firstRender = true;
+try { selected = localStorage.getItem('viz.sel'); pinned = !!selected; } catch (e) {}
+
+const fam = f => 'f-' + (f || 'none');
+const kfmt = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0);
+const clock = ts => { const d = new Date(ts * 1000); return d.toTimeString().slice(0, 8); };
+function dur(sec) { sec = Math.max(0, Math.round(sec)); if (sec < 60) return sec + 's'; if (sec < 3600) return Math.floor(sec / 60) + 'm ' + String(sec % 60).padStart(2, '0') + 's'; return Math.floor(sec / 3600) + 'h ' + Math.floor(sec % 3600 / 60) + 'm'; }
+function ago(ts) { const s = Date.now() / 1000 - ts; if (s < 60) return '刚刚'; if (s < 3600) return Math.floor(s / 60) + ' 分钟前'; return Math.floor(s / 3600) + ' 小时前'; }
+const EFF = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
+function effort(level) {
+  if (!level) return '<span class="effort" style="color:var(--faint)">—</span>';
+  const n = EFF[level] || 0; let s = '';
+  for (let i = 0; i < 4; i++) s += `<span class="${i < n ? 'on' : 'off'}">▮</span>`;
+  return `<span class="effort">${s} ${esc(level)}</span>`;
+}
+const STATUS = { running: '运行中', idle: '等你下一步', 'needs-you': '等你确认', ended: '已结束', done: '已完成', failed: '出错', stopped: '已中断' };
+function timer(start, end) { return end ? `<span>${dur(end - start)}</span>` : `<span data-since="${start}"></span>`; }
+function tick() { const t = Date.now() / 1000; document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(t - Number(el.dataset.since)); }); }
+function testHtml(t) { if (!t) return ''; return `<div class="test ${t.failed ? 'bad' : 'good'}">${t.failed ? '✗' : '✓'} 测试 ${t.passed}/${t.total} 通过</div>`; }
+
+function connect() {
+  const es = new EventSource('/api/stream');
+  es.onopen = () => { $('#conn').className = 'conn ok'; $('#conn span').textContent = '实时连接'; };
+  es.onmessage = ev => { state = JSON.parse(ev.data); render(); };
+  es.onerror = () => { $('#conn').className = 'conn'; $('#conn span').textContent = '已断开，重连中…'; };
+}
+
+function pick() {
+  const ss = state.sessions;
+  if (!ss.length) return null;
+  if (pinned && ss.find(s => s.id === selected)) return ss.find(s => s.id === selected);
+  const live = ss.find(s => s.active) || ss[0];
+  selected = live.id; return live;
+}
+function select(id) { selected = id; pinned = true; try { localStorage.setItem('viz.sel', id); } catch (e) {} cache = {}; render(); }
+
+let cache = {};
+function put(key, el, html) { if (cache[key] === html) return; cache[key] = html; el.innerHTML = html; }
+
+function render() {
+  if (!state) return;
+  const s = pick();
+  const adv = state.settings.advisorModel;
+  const head = `CLAUDE CODE AGENT TREE<span class="sep">·</span><span class="${fam(s && s.family || 'opus')}"><span class="m">${esc((s && s.model) || state.settings.model || 'OPUS').toUpperCase()}</span> 主力</span>` +
+    (adv ? `<span class="sep">·</span><span class="${fam(state.settings.advisorFamily)}"><span class="m">${esc(adv.toUpperCase())}</span> 顾问待命</span>` : '') +
+    (state.demo ? '<span class="demo">演示模式 · 模拟数据</span>' : '');
+  put('title', $('#title'), head);
+  put('tabs', $('#tabs'), state.sessions.map(x => `<button class="tab ${fam(x.family)} ${x.id === (s && s.id) ? 'sel' : ''} ${x.active ? x.status : 'done'}" onclick="select('${esc(x.id)}')"><span class="dot"></span>${esc(x.project)} <small>${esc(STATUS[x.status] || '')} · ${ago(x.lastTs)}</small></button>`).join(''));
+  if (!s) {
+    put('main', $('#main'), `<div class="empty"><h2>现在没有正在运行的 Claude Code</h2>
+      <div>在任意项目文件夹里打开终端，输入 <code>claude</code> 开始工作，这里会自动出现。</div>
+      <div style="margin-top:8px;color:var(--faint)">已读取事件 ${state.stats.events} 条</div></div>`);
+    return;
+  }
+  if (!$('#grid')) { cache = {}; $('#main').innerHTML = `<div class="grid" id="grid"><div class="stack"><div id="adv"></div><div id="met"></div></div><div class="tree" id="tree"></div></div><div class="log" id="log"></div><div class="status" id="status"></div>`; }
+  renderAdvisor(s); renderMetrics(s); renderTree(s); renderLog(s); renderStatus(s);
+  firstRender = false; tick();
+}
+
+function renderAdvisor(s) {
+  const adv = state.settings.advisorModel, a = s.advisor || {};
+  if (!adv && !a.calls) { put('adv', $('#adv'), `<div class="panel plain"><div class="ph" style="color:var(--dim)">顾问</div><div class="sub" style="color:var(--faint)">未开启</div><div class="note">在 Claude Code 里输入 /advisor fable 可开启。</div></div>`); return; }
+  const m = a.moment || '';
+  put('adv', $('#adv'), `<div class="panel ${fam(state.settings.advisorFamily || 'fable')}">
+    <div class="ph">${esc((adv || 'FABLE').toUpperCase())}</div><div class="sub">advisor · ${a.calls ? '已介入' : '待命'}</div>
+    <ul class="moments"><li class="${m === '做计划前' ? 'on' : ''}">◇ 做计划前</li><li class="${m === '错误重复时' ? 'on' : ''}">◇ 错误重复时</li><li class="${m === '收尾前' ? 'on' : ''}">◇ 收尾前</li></ul>
+    <div class="kv">介入次数<b>${a.calls || 0}</b></div>
+    <div class="kv">最近一次<b>${a.lastAt ? clock(a.lastAt) : '—'}</b></div>
+    ${a.last ? `<div class="advice"><span class="lbl">最近建议</span>${esc(a.last)}</div>` : ''}
+    <div class="note">顾问读完整个会话后给建议，从不自己写代码；由主会话采纳执行。</div></div>`);
+}
+
+function renderMetrics(s) {
+  const pct = s.contextLimit ? s.context / s.contextLimit : 0;
+  put('met', $('#met'), `<div class="panel plain">
+    <div class="kv">项目<b>${esc(s.project)}</b></div>
+    <div class="kv">会话开始<b>${clock(s.startedAt)}</b></div>
+    <div class="kv">已运行<b>${timer(s.startedAt, s.active ? null : s.lastTs)}</b></div>
+    <div class="kv">完成的回合<b>${s.tasksDone}</b></div>
+    <div class="kv">主会话工具调用<b>${s.toolCount}</b></div>
+    <div class="kv">子代理（本会话）<b>${s.totalAgents}</b></div>
+    <div class="kv">累计输出 token<b>${kfmt(s.outTokens)}</b></div>
+    <div class="kv">上下文占用<b>${(pct * 100).toFixed(pct < .1 ? 1 : 0)}%</b></div></div>`);
+}
+
+function renderTree(s) {
+  const tree = $('#tree');
+  if (!tree.querySelector('#task')) tree.innerHTML = `<div id="task"></div><div id="mainnode"></div><div id="stem1"></div><div id="kids"></div><div id="stem2"></div><div id="back"></div>`;
+  const t = s.task;
+  put('task', tree.querySelector('#task'), t ? `<div class="task"><span class="k">当前任务</span><span class="v">${esc(t.prompt)}</span><span class="tm">${clock(t.startedAt)} · ${timer(t.startedAt, t.endedAt)}</span></div>`
+    : `<div class="task"><span class="k">当前任务</span><span class="v" style="color:var(--faint)">还没有收到任务</span></div>`);
+  const pct = s.contextLimit ? s.context / s.contextLimit : 0;
+  const barCls = pct > .85 ? 'bad' : pct > .6 ? 'warn' : '';
+  const st = s.active ? s.status : 'ended';
+  put('mainnode', tree.querySelector('#mainnode'), `<div class="node main ${fam(s.family)} ${st === 'running' ? 'running' : st === 'needs-you' ? 'needs-you' : 'done'}">
+    <div class="hd"><span class="dot"></span><span class="name">${esc(s.model || '主模型')}</span><span class="who">· 主会话</span><span class="st">${esc(STATUS[st] || st)}</span></div>
+    <div class="role">规划 + 决策 + 派活 + 最后复核</div>
+    ${s.route && s.route.last ? `<div class="route">⇄ 自动选模型：${esc(s.route.last.reason)}${s.route.mode && s.route.mode !== 'auto' ? `（模式：${esc(s.route.mode)}）` : ''}${s.route.pendingDown ? ` · 下一轮仍简单就降到 ${esc(s.route.pendingDown)}` : ''}</div>` : ''}
+    <div class="kv">effort ${effort(s.effort)}</div>
+    <div class="kv">上下文<b>${kfmt(s.context)} / ${kfmt(s.contextLimit)}</b></div>
+    <div class="bar ${barCls}"><i style="width:${Math.min(100, pct * 100).toFixed(1)}%"></i></div>
+    <div class="kv">当前动作<span class="tool ${s.currentTool ? '' : 'idle'}">${esc(s.currentTool ? '▶ ' + s.currentTool : (st === 'running' ? '思考中…' : '空闲'))}</span></div>
+    ${!s.currentTool && s.lastTool ? `<div class="lasttool" style="text-align:right">上一步：${esc(s.lastTool)}</div>` : ''}
+    ${testHtml(s.test)}</div>`);
+  const kids = s.agents || [];
+  const anyLive = kids.some(a => a.status === 'running');
+  put('stem1', tree.querySelector('#stem1'), kids.length ? `<div style="display:flex;flex-direction:column;align-items:center"><div class="stem ${anyLive ? 'live' : ''}"></div><div class="delegate">派活给子代理 · <b>${kids.filter(a => a.status === 'running').length} 个运行中 / 共 ${kids.length} 个</b></div></div>` : '<div class="stem"></div>');
+  const kidsEl = tree.querySelector('#kids');
+  if (!kids.length) { put('kids', kidsEl, `<div class="nochild">这一轮还没有派出子代理（简单的活主会话会自己做）</div>`); }
+  else {
+    if (!kidsEl.querySelector('.children')) { kidsEl.innerHTML = '<div class="children"></div>'; cache.kids = null; }
+    const wrap = kidsEl.querySelector('.children');
+    const ids = kids.map(a => a.id);
+    [...wrap.children].forEach(c => { if (!ids.includes(c.dataset.id)) c.remove(); });
+    kids.forEach((a, i) => {
+      let c = wrap.querySelector(`[data-id="${CSS.escape(a.id)}"]`);
+      if (!c) { c = document.createElement('div'); c.className = 'child'; c.dataset.id = a.id; wrap.appendChild(c); }
+      if (wrap.children[i] !== c) wrap.insertBefore(c, wrap.children[i]);
+      c.classList.toggle('live', a.status === 'running');
+      put('kid:' + a.id, c, `<div class="node sub ${fam(a.family)} ${a.status}">
+        <div class="hd"><span class="dot"></span><span class="who">${esc(a.type)}</span><span class="st">${esc(STATUS[a.status] || a.status)}</span></div>
+        <div class="name" style="color:var(--c);font-weight:600">${esc(a.model || '—')} <span class="src">(${esc(a.modelSource)})</span></div>
+        <div class="kv">effort ${effort(a.effort)}</div>
+        <div class="desc">${esc(a.description || '（未取到任务描述）')}</div>
+        <div class="kv">${a.status === 'running' ? `<span class="tool ${a.currentTool ? '' : 'idle'}">${esc(a.currentTool ? '▶ ' + a.currentTool : '思考中…')}</span>` : `<span>工具 ${a.toolCount} 次</span>`}<b>${timer(a.startedAt, a.endedAt)}</b></div>
+        ${a.status === 'running' && !a.currentTool && a.lastTool ? `<div class="lasttool">上一步：${esc(a.lastTool)}</div>` : ''}
+        ${testHtml(a.test)}
+        ${a.lastMessage ? `<div class="msg">↩ ${esc(a.lastMessage)}</div>` : ''}</div><div class="jn"></div>`);
+    });
+  }
+  const allDone = kids.length && !anyLive;
+  const reviewing = allDone && st === 'running';
+  put('stem2', tree.querySelector('#stem2'), kids.length ? `<div class="stem ${reviewing ? 'live' : ''}"></div>` : '');
+  put('back', tree.querySelector('#back'), kids.length ? `<div class="back ${reviewing ? 'on' : ''}">回到主会话 · ${esc(s.effort || '')}<div class="s">${reviewing ? '正在复核子代理交回的结果…' : allDone ? '结果已交回主会话' : '等子代理交回结果后复核'}</div></div>${s.earlierAgents ? `<div class="earlier">本会话更早的回合还派过 ${s.earlierAgents} 个子代理</div>` : ''}` : '');
+}
+
+function renderLog(s) {
+  const famOf = who => { if (who === 'main') return s.family; if (who === 'advisor') return state.settings.advisorFamily || 'fable'; if (who === 'you') return 'none'; if (who === 'router') return 'haiku'; const a = (s.agents || []).find(x => x.type === who); return a ? a.family : 'none'; };
+  const label = who => who === 'main' ? '主会话' : who === 'advisor' ? '顾问' : who === 'you' ? '你' : who === 'router' ? '自动选模型' : who;
+  const rows = s.timeline.slice().reverse().slice(0, 20);
+  const html = `<div class="lt">session log · 最近 20 条，最新在上</div>` + rows.map(r => {
+    const key = r.ts + r.text; const fresh = !firstRender && !lastLogKey.has(key);
+    return `<div class="row k-${esc(r.kind)} ${fresh ? 'fresh' : ''}"><span class="t">${clock(r.ts)}</span><span class="w ${fam(famOf(r.who))}">${esc(label(r.who))}</span><span class="x">${esc(r.text)}</span></div>`;
+  }).join('');
+  if (cache.log !== html.replace(/ fresh/g, '')) { $('#log').innerHTML = html; cache.log = html.replace(/ fresh/g, ''); }
+  lastLogKey = new Set(rows.map(r => r.ts + r.text));
+}
+
+function renderStatus(s) {
+  const kids = s.agents || [];
+  const subEff = [...new Set(kids.map(a => a.effort).filter(Boolean))].join('/') || '—';
+  const pct = s.contextLimit ? Math.round(s.context / s.contextLimit * 100) : 0;
+  put('status', $('#status'), `<span class="p">~/${esc(s.project)} $ claude</span>
+    <span>effort <b>[${esc(s.effort || '—')}/${esc(subEff)}]</b></span>
+    <span>subagents <b>[${kids.filter(a => a.status === 'running').length}/${kids.length}]</b></span>
+    <span>顾问 <b>[${(s.advisor && s.advisor.calls) || 0} 次]</b></span>
+    <span>上下文 <b>[${pct}%]</b></span>
+    <span>事件 <b>[${state.stats.events}]</b></span>`);
+}
+
+setInterval(tick, 1000);
+connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "auto-router",
+  "version":"0.2.0",
+  "description": "每一轮自动选模型：Haiku 处理小活，Sonnet 处理日常开发，Opus 处理架构和疑难，Fable 当顾问",
+  "author": {
+    "name": "Paxon"
+  }
+}
