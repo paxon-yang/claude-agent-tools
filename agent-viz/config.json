@@ -4,5 +4,27 @@
   "collapseAfterMinutes": 30,
   "keepHours": 24,
   "rotateAtMB": 50,
-  "keepArchives": 7
+  "keepArchives": 7,
+  "remote": "tailscale",
+  "prices": {
+    "haiku": {
+      "in": 0.1,
+      "out": 0.5
+    },
+    "sonnet": {
+      "in": 2,
+      "out": 10
+    },
+    "opus": {
+      "in": 4,
+      "out": 20
+    },
+    "fable": {
+      "in": 10,
+      "out": 50,
+      "cacheRead": 0.25,
+      "cacheWrite": 12.5
+    }
+  },
+  "baselineModel": "opus"
 }

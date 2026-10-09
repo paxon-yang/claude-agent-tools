@@ -27,6 +27,15 @@ const IDLE_MIN = Number(CONFIG.collapseAfterMinutes || 30);
 const KEEP_HOURS = Number(CONFIG.keepHours || 24);
 const ROTATE_MB = Number(CONFIG.rotateAtMB || 50);
 const KEEP_ARCHIVES = Number(CONFIG.keepArchives || 7);
+const REMOTE = CONFIG.remote || 'tailscale';           // 'tailscale'：同时在 Tailscale 地址上开放；'off'：只在本机
+// 每百万 token 的美元价格（估算用）。cacheRead/cacheWrite 不填时按输入价的 0.1 倍 / 1.25 倍算
+const PRICES = Object.assign({
+  haiku: { in: 0.10, out: 0.50 },
+  sonnet: { in: 2, out: 10 },
+  opus: { in: 4, out: 20 },
+  fable: { in: 10, out: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+}, CONFIG.prices || {});
+const BASELINE = CONFIG.baselineModel || 'opus';      // "全用这个模型要花多少"的对照
 
 function readJSON(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
 const now = () => Date.now() / 1000;
@@ -92,7 +101,8 @@ function getSession(d, ts) {
       task: null, tasksDone: 0, toolCount: 0, currentTool: null, test: null,
       context: 0, outTokens: 0, seenMsg: new Set(),
       advisor: { calls: 0, last: null, lastAt: null },
-      agents: new Map(), pendingSpawns: [], tools: new Map(), timeline: [] };
+      agents: new Map(), pendingSpawns: [], tools: new Map(), timeline: [],
+      usage: new Map(), turns: [], decisions: [], msgModels: [], needMsg: null };
     sessions.set(id, s);
   }
   if (d.cwd && !s.cwd) s.cwd = d.cwd;
@@ -179,15 +189,21 @@ function handle(line) {
       log(s, ts, 'main', d.source === 'resume' ? '恢复会话' : '会话开始', 'session');
       break;
     case 'SessionEnd':
-      s.ended = true; s.status = 'ended'; s.currentTool = null;
+      s.ended = true; s.status = 'ended'; s.currentTool = null; s.needMsg = null;
+      closeTurn(s, ts);
+      if (s.task && !s.task.endedAt) { s.task.endedAt = ts; s.tasksDone++; }
       log(s, ts, 'main', '会话结束', 'session');
       break;
     case 'UserPromptSubmit': {
       if (isHandback(d.prompt)) {
         s.status = 'running';
+        const last = s.turns[s.turns.length - 1];
+        if (!last || last.end) pushTurn(s, { start: ts, end: null, prompt: '整理子代理交回的结果', handback: true });
         log(s, ts, 'main', '收到子代理交回的结果，整理中', 'info');
         break;
       }
+      closeTurn(s, ts);
+      pushTurn(s, { start: ts, end: null, prompt: short(d.prompt, 240), handback: false });
       if (s.task && !s.task.endedAt) s.task.endedAt = ts;
       s.task = { id: d.prompt_id || String(ts), prompt: short(d.prompt, 300), startedAt: ts, endedAt: null };
       s.status = 'running'; s.test = null;
@@ -199,7 +215,7 @@ function handle(line) {
       const rec = { label, agentId: d.agent_id || null, startedAt: ts };
       if (d.tool_use_id) s.tools.set(d.tool_use_id, rec);
       if (agent) { agent.currentTool = label; agent.lastTool = label; agent.toolCount++; agent.status = 'running'; }
-      else { s.currentTool = label; s.lastTool = label; s.toolCount++; if (s.status !== 'running') s.status = 'running'; }
+      else { s.currentTool = label; s.lastTool = label; s.toolCount++; if (s.status !== 'running') s.status = 'running'; s.needMsg = null; }
       if (isSpawn(d.tool_name)) {
         const ti = d.tool_input || {};
         s.pendingSpawns.push({ toolUseId: d.tool_use_id, type: ti.subagent_type || null,
@@ -251,13 +267,14 @@ function handle(line) {
       break;
     }
     case 'Stop':
-      s.status = 'idle'; s.currentTool = null;
+      s.status = 'idle'; s.currentTool = null; s.needMsg = null;
+      closeTurn(s, ts);
       if (s.task && !s.task.endedAt) { s.task.endedAt = ts; s.tasksDone++; }
       log(s, ts, 'main', '本轮回复完成，等你下一步', 'session');
       break;
     case 'Notification':
       if (/permission|needs_input/.test(d.notification_type || d.message || '')) {
-        s.status = 'needs-you';
+        s.status = 'needs-you'; s.needMsg = short(d.message, 120); s.needAt = ts;
         log(s, ts, 'main', '需要你确认：' + short(d.message, 50), 'warn');
       }
       break;
@@ -269,12 +286,35 @@ function handle(line) {
       log(s, ts, 'main', '上下文已自动压缩', 'warn');
       break;
     // 以下为演示模式专用的模拟事件
+    case 'DemoHistory': {
+      // 演示用：一次性补上一个会话过去几轮的记录和用量
+      if (d.cwd) s.cwd = d.cwd;
+      for (const tu of d.turns || []) {
+        pushTurn(s, { start: ts - tu.ago, end: tu.dur == null ? null : ts - tu.ago + tu.dur, prompt: tu.prompt, handback: false });
+        addDecision(s, { at: ts - tu.ago, model: 'claude-' + tu.fam + '-5-5', effort: tu.effort || 'medium', reason: tu.reason || '', by: tu.by || '规则' });
+        if (tu.dur != null) s.tasksDone++;
+      }
+      for (const [fam, u] of Object.entries(d.usage || {})) addUsage(s, 'demo-h-' + fam, 'claude-' + fam, { input_tokens: u[0], output_tokens: u[1], cache_read_input_tokens: u[2], cache_creation_input_tokens: u[3] });
+      if (d.model) s.actualModel = d.model;
+      if (d.status) s.status = d.status;
+      if (d.needMsg) { s.status = 'needs-you'; s.needMsg = d.needMsg; }
+      if (d.context) s.context = d.context;
+      s.startedAt = Math.min(s.startedAt, ts - Math.max(...(d.turns || [{ ago: 0 }]).map(x => x.ago)));
+      break;
+    }
+    case 'DemoUsage': {
+      const target = d.agent_id ? getAgent(s, d.agent_id, d.agent_type, ts) : null;
+      addUsage(s, 'demo-' + stats.events, d.model, { input_tokens: d.in, output_tokens: d.out, cache_read_input_tokens: d.cr || 0, cache_creation_input_tokens: d.cw || 0 });
+      if (!target) s.msgModels.push({ ts, fam: family(d.model) });
+      break;
+    }
     case 'DemoTranscript':
       if (d.model) s.actualModel = d.model;
       if (d.context) s.context = d.context;
       if (d.out) s.outTokens = d.out;
       break;
     case 'DemoRoute':
+      addDecision(s, { at: ts, model: d.model || 'claude-opus-5-5', effort: d.effort || 'high', reason: d.reason, by: 'Haiku 判断' });
       s.route = { mode: 'auto', last: { reason: d.reason }, advisorCalls: s.advisor.calls };
       log(s, ts, 'router', d.text, 'route');
       break;
@@ -284,6 +324,55 @@ function handle(line) {
       break;
   }
   changed();
+}
+
+// ---------- 轮次、用量、模型选择 ----------
+function pushTurn(s, t) {
+  s.turns.push(t);
+  if (s.turns.length > 60) s.turns.splice(0, s.turns.length - 60);
+}
+function closeTurn(s, ts) {
+  const t = s.turns[s.turns.length - 1];
+  if (t && !t.end) t.end = ts;
+}
+function addUsage(s, key, model, u) {
+  const fam = family(model);
+  if (!fam || !u) return;
+  // 同一条消息在会话记录里可能分几行写入，用最后一次的数字
+  s.usage.set(key, { fam, in: u.input_tokens || 0, out: u.output_tokens || 0,
+    cr: u.cache_read_input_tokens || 0, cw: u.cache_creation_input_tokens || 0 });
+  if (s.usage.size > 20000) s.usage.delete(s.usage.keys().next().value);
+}
+function addDecision(s, d) {
+  s.decisions.push({ at: d.at, fam: family(d.model), model: prettyModel(d.model), effort: d.effort, reason: d.reason, by: d.by });
+  if (s.decisions.length > 300) s.decisions.splice(0, s.decisions.length - 300);
+}
+function price(fam) {
+  const p = PRICES[fam];
+  if (!p || p.in == null) return null;
+  return { in: p.in, out: p.out, cr: p.cacheRead != null ? p.cacheRead : p.in * 0.1, cw: p.cacheWrite != null ? p.cacheWrite : p.in * 1.25 };
+}
+function costOf(u, fam) {
+  const p = price(fam);
+  if (!p) return null;
+  return (u.in * p.in + u.out * p.out + u.cr * p.cr + u.cw * p.cw) / 1e6;
+}
+function usageSummary(maps) {
+  const by = {};
+  for (const m of maps) for (const u of m.values()) {
+    const b = by[u.fam] || (by[u.fam] = { in: 0, out: 0, cr: 0, cw: 0 });
+    b.in += u.in; b.out += u.out; b.cr += u.cr; b.cw += u.cw;
+  }
+  let cost = 0, baseline = 0, unpriced = false;
+  for (const fam of Object.keys(by)) {
+    const c = costOf(by[fam], fam);
+    by[fam].cost = c;
+    by[fam].tokens = by[fam].in + by[fam].out + by[fam].cr + by[fam].cw;
+    if (c == null) unpriced = true; else cost += c;
+    const b = costOf(by[fam], BASELINE);
+    if (b != null) baseline += b;
+  }
+  return { byModel: by, cost, baseline, saved: baseline > 0 ? Math.max(0, 1 - cost / baseline) : null, unpriced };
 }
 
 function fmtDur(sec) {
@@ -333,7 +422,12 @@ function onTranscript(s, o) {
   if (!m || typeof m !== 'object') return;
   const ts = o.timestamp ? Date.parse(o.timestamp) / 1000 : now();
   if (o.type === 'assistant') {
-    if (m.model && !String(m.model).startsWith('<')) s.actualModel = m.model;
+    if (m.model && !String(m.model).startsWith('<')) {
+      s.actualModel = m.model;
+      const key0 = m.id || o.uuid;
+      if (key0 !== s.lastMsgKey) { s.lastMsgKey = key0; s.msgModels.push({ ts, fam: family(m.model) }); if (s.msgModels.length > 3000) s.msgModels.splice(0, 1000); }
+      if (m.usage) addUsage(s, 'm:' + key0, m.model, m.usage);
+    }
     const u = m.usage;
     if (u) {
       const ctx = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
@@ -365,9 +459,12 @@ function onTranscript(s, o) {
   }
 }
 
-function onAgentTranscript(a, o) {
+function onAgentTranscript(s, a, o) {
   const m = o.message;
-  if (o.type === 'assistant' && m && m.model && !String(m.model).startsWith('<')) a.actualModel = m.model;
+  if (o.type === 'assistant' && m && m.model && !String(m.model).startsWith('<')) {
+    a.actualModel = m.model;
+    if (m.usage) addUsage(s, 'a:' + a.id + ':' + (m.id || o.uuid), m.model, m.usage);
+  }
 }
 
 function pollRouter(s) {
@@ -384,6 +481,7 @@ function pollRouter(s) {
       : String(d.prompt || '').includes('本轮中途升档') ? '本轮中途升档'
       : { manual: '你指定', pin: '/route 固定', continue: '沿用上一轮', escalate: '自动升档', rule: '规则', haiku: 'Haiku 判断', fallback: '默认', guard: '保护', phase: '计划执行' }[d.source] || d.source;
     log(s, d.at / 1000, 'router', `选择 ${prettyModel(d.model)} · ${d.effort}（${by}：${d.reason}）`, 'route');
+    addDecision(s, { at: d.at / 1000, model: d.model, effort: d.effort, reason: d.reason, by });
   }
   if (last) s.routeSeen = last.at / 1000;
   s.route = { mode: r.mode, last, advisorCalls: r.advisorCalls || 0, pendingDown: r.pendingDown || null };
@@ -394,7 +492,9 @@ function pollRouter(s) {
 function pollTranscripts() {
   const t = now();
   for (const s of sessions.values()) {
-    if (t - s.lastTs > IDLE_MIN * 60) continue;
+    // 不活跃的会话不再盯着读，但至少读一次（看板重启后也能显示它用过的模型和花费）
+    if (t - s.lastTs > IDLE_MIN * 60 && s.readOnce) continue;
+    s.readOnce = true;
     pollRouter(s);
     if (s.transcript) {
       const before = s.context + '|' + s.actualModel + '|' + s.advisor.calls + '|' + s.advisor.last;
@@ -402,7 +502,8 @@ function pollTranscripts() {
       if (before !== s.context + '|' + s.actualModel + '|' + s.advisor.calls + '|' + s.advisor.last) changed();
     }
     for (const a of s.agents.values()) {
-      if (a.actualModel) continue;
+      if (a.finalRead) continue;
+      if (a.endedAt) a.finalRead = true;   // 结束后再读最后一次，把用量读全
       const guesses = [];
       if (a.transcript) guesses.push(a.transcript);
       if (s.transcript) {
@@ -411,7 +512,7 @@ function pollTranscripts() {
         guesses.push(path.join(dir, `agent-${a.id}.jsonl`));
       }
       for (const g of guesses) {
-        if (readNew(g, o => onAgentTranscript(a, o), 2 * 1024 * 1024)) { if (a.actualModel) { changed(); break; } }
+        if (readNew(g, o => onAgentTranscript(s, a, o), 4 * 1024 * 1024)) { changed(); break; }
       }
     }
   }
@@ -452,7 +553,33 @@ function view(s) {
     }),
     earlierAgents: all.length - shown.length, totalAgents: all.length,
     timeline: s.timeline.slice(-40),
+    needMsg: s.needMsg || null,
+    turns: turnsView(s, t),
+    lanes: all.slice(-24).map(a => {
+      const m = resolveAgentModel(s, a);
+      return { id: a.id, type: a.type, family: family(m), model: prettyModel(m), start: a.startedAt, end: a.endedAt, status: a.status, description: a.description };
+    }),
+    usage: usageSummary([s.usage]),
   };
+}
+
+// 每一轮：起止时间、你说了什么、用了哪些模型（模型中途换了就分成几段）
+function turnsView(s, t) {
+  const fallback = family(sessionModel(s));
+  return s.turns.slice(-30).map(tu => {
+    const end = tu.end || t;
+    const ds = s.decisions.filter(d => d.at >= tu.start - 3 && d.at <= end);
+    let segs;
+    if (ds.length) {
+      segs = ds.map((d, i) => ({ start: i ? d.at : tu.start, family: d.fam, model: d.model, effort: d.effort, reason: d.reason, by: d.by }));
+    } else {
+      const counts = {};
+      for (const mm of s.msgModels) if (mm.ts >= tu.start && mm.ts <= end && mm.fam) counts[mm.fam] = (counts[mm.fam] || 0) + 1;
+      const fam = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || fallback;
+      segs = [{ start: tu.start, family: fam, model: fam ? fam[0].toUpperCase() + fam.slice(1) : null }];
+    }
+    return { start: tu.start, end: tu.end, prompt: tu.prompt, handback: tu.handback, segs };
+  });
 }
 
 function snapshot() {
@@ -460,9 +587,15 @@ function snapshot() {
   const list = [...sessions.values()]
     .filter(s => DEMO || t - s.lastTs < KEEP_HOURS * 3600)
     .sort((a, b) => b.lastTs - a.lastTs).slice(0, 20).map(view);
+  const recent = [...sessions.values()].filter(s => DEMO || t - s.lastTs < KEEP_HOURS * 3600);
+  const all = usageSummary(recent.map(s => s.usage));
+  const tasks = recent.reduce((n, s) => n + s.turns.filter(x => !x.handback && x.end).length, 0);
   return { now: t, demo: DEMO, settings: { model: prettyModel(settings.model), advisorModel: prettyModel(settings.advisorModel),
     advisorFamily: family(settings.advisorModel), effortLevel: settings.effortLevel },
-    sessions: list, stats: { events: stats.events, badLines: stats.badLines } };
+    sessions: list, stats: { events: stats.events, badLines: stats.badLines },
+    totals: { ...all, tasks, sessions: recent.length, hours: KEEP_HOURS, baselineModel: BASELINE },
+    needsYou: list.filter(x => x.active && x.status === 'needs-you').map(x => ({ id: x.id, project: x.project, msg: x.needMsg })),
+    remote: remoteInfo() };
 }
 
 // ---------- 推送 ----------
@@ -563,3 +696,59 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`✓ Claude Code 看板已启动${DEMO ? '（演示模式）' : ''}：http://localhost:${PORT}`);
   if (!DEMO) console.log('  数据来源：' + LOG);
 });
+
+// ---------- 远程访问：只在 Tailscale 的私有地址上额外开放（100.64.0.0/10，只有你登录同一账号的设备能连） ----------
+const remote = { ips: new Map(), dnsName: null, hostName: null, cli: null };
+function tailscaleIPs() {
+  const out = [];
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const a of list || []) {
+      if (a.family !== 'IPv4' && a.family !== 4) continue;
+      const [x, y] = a.address.split('.').map(Number);
+      if (x === 100 && y >= 64 && y <= 127) out.push(a.address);
+    }
+  }
+  return out;
+}
+function findTailscaleCli() {
+  const c = ['/Applications/Tailscale.app/Contents/MacOS/Tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale', '/usr/bin/tailscale'];
+  return c.find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } }) || null;
+}
+function refreshTailscaleName() {
+  if (!remote.cli) remote.cli = findTailscaleCli();
+  if (!remote.cli) return;
+  require('child_process').execFile(remote.cli, ['status', '--json'], { timeout: 4000 }, (err, stdout) => {
+    if (err) return;
+    try {
+      const j = JSON.parse(stdout);
+      remote.dnsName = j.Self && j.Self.DNSName ? j.Self.DNSName.replace(/\.$/, '') : null;
+      remote.hostName = j.Self && j.Self.HostName ? j.Self.HostName : null;
+      changed();
+    } catch { }
+  });
+}
+function syncRemote() {
+  if (REMOTE === 'off' || DEMO) return;
+  const want = new Set(tailscaleIPs());
+  for (const [ip, srv] of remote.ips) if (!want.has(ip)) { try { srv.close(); } catch { } remote.ips.delete(ip); changed(); }
+  for (const ip of want) {
+    if (remote.ips.has(ip)) continue;
+    const srv = http.createServer((req, res) => server.emit('request', req, res));
+    srv.on('error', () => { remote.ips.delete(ip); });
+    srv.listen(PORT, ip, () => { console.log(`✓ Tailscale 远程地址：http://${ip}:${PORT}`); changed(); });
+    remote.ips.set(ip, srv);
+    refreshTailscaleName();
+  }
+}
+function remoteInfo() {
+  if (REMOTE === 'off') return { mode: 'off', urls: [] };
+  const urls = [];
+  if (remote.ips.size) {
+    if (remote.dnsName) urls.push(`http://${remote.dnsName}:${PORT}`);
+    for (const ip of remote.ips.keys()) urls.push(`http://${ip}:${PORT}`);
+  }
+  return { mode: REMOTE, urls, tailscale: remote.ips.size > 0, cli: !!remote.cli };
+}
+syncRemote();
+setInterval(syncRemote, 30000);
+setInterval(refreshTailscaleName, 10 * 60 * 1000);

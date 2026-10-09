@@ -1,16 +1,23 @@
-Claude Code 代理看板 · 安装包
+Claude Code 代理看板（v2）
 
-安装（只需要做一次）：
-  1. 打开"终端"（按 Command+空格，输入 终端，回车）
-  2. 粘贴下面这行，按回车：
-       bash ~/claude-agent-tools/install.sh
-  3. 看到"安装完成"，浏览器会自动打开 http://localhost:4321
+打开：浏览器访问 http://localhost:4321（开机自动运行，不用管）
 
-先看演示效果（可选）：
-  node ~/.claude/viz/app/server.js --demo --port 4322
-  然后浏览器打开 http://localhost:4322 ，看完回到终端按 Control+C 结束
+能看到什么
+  - 左边：近 24 小时的估算花费、比"全用 Opus"少花多少、所有项目和它们的状态
+  - 当前任务：你发的那句话、用的模型、为什么选它
+  - 分工：主会话和每个子代理用的模型、effort、在做什么、交回了什么
+  - 模型时间轴：每一轮、每个子代理用了什么模型、跑了多久（鼠标放上去看详情）
+  - 花费：这个会话按模型统计的 token 和估算费用
+  - 任务记录：每一轮做了什么、用了多久
+  - 等你确认：Claude 卡在等你批准时，顶部变红；可以开启桌面提醒或提示音
 
-卸载：
-  bash ~/.claude/viz/app/uninstall.sh
+在其他电脑和手机上看（Tailscale）
+  1. 在 Mac 和其他设备上都装 Tailscale（https://tailscale.com/download），登录同一个账号
+  2. 看板会自动发现 Tailscale，左下角会显示地址，比如 http://你的Mac名.xxx.ts.net:4321
+  3. 在其他设备的浏览器里打开这个地址就行。只有你登录了同一账号的设备能访问
+  如果 Mac 弹出"是否允许 node 接受传入的网络连接"，点"允许"
+  不想开放远程：把 ~/.claude/viz/app/config.json 里的 "remote" 改成 "off"，再运行一次安装
 
-详细图文教程见对话里的"Claude Code 代理看板 · 搭建教程"文档。
+演示效果：node ~/.claude/viz/app/server.js --demo --port 4322，然后打开 http://localhost:4322
+更新：bash ~/claude-agent-tools/update.sh
+卸载：bash ~/.claude/viz/app/uninstall.sh

@@ -3,7 +3,7 @@
 两个配套的小工具，装一次，对所有项目生效。
 
 - **auto-router**：Claude Code 每一轮自动选模型和 effort。简单提问交给 Haiku，日常开发交给 Sonnet，架构、重构和大任务交给 Opus 统筹并派子代理分工，Fable 当顾问。
-- **agent-viz**：本地看板（http://localhost:4321），实时显示当前任务、主会话和子代理的树形结构、每个节点用的模型、effort、上下文和自动选模型的理由。
+- **agent-viz**：看板（http://localhost:4321），实时显示所有项目的状态、当前任务、主会话和子代理的分工、模型时间轴、估算花费（以及比全用 Opus 少花多少）、任务记录；Claude 等你确认时会提醒你。装了 [Tailscale](https://tailscale.com/download) 的话，你的其他电脑和手机也能打开。
 
 ## 安装（Mac）
 
@@ -22,6 +22,10 @@ bash ~/claude-agent-tools/update.sh
 ```
 
 也可以直接在 Claude Code 里说一句："运行 bash ~/claude-agent-tools/update.sh"，让它替你更新。更新完重开 Claude Code 生效。
+
+## 在其他电脑和手机上看看板
+
+在 Mac 和其他设备上都装 Tailscale 并登录同一个账号，看板左下角会显示远程地址（比如 `http://你的Mac名.xxx.ts.net:4321`），在其他设备的浏览器里打开即可。只有你自己的设备能访问。不想开放：把 `~/.claude/viz/app/config.json` 里的 `remote` 改成 `off`。
 
 ## 日常用法
 

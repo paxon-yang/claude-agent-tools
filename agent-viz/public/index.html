@@ -2,310 +2,516 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Code 代理看板</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agent 看板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#0b0e14; --win:#0f131b; --panel:#131924; --panel2:#171e2b; --line:#273042; --line2:#334056;
-  --ink:#e6edf3; --dim:#8b96a8; --faint:#5b6577;
-  --opus:#f0883e; --sonnet:#58a6ff; --haiku:#3fb9a0; --fable:#bc8cff; --none:#8b96a8;
-  --run:#3fb950; --warn:#d29922; --bad:#f85149;
-  --mono: ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,"PingFang SC","Microsoft YaHei",monospace;
+:root {
+  --bg: #F3F5F8; --surface: #FFFFFF; --sunk: #F7F9FB;
+  --ink: #152030; --ink2: #465467; --muted: #7E8999; --line: #E1E6EC; --line2: #EDF0F4;
+  --haiku: #0E9384; --sonnet: #2E6BE6; --opus: #D97706; --fable: #9D3FD6; --none: #98A2B3;
+  --haiku-t: #E6F5F3; --sonnet-t: #EAF1FD; --opus-t: #FDF1E1; --fable-t: #F4EAFB; --none-t: #F0F2F5;
+  --alert: #C8321F; --alert-t: #FDEEEB; --run: #12A150; --run-t: #E7F6EC;
+  --sans: "Manrope", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.5}
-.f-opus{--c:var(--opus)} .f-sonnet{--c:var(--sonnet)} .f-haiku{--c:var(--haiku)}
-.f-fable,.f-mythos{--c:var(--fable)} .f-none{--c:var(--none)}
-.shell{max-width:1480px;margin:18px auto;padding:0 18px}
-.window{background:var(--win);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-.chrome{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#0d1118}
-.chrome i{width:11px;height:11px;border-radius:50%;display:inline-block}
-.chrome .t{flex:1;text-align:center;color:var(--faint);font-size:11.5px}
-.conn{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
-.conn b{width:7px;height:7px;border-radius:50%;background:var(--bad);display:inline-block}
-.conn.ok b{background:var(--run);box-shadow:0 0 8px var(--run)}
-.body{padding:18px 22px 14px}
-.title{text-align:center;letter-spacing:.14em;font-weight:700;font-size:13.5px;padding:2px 0 12px;border-bottom:1px solid var(--line)}
-.title .m{color:var(--c)} .title .sep{color:var(--faint);margin:0 10px}
-.title .demo{display:inline-block;margin-left:12px;padding:1px 8px;border:1px solid var(--warn);color:var(--warn);border-radius:4px;letter-spacing:0;font-weight:500;font-size:11.5px}
-.tabs{display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 6px}
-.tab{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:7px;padding:6px 11px;display:flex;align-items:center;gap:8px;font:inherit}
-.tab:hover{border-color:var(--line2);color:var(--ink)}
-.tab.sel{border-color:var(--c);color:var(--ink);background:var(--panel2)}
-.tab small{color:var(--faint)}
-.legend{display:flex;justify-content:center;gap:22px;color:var(--dim);font-size:12px;padding:8px 0 14px}
-.legend span::before{content:"";display:inline-block;width:9px;height:9px;background:var(--c);margin-right:7px;border-radius:2px;vertical-align:-1px}
-.grid{display:grid;grid-template-columns:270px 1fr;gap:22px;align-items:start}
-.panel{border:1.5px solid var(--c,var(--line2));border-radius:8px;background:var(--panel);padding:14px 14px 12px}
-.panel.plain{border-color:var(--line)}
-.ph{color:var(--c);font-weight:700;letter-spacing:.12em;text-align:center}
-.sub{color:var(--c);opacity:.85;text-align:center;font-size:12px;margin-bottom:10px}
-.moments{list-style:none;margin:0 0 10px;padding:0;border-left:1px dashed var(--line2);padding-left:10px}
-.moments li{color:var(--dim);padding:3px 0}
-.moments li.on{color:var(--c)} .moments li.on::after{content:"  ← 最近一次";color:var(--faint);font-size:11px}
-.kv{display:flex;justify-content:space-between;gap:10px;padding:2px 0;color:var(--dim)}
-.kv b{color:var(--ink);font-weight:600;text-align:right}
-.advice{margin-top:10px;padding:9px 10px;border-radius:6px;background:rgba(188,140,255,.07);border:1px solid rgba(188,140,255,.25);color:var(--ink);font-size:12.5px;white-space:pre-wrap;max-height:220px;overflow:auto}
-.advice .lbl{color:var(--fable);display:block;margin-bottom:4px;font-size:11.5px}
-.note{color:var(--faint);font-size:11.5px;margin-top:10px}
-.stack{display:flex;flex-direction:column;gap:16px}
-.tree{display:flex;flex-direction:column;align-items:center;min-width:0}
-.task{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:10px 14px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start}
-.task .k{color:var(--faint);white-space:nowrap}
-.task .v{flex:1;color:var(--ink)}
-.task .tm{color:var(--dim);white-space:nowrap}
-.node{position:relative;border:1.5px solid var(--c);border-radius:8px;background:var(--panel);padding:11px 13px}
-.node.main{width:380px}
-.node .hd{display:flex;align-items:center;gap:8px;font-weight:700}
-.node .hd .name{color:var(--c)}
-.node .hd .who{color:var(--ink);font-weight:600}
-.node .hd .st{margin-left:auto;font-weight:500;font-size:11.5px;color:var(--dim)}
-.node .role{color:var(--dim);font-size:12px;margin:2px 0 8px}
-.route{color:var(--haiku);font-size:12px;margin:-4px 0 8px}
-.row.k-route .x{color:var(--haiku)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
-.running .dot{background:var(--run);box-shadow:0 0 0 0 rgba(63,185,80,.6);animation:ping 1.6s infinite}
-.needs-you .dot{background:var(--warn);animation:ping 1.2s infinite}
-.done .dot{background:var(--dim)} .failed .dot{background:var(--bad)} .stopped .dot{background:var(--warn)}
-@keyframes ping{0%{box-shadow:0 0 0 0 rgba(63,185,80,.55)}80%{box-shadow:0 0 0 7px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
-.node.running{box-shadow:0 0 0 1px rgba(63,185,80,.0),0 0 18px -6px var(--c)}
-.node.done{opacity:.78}
-.node.failed{border-color:var(--bad)}
-.effort{letter-spacing:1px}
-.effort .on{color:var(--c)} .effort .off{color:#2b3445}
-.bar{height:6px;border-radius:3px;background:#1f2735;overflow:hidden;margin:3px 0 6px}
-.bar i{display:block;height:100%;background:var(--c);border-radius:3px;transition:width .6s}
-.bar.warn i{background:var(--warn)} .bar.bad i{background:var(--bad)}
-.tool{color:var(--ink);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.tool.idle{color:var(--faint)}
-.test{font-size:12px;margin-top:4px}
-.test.good{color:var(--run)} .test.bad{color:var(--warn)}
-.stem{width:1.5px;height:26px;background:var(--line2);position:relative}
-.stem.live{background:repeating-linear-gradient(180deg,var(--run) 0 5px,transparent 5px 9px);background-size:100% 18px;animation:flow 0.9s linear infinite}
-@keyframes flow{from{background-position:0 0}to{background-position:0 18px}}
-.delegate{color:var(--dim);font-size:12px;padding:2px 0}
-.delegate b{color:var(--sonnet);font-weight:500}
-.children{display:flex;justify-content:center;max-width:100%;overflow-x:auto;padding-bottom:4px}
-.child{position:relative;padding:26px 7px 0;display:flex;flex-direction:column;align-items:center}
-.children{align-items:stretch}
-.child::before,.child::after{content:"";position:absolute;top:0;right:50%;width:50%;height:26px;border-top:1.5px solid var(--line2)}
-.child::after{right:auto;left:50%;border-left:1.5px solid var(--line2)}
-.child:first-child::before,.child:last-child::after{border-top:none}
-.child:only-child::after{border-top:none}
-.child:only-child::before{display:none}
-.child.live::after{border-left-color:var(--run)}
-.jn{position:relative;height:22px;width:calc(100% + 14px);margin:auto -7px 0}
-.jn::before,.jn::after{content:"";position:absolute;bottom:0;height:22px;width:50%;border-bottom:1.5px solid var(--line2)}
-.jn::before{right:50%}
-.jn::after{left:50%;border-left:1.5px solid var(--line2)}
-.child:first-child .jn::before,.child:last-child .jn::after{border-bottom:none}
-.child:only-child .jn::before{display:none}
-.lasttool{color:var(--faint);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.node.sub{width:226px}
-.node.sub .desc{color:var(--ink);font-size:12px;margin:4px 0 6px;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.node.sub .msg{color:var(--dim);font-size:11.5px;margin-top:6px;border-top:1px dashed var(--line);padding-top:6px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
-.node.sub .src{color:var(--faint);font-size:10.5px}
-.earlier{color:var(--faint);font-size:11.5px;margin-top:8px}
-.back{border:1.5px dashed var(--opus);border-radius:8px;padding:8px 16px;text-align:center;color:var(--opus);min-width:300px}
-.back .s{color:var(--ink);font-size:12px}
-.back.on{border-style:solid;box-shadow:0 0 18px -6px var(--opus)}
-.nochild{color:var(--faint);border:1px dashed var(--line);border-radius:8px;padding:12px 18px;margin-top:4px;text-align:center}
-.log{margin-top:20px;border:1px solid var(--line);border-radius:8px;padding:8px 14px 10px;background:#0d1118}
-.log .lt{color:var(--faint);font-size:11.5px;margin-bottom:4px}
-.row{display:grid;grid-template-columns:78px 120px 1fr;gap:10px;padding:2px 0;font-size:12.5px}
-.row .t{color:var(--faint)} .row .w{color:var(--c);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row.k-good .x{color:var(--run)} .row.k-warn .x{color:var(--warn)} .row.k-bad .x{color:var(--bad)}
-.row.k-advisor .x{color:var(--fable)} .row.k-task .x{color:var(--ink);font-weight:600} .row.k-session .x{color:var(--dim)}
-.row.fresh{animation:fresh 1.4s ease-out}
-@keyframes fresh{from{background:rgba(88,166,255,.16)}to{background:transparent}}
-.status{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);color:var(--dim);font-size:12px;display:flex;gap:18px;flex-wrap:wrap}
-.status .p{color:var(--run)} .status b{color:var(--sonnet);font-weight:500}
-.empty{padding:70px 20px;text-align:center;color:var(--dim)}
-.empty h2{color:var(--ink);font-size:16px;margin:0 0 10px}
-.empty code{color:var(--run)}
-@media (max-width:980px){.grid{grid-template-columns:1fr}.node.main{width:100%}}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--sonnet); outline-offset: 2px; border-radius: 6px; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+
+/* 模型身份色：每个元素用 --c / --t 拿到自己的模型色 */
+.f-haiku { --c: var(--haiku); --t: var(--haiku-t); }
+.f-sonnet { --c: var(--sonnet); --t: var(--sonnet-t); }
+.f-opus { --c: var(--opus); --t: var(--opus-t); }
+.f-fable, .f-mythos { --c: var(--fable); --t: var(--fable-t); }
+.f-none { --c: var(--none); --t: var(--none-t); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border-radius: 6px; background: var(--t); color: var(--ink); font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+
+.app { display: grid; grid-template-columns: 292px minmax(0, 1fr); min-height: 100vh; }
+
+/* ---------- 左栏 ---------- */
+.rail { background: var(--surface); border-right: 1px solid var(--line); padding: 20px 18px 24px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.brand { display: flex; align-items: center; justify-content: space-between; }
+.brand b { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+.conn { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.conn i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.conn.ok i { background: var(--run); }
+.demo { font-size: 12px; color: var(--opus); background: var(--opus-t); padding: 4px 8px; border-radius: 6px; }
+
+.spend h3, .projects h3, .remote h3 { margin: 0 0 10px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.spend .big { font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.spend .vs { margin-top: 4px; color: var(--ink2); font-size: 13px; }
+.spend .vs b { color: var(--run); font-weight: 700; }
+.mix { display: flex; height: 8px; margin: 14px 0 10px; gap: 2px; }
+.mix span { background: var(--c); border-radius: 4px; min-width: 3px; }
+.mixrow { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; font-size: 12.5px; padding: 3px 0; color: var(--ink2); }
+.mixrow .n { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
+.mixrow .n::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.spend .foot { margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+.projects { display: flex; flex-direction: column; }
+.proj { display: grid; grid-template-columns: 18px 1fr; gap: 2px 8px; width: 100%; text-align: left; padding: 10px 10px 10px 8px; border: 0; border-radius: 10px; background: none; cursor: pointer; }
+.proj + .proj { margin-top: 2px; }
+.proj:hover { background: var(--sunk); }
+.proj.sel { background: var(--bg); box-shadow: inset 3px 0 0 var(--c); }
+.proj .name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj .when { font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 8px; }
+.proj .sub { grid-column: 2; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.proj.need { background: var(--alert-t); }
+.st { width: 18px; height: 22px; display: grid; place-items: center; }
+.st i { width: 9px; height: 9px; border-radius: 50%; }
+.st.running i { background: var(--run); box-shadow: 0 0 0 4px var(--run-t); }
+.st.idle i { border: 2px solid var(--ink2); }
+.st.ended i { background: var(--line); }
+.st.need i { width: 16px; height: 16px; background: var(--alert); color: #fff; font-style: normal; font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+@media (prefers-reduced-motion: no-preference) { .st.running i { animation: pulse 1.6s ease-in-out infinite; } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px transparent; } }
+
+.remote { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line2); font-size: 13px; color: var(--ink2); }
+.url { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.url code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--sunk); border: 1px solid var(--line); padding: 5px 8px; border-radius: 6px; font-family: var(--mono); font-size: 12px; color: var(--ink); }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--ink2); }
+.remote a { color: var(--sonnet); }
+
+/* ---------- 主区 ---------- */
+main { padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.alerts { display: flex; flex-direction: column; gap: 8px; }
+.alert { display: flex; align-items: center; gap: 12px; background: var(--alert-t); border: 1px solid #F6C7BE; color: #7A1D10; border-radius: 12px; padding: 12px 14px; }
+.alert .ic { width: 22px; height: 22px; border-radius: 50%; background: var(--alert); color: #fff; display: grid; place-items: center; font-weight: 800; flex: none; }
+.alert .tx { flex: 1; min-width: 0; }
+.alert .tx b { color: var(--alert); }
+.alert .btn { border-color: #F0B3A8; background: #fff; }
+.notify { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.remote h3 { margin: 0 0 8px; }
+
+.head .where { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.head .where .p { font-weight: 700; color: var(--ink2); }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.pill.running { background: var(--run-t); color: #0B6B35; }
+.pill.need { background: var(--alert-t); color: var(--alert); }
+.pill.idle { background: var(--line2); color: var(--ink2); }
+.pill.ended { background: var(--line2); color: var(--muted); }
+.head h1 { margin: 8px 0 10px; font-size: 26px; line-height: 1.3; font-weight: 700; letter-spacing: -.015em; max-width: 60em; text-wrap: pretty; }
+.head h1.quiet { color: var(--muted); font-weight: 600; }
+.meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; color: var(--ink2); font-size: 13px; }
+.reason { color: var(--ink2); }
+.reason em { font-style: normal; color: var(--muted); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; min-width: 0; }
+.panel > h2 { margin: 0 0 12px; font-size: 14px; font-weight: 700; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
+.panel > h2 > :first-child { white-space: nowrap; }
+.panel > h2 small { font-weight: 500; color: var(--muted); font-size: 12.5px; }
+
+/* 流程：主会话在左，子代理在右 */
+.flow { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 0; align-items: start; }
+.node { border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.mainnode { border: 1.5px solid var(--c); box-shadow: 0 0 0 4px var(--t); padding: 16px; }
+.mainnode .top { display: flex; align-items: center; gap: 8px; }
+.mainnode .model { font-size: 18px; font-weight: 800; color: var(--c); }
+.mainnode .role { color: var(--muted); font-size: 12.5px; margin: 2px 0 12px; }
+.kv { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; color: var(--ink2); }
+.kv b { color: var(--ink); font-weight: 600; }
+.meter { display: inline-flex; gap: 3px; align-items: center; }
+.meter i { width: 12px; height: 6px; border-radius: 2px; background: var(--line); }
+.meter i.on { background: var(--c); }
+.meter span { margin-left: 6px; color: var(--ink); font-weight: 600; }
+.ctx { height: 6px; background: var(--line2); border-radius: 4px; overflow: hidden; margin: 2px 0 6px; }
+.ctx i { display: block; height: 100%; background: var(--c); border-radius: 4px; }
+.ctx.warn i { background: var(--opus); } .ctx.bad i { background: var(--alert); }
+.doing { margin-top: 8px; padding: 8px 10px; background: var(--sunk); border-radius: 8px; font-size: 12.5px; color: var(--ink2); display: flex; gap: 8px; align-items: baseline; }
+.doing .mono { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.test { margin-top: 8px; font-size: 12.5px; font-weight: 700; }
+.test.good { color: #0B6B35; } .test.bad { color: var(--alert); }
+.advice { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--fable-t); font-size: 12.5px; color: var(--ink2); }
+.advice b { color: var(--fable); }
+
+.agents { position: relative; padding-left: 34px; }
+.agents::before { content: ""; position: absolute; left: 0; top: 30px; width: 34px; border-top: 1.5px solid var(--line); }
+.agents.live::before { border-color: var(--run); }
+.agents-h { font-size: 12.5px; color: var(--muted); margin: 0 0 8px 14px; min-height: 20px; }
+.agents-h b { color: var(--ink); }
+.agrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; padding-left: 14px; }
+.agent { padding: 12px 14px; border-left: 4px solid var(--c); position: relative; }
+.agent .top { display: flex; align-items: center; gap: 8px; }
+.agent .type { font-weight: 800; }
+.agent .sstate { margin-left: auto; font-size: 12px; color: var(--muted); }
+.agent.running .sstate { color: #0B6B35; font-weight: 700; }
+.agent.failed .sstate { color: var(--alert); font-weight: 700; }
+.agent .mline { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12.5px; color: var(--muted); }
+.agent .desc { font-size: 13px; color: var(--ink); margin: 4px 0 8px; }
+.agent .foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.agent .back { margin-top: 8px; font-size: 12px; color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.noagents { margin-left: 14px; padding: 14px 16px; border: 1.5px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 13px; }
+
+/* 时间轴：这块是看板的主角 */
+.tl { position: relative; }
+.tl-axis { position: relative; height: 22px; margin-left: 112px; border-bottom: 1px solid var(--line2); }
+.tl-axis span { position: absolute; top: 0; transform: translateX(-50%); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.tl-row { display: grid; grid-template-columns: 112px 1fr; align-items: center; min-height: 34px; }
+.tl-row + .tl-row { border-top: 1px solid var(--line2); }
+.tl-label { font-size: 12.5px; color: var(--ink2); padding-right: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-label b { color: var(--ink); }
+.tl-track { position: relative; height: 34px; }
+.tl-grid { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--line2); }
+.seg { position: absolute; top: 7px; height: 20px; border-radius: 4px; background: var(--c); min-width: 3px; color: #fff; font-size: 11.5px; font-weight: 700; line-height: 20px; padding: 0 6px; overflow: hidden; white-space: nowrap; text-overflow: clip; cursor: default; }
+.seg.main { top: 5px; height: 24px; line-height: 24px; }
+.seg.open { background: repeating-linear-gradient(135deg, var(--c) 0 8px, color-mix(in srgb, var(--c) 78%, #fff) 8px 16px); }
+.seg.hb { opacity: .55; }
+.seg:hover { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--c); z-index: 2; }
+.tl-now { position: absolute; top: 0; bottom: 0; border-left: 1.5px solid var(--alert); }
+.tl-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12.5px; color: var(--ink2); }
+.tl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tl-legend span::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.tl-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+.tip { position: fixed; z-index: 50; pointer-events: none; max-width: 320px; background: var(--ink); color: #fff; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.45; opacity: 0; transition: opacity .1s; }
+.tip.on { opacity: 1; }
+.tip b { font-weight: 700; }
+.tip .d { color: #B8C2CF; }
+
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 18px; }
+table.use { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.use th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 0 0 8px; }
+table.use td { padding: 7px 0; border-top: 1px solid var(--line2); }
+table.use td.r, table.use th.r { text-align: right; }
+.save { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--run-t); color: #0B5A2E; font-size: 13px; }
+.save b { font-weight: 800; }
+.fine { margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+.hist { list-style: none; margin: 0; padding: 0; }
+.hist li { display: grid; grid-template-columns: 54px 1fr auto; gap: 4px 12px; padding: 9px 0; border-top: 1px solid var(--line2); align-items: baseline; }
+.hist li:first-child { border-top: 0; padding-top: 0; }
+.hist .t { color: var(--muted); font-size: 12.5px; }
+.hist .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist .p.hb { color: var(--muted); }
+.hist .d { color: var(--muted); font-size: 12.5px; text-align: right; }
+.hist .m { grid-column: 2 / 4; display: flex; gap: 6px; flex-wrap: wrap; }
+.hist .cur .p { font-weight: 700; }
+
+details.log { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 18px; }
+details.log summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+details.log summary small { font-weight: 500; color: var(--muted); margin-left: 8px; }
+.lrow { display: grid; grid-template-columns: 66px 96px 1fr; gap: 10px; padding: 5px 0; font-size: 12.5px; border-top: 1px solid var(--line2); }
+.lrow:first-of-type { margin-top: 10px; }
+.lrow .t { color: var(--muted); }
+.lrow .w { color: var(--c); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lrow.k-bad .x { color: var(--alert); } .lrow.k-good .x { color: #0B6B35; } .lrow.k-task .x { font-weight: 700; }
+
+.empty { padding: 60px 20px; text-align: center; color: var(--ink2); }
+.empty h2 { color: var(--ink); margin: 0 0 8px; }
+.empty code { font-family: var(--mono); background: var(--surface); border: 1px solid var(--line); padding: 2px 6px; border-radius: 6px; }
+
+@media (max-width: 1180px) {
+  .flow { grid-template-columns: 1fr; }
+  .agents { padding-left: 0; margin-top: 14px; }
+  .agents::before { display: none; }
+  .agents-h, .agrid, .noagents { margin-left: 0; padding-left: 0; }
+  .split { grid-template-columns: 1fr; }
+}
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 14px 16px; gap: 14px; }
+  .projects { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 2px; }
+  .projects h3 { display: none; }
+  .proj { width: auto; min-width: 170px; background: var(--sunk); }
+  .proj + .proj { margin-top: 0; }
+  .spend .big { font-size: 24px; }
+  .spend .rows, .spend .foot { display: none; }
+  .remote { margin-top: 0; padding-top: 12px; } #remote { display: none; }
+  main { padding: 16px 16px 32px; }
+  .head h1 { font-size: 21px; }
+  .tl-axis { margin-left: 76px; }
+  .tl-row { grid-template-columns: 76px 1fr; }
+  .lrow { grid-template-columns: 58px 1fr; }
+  .lrow .x { grid-column: 1 / 3; }
+}
 </style>
 </head>
 <body>
-<div class="shell"><div class="window">
-  <div class="chrome"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
-    <span class="t">~/agent-tree — Claude Code 代理看板 — localhost</span>
-    <span class="conn" id="conn"><b></b><span>连接中…</span></span></div>
-  <div class="body">
-    <div class="title" id="title">CLAUDE CODE AGENT TREE</div>
-    <div class="tabs" id="tabs"></div>
-    <div class="legend">
-      <span class="f-opus">Opus</span><span class="f-sonnet">Sonnet</span><span class="f-haiku">Haiku</span><span class="f-fable">Fable · 顾问</span>
-      <span style="--c:var(--run)">运行中</span>
-    </div>
-    <div id="main"></div>
-  </div>
-</div></div>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><b>Agent 看板</b><span class="conn" id="conn"><i></i><span>连接中</span></span></div>
+    <div id="demo"></div>
+    <section class="spend" id="spend"></section>
+    <nav class="projects" id="projects" aria-label="项目"></nav>
+    <section class="remote"><div id="notify"></div><div id="remote" style="margin-top:16px"></div></section>
+  </aside>
+  <main id="main"></main>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
 <script>
 const $ = s => document.querySelector(s);
-const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state = null, selected = null, pinned = false, lastLogKey = new Set(), firstRender = true;
-try { selected = localStorage.getItem('viz.sel'); pinned = !!selected; } catch (e) {}
-
-const fam = f => 'f-' + (f || 'none');
-const kfmt = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0);
-const clock = ts => { const d = new Date(ts * 1000); return d.toTimeString().slice(0, 8); };
-function dur(sec) { sec = Math.max(0, Math.round(sec)); if (sec < 60) return sec + 's'; if (sec < 3600) return Math.floor(sec / 60) + 'm ' + String(sec % 60).padStart(2, '0') + 's'; return Math.floor(sec / 3600) + 'h ' + Math.floor(sec % 3600 / 60) + 'm'; }
-function ago(ts) { const s = Date.now() / 1000 - ts; if (s < 60) return '刚刚'; if (s < 3600) return Math.floor(s / 60) + ' 分钟前'; return Math.floor(s / 3600) + ' 小时前'; }
-const EFF = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
-function effort(level) {
-  if (!level) return '<span class="effort" style="color:var(--faint)">—</span>';
-  const n = EFF[level] || 0; let s = '';
-  for (let i = 0; i < 4; i++) s += `<span class="${i < n ? 'on' : 'off'}">▮</span>`;
-  return `<span class="effort">${s} ${esc(level)}</span>`;
-}
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const NAMES = { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', fable: 'Fable', mythos: 'Mythos' };
+const ORDER = ['haiku', 'sonnet', 'opus', 'fable'];
 const STATUS = { running: '运行中', idle: '等你下一步', 'needs-you': '等你确认', ended: '已结束', done: '已完成', failed: '出错', stopped: '已中断' };
-function timer(start, end) { return end ? `<span>${dur(end - start)}</span>` : `<span data-since="${start}"></span>`; }
-function tick() { const t = Date.now() / 1000; document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(t - Number(el.dataset.since)); }); }
-function testHtml(t) { if (!t) return ''; return `<div class="test ${t.failed ? 'bad' : 'good'}">${t.failed ? '✗' : '✓'} 测试 ${t.passed}/${t.total} 通过</div>`; }
+const EFF = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
+let state = null, selected = null, pinned = false, skew = 0;
+const seenNeeds = new Set();
+try { selected = localStorage.getItem('viz.sel'); pinned = !!selected; } catch (e) { }
+
+const f = fam => 'f-' + (fam || 'none');
+const nowS = () => Date.now() / 1000 + skew;
+const kfmt = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'k' : String(Math.round(n || 0));
+const money = v => v == null ? '—' : v < 0.01 ? '<$0.01' : '$' + (v < 10 ? v.toFixed(2) : v.toFixed(1));
+const hm = ts => { const d = new Date(ts * 1000); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+function dur(sec) { sec = Math.max(0, Math.round(sec)); if (sec < 60) return sec + ' 秒'; if (sec < 3600) return Math.floor(sec / 60) + ' 分' + (sec % 60 ? ' ' + (sec % 60) + ' 秒' : ''); return Math.floor(sec / 3600) + ' 小时 ' + Math.floor(sec % 3600 / 60) + ' 分'; }
+function ago(ts) { const s = nowS() - ts; if (s < 60) return '刚刚'; if (s < 3600) return Math.floor(s / 60) + ' 分钟前'; if (s < 86400) return Math.floor(s / 3600) + ' 小时前'; return Math.floor(s / 86400) + ' 天前'; }
+const timer = (start, end) => end ? dur(end - start) : `<span data-since="${start}">${dur(nowS() - start)}</span>`;
+const chip = (fam, label) => `<span class="chip ${f(fam)}">${esc(label || NAMES[fam] || '未知')}</span>`;
+function meter(level, fam) {
+  if (!level) return '<span style="color:var(--muted)">—</span>';
+  const n = EFF[level] || 0; let s = '';
+  for (let i = 0; i < 4; i++) s += `<i class="${i < n ? 'on' : ''}"></i>`;
+  return `<span class="meter ${f(fam)}" aria-label="effort ${esc(level)}">${s}<span>${esc(level)}</span></span>`;
+}
+const stKey = x => !x.active ? 'ended' : x.status === 'needs-you' ? 'need' : x.status === 'running' ? 'running' : 'idle';
+
+const cache = {};
+function put(id, html) { if (cache[id] === html) return; cache[id] = html; const el = document.getElementById(id); if (el) el.innerHTML = html; }
 
 function connect() {
   const es = new EventSource('/api/stream');
-  es.onopen = () => { $('#conn').className = 'conn ok'; $('#conn span').textContent = '实时连接'; };
-  es.onmessage = ev => { state = JSON.parse(ev.data); render(); };
-  es.onerror = () => { $('#conn').className = 'conn'; $('#conn span').textContent = '已断开，重连中…'; };
+  es.onopen = () => { $('#conn').className = 'conn ok'; $('#conn span').textContent = '实时'; };
+  es.onmessage = ev => { state = JSON.parse(ev.data); skew = state.now - Date.now() / 1000; render(); };
+  es.onerror = () => { $('#conn').className = 'conn'; $('#conn span').textContent = '重连中'; };
 }
 
 function pick() {
   const ss = state.sessions;
   if (!ss.length) return null;
-  if (pinned && ss.find(s => s.id === selected)) return ss.find(s => s.id === selected);
-  const live = ss.find(s => s.active) || ss[0];
-  selected = live.id; return live;
+  const sel = ss.find(s => s.id === selected);
+  if (pinned && sel) return sel;
+  const auto = ss.find(s => s.active && s.status === 'needs-you') || ss.find(s => s.active && s.status === 'running') || ss.find(s => s.active) || ss[0];
+  selected = auto.id; return auto;
 }
-function select(id) { selected = id; pinned = true; try { localStorage.setItem('viz.sel', id); } catch (e) {} cache = {}; render(); }
-
-let cache = {};
-function put(key, el, html) { if (cache[key] === html) return; cache[key] = html; el.innerHTML = html; }
+function select(id) { selected = id; pinned = true; try { localStorage.setItem('viz.sel', id); } catch (e) { } render(); }
 
 function render() {
   if (!state) return;
   const s = pick();
-  const adv = state.settings.advisorModel;
-  const head = `CLAUDE CODE AGENT TREE<span class="sep">·</span><span class="${fam(s && s.family || 'opus')}"><span class="m">${esc((s && s.model) || state.settings.model || 'OPUS').toUpperCase()}</span> 主力</span>` +
-    (adv ? `<span class="sep">·</span><span class="${fam(state.settings.advisorFamily)}"><span class="m">${esc(adv.toUpperCase())}</span> 顾问待命</span>` : '') +
-    (state.demo ? '<span class="demo">演示模式 · 模拟数据</span>' : '');
-  put('title', $('#title'), head);
-  put('tabs', $('#tabs'), state.sessions.map(x => `<button class="tab ${fam(x.family)} ${x.id === (s && s.id) ? 'sel' : ''} ${x.active ? x.status : 'done'}" onclick="select('${esc(x.id)}')"><span class="dot"></span>${esc(x.project)} <small>${esc(STATUS[x.status] || '')} · ${ago(x.lastTs)}</small></button>`).join(''));
+  put('demo', state.demo ? '<span class="demo">演示模式：以下是模拟数据</span>' : '');
+  renderSpend(); renderProjects(s); renderRemote(); notifyNeeds();
   if (!s) {
-    put('main', $('#main'), `<div class="empty"><h2>现在没有正在运行的 Claude Code</h2>
-      <div>在任意项目文件夹里打开终端，输入 <code>claude</code> 开始工作，这里会自动出现。</div>
-      <div style="margin-top:8px;color:var(--faint)">已读取事件 ${state.stats.events} 条</div></div>`);
+    put('main', `<div class="empty"><h2>现在没有 Claude Code 在运行</h2><p>在任意项目文件夹里打开终端，输入 <code>claude</code>，这里会自动出现。</p></div>`);
     return;
   }
-  if (!$('#grid')) { cache = {}; $('#main').innerHTML = `<div class="grid" id="grid"><div class="stack"><div id="adv"></div><div id="met"></div></div><div class="tree" id="tree"></div></div><div class="log" id="log"></div><div class="status" id="status"></div>`; }
-  renderAdvisor(s); renderMetrics(s); renderTree(s); renderLog(s); renderStatus(s);
-  firstRender = false; tick();
-}
-
-function renderAdvisor(s) {
-  const adv = state.settings.advisorModel, a = s.advisor || {};
-  if (!adv && !a.calls) { put('adv', $('#adv'), `<div class="panel plain"><div class="ph" style="color:var(--dim)">顾问</div><div class="sub" style="color:var(--faint)">未开启</div><div class="note">在 Claude Code 里输入 /advisor fable 可开启。</div></div>`); return; }
-  const m = a.moment || '';
-  put('adv', $('#adv'), `<div class="panel ${fam(state.settings.advisorFamily || 'fable')}">
-    <div class="ph">${esc((adv || 'FABLE').toUpperCase())}</div><div class="sub">advisor · ${a.calls ? '已介入' : '待命'}</div>
-    <ul class="moments"><li class="${m === '做计划前' ? 'on' : ''}">◇ 做计划前</li><li class="${m === '错误重复时' ? 'on' : ''}">◇ 错误重复时</li><li class="${m === '收尾前' ? 'on' : ''}">◇ 收尾前</li></ul>
-    <div class="kv">介入次数<b>${a.calls || 0}</b></div>
-    <div class="kv">最近一次<b>${a.lastAt ? clock(a.lastAt) : '—'}</b></div>
-    ${a.last ? `<div class="advice"><span class="lbl">最近建议</span>${esc(a.last)}</div>` : ''}
-    <div class="note">顾问读完整个会话后给建议，从不自己写代码；由主会话采纳执行。</div></div>`);
-}
-
-function renderMetrics(s) {
-  const pct = s.contextLimit ? s.context / s.contextLimit : 0;
-  put('met', $('#met'), `<div class="panel plain">
-    <div class="kv">项目<b>${esc(s.project)}</b></div>
-    <div class="kv">会话开始<b>${clock(s.startedAt)}</b></div>
-    <div class="kv">已运行<b>${timer(s.startedAt, s.active ? null : s.lastTs)}</b></div>
-    <div class="kv">完成的回合<b>${s.tasksDone}</b></div>
-    <div class="kv">主会话工具调用<b>${s.toolCount}</b></div>
-    <div class="kv">子代理（本会话）<b>${s.totalAgents}</b></div>
-    <div class="kv">累计输出 token<b>${kfmt(s.outTokens)}</b></div>
-    <div class="kv">上下文占用<b>${(pct * 100).toFixed(pct < .1 ? 1 : 0)}%</b></div></div>`);
-}
-
-function renderTree(s) {
-  const tree = $('#tree');
-  if (!tree.querySelector('#task')) tree.innerHTML = `<div id="task"></div><div id="mainnode"></div><div id="stem1"></div><div id="kids"></div><div id="stem2"></div><div id="back"></div>`;
-  const t = s.task;
-  put('task', tree.querySelector('#task'), t ? `<div class="task"><span class="k">当前任务</span><span class="v">${esc(t.prompt)}</span><span class="tm">${clock(t.startedAt)} · ${timer(t.startedAt, t.endedAt)}</span></div>`
-    : `<div class="task"><span class="k">当前任务</span><span class="v" style="color:var(--faint)">还没有收到任务</span></div>`);
-  const pct = s.contextLimit ? s.context / s.contextLimit : 0;
-  const barCls = pct > .85 ? 'bad' : pct > .6 ? 'warn' : '';
-  const st = s.active ? s.status : 'ended';
-  put('mainnode', tree.querySelector('#mainnode'), `<div class="node main ${fam(s.family)} ${st === 'running' ? 'running' : st === 'needs-you' ? 'needs-you' : 'done'}">
-    <div class="hd"><span class="dot"></span><span class="name">${esc(s.model || '主模型')}</span><span class="who">· 主会话</span><span class="st">${esc(STATUS[st] || st)}</span></div>
-    <div class="role">规划 + 决策 + 派活 + 最后复核</div>
-    ${s.route && s.route.last ? `<div class="route">⇄ 自动选模型：${esc(s.route.last.reason)}${s.route.mode && s.route.mode !== 'auto' ? `（模式：${esc(s.route.mode)}）` : ''}${s.route.pendingDown ? ` · 下一轮仍简单就降到 ${esc(s.route.pendingDown)}` : ''}</div>` : ''}
-    <div class="kv">effort ${effort(s.effort)}</div>
-    <div class="kv">上下文<b>${kfmt(s.context)} / ${kfmt(s.contextLimit)}</b></div>
-    <div class="bar ${barCls}"><i style="width:${Math.min(100, pct * 100).toFixed(1)}%"></i></div>
-    <div class="kv">当前动作<span class="tool ${s.currentTool ? '' : 'idle'}">${esc(s.currentTool ? '▶ ' + s.currentTool : (st === 'running' ? '思考中…' : '空闲'))}</span></div>
-    ${!s.currentTool && s.lastTool ? `<div class="lasttool" style="text-align:right">上一步：${esc(s.lastTool)}</div>` : ''}
-    ${testHtml(s.test)}</div>`);
-  const kids = s.agents || [];
-  const anyLive = kids.some(a => a.status === 'running');
-  put('stem1', tree.querySelector('#stem1'), kids.length ? `<div style="display:flex;flex-direction:column;align-items:center"><div class="stem ${anyLive ? 'live' : ''}"></div><div class="delegate">派活给子代理 · <b>${kids.filter(a => a.status === 'running').length} 个运行中 / 共 ${kids.length} 个</b></div></div>` : '<div class="stem"></div>');
-  const kidsEl = tree.querySelector('#kids');
-  if (!kids.length) { put('kids', kidsEl, `<div class="nochild">这一轮还没有派出子代理（简单的活主会话会自己做）</div>`); }
-  else {
-    if (!kidsEl.querySelector('.children')) { kidsEl.innerHTML = '<div class="children"></div>'; cache.kids = null; }
-    const wrap = kidsEl.querySelector('.children');
-    const ids = kids.map(a => a.id);
-    [...wrap.children].forEach(c => { if (!ids.includes(c.dataset.id)) c.remove(); });
-    kids.forEach((a, i) => {
-      let c = wrap.querySelector(`[data-id="${CSS.escape(a.id)}"]`);
-      if (!c) { c = document.createElement('div'); c.className = 'child'; c.dataset.id = a.id; wrap.appendChild(c); }
-      if (wrap.children[i] !== c) wrap.insertBefore(c, wrap.children[i]);
-      c.classList.toggle('live', a.status === 'running');
-      put('kid:' + a.id, c, `<div class="node sub ${fam(a.family)} ${a.status}">
-        <div class="hd"><span class="dot"></span><span class="who">${esc(a.type)}</span><span class="st">${esc(STATUS[a.status] || a.status)}</span></div>
-        <div class="name" style="color:var(--c);font-weight:600">${esc(a.model || '—')} <span class="src">(${esc(a.modelSource)})</span></div>
-        <div class="kv">effort ${effort(a.effort)}</div>
-        <div class="desc">${esc(a.description || '（未取到任务描述）')}</div>
-        <div class="kv">${a.status === 'running' ? `<span class="tool ${a.currentTool ? '' : 'idle'}">${esc(a.currentTool ? '▶ ' + a.currentTool : '思考中…')}</span>` : `<span>工具 ${a.toolCount} 次</span>`}<b>${timer(a.startedAt, a.endedAt)}</b></div>
-        ${a.status === 'running' && !a.currentTool && a.lastTool ? `<div class="lasttool">上一步：${esc(a.lastTool)}</div>` : ''}
-        ${testHtml(a.test)}
-        ${a.lastMessage ? `<div class="msg">↩ ${esc(a.lastMessage)}</div>` : ''}</div><div class="jn"></div>`);
-    });
+  if (!document.getElementById('flow')) {
+    for (const k of Object.keys(cache)) if (!['demo', 'spend', 'projects', 'remote', 'notify'].includes(k)) delete cache[k];
+    $('#main').innerHTML = `<div class="alerts" id="alerts"></div><header class="head" id="head"></header>
+      <section class="panel"><h2>分工 <small id="flowsub"></small></h2><div id="flow"></div></section>
+      <section class="panel"><h2>模型时间轴 <small>每一轮主会话和每个子代理各用了什么模型、跑了多久</small></h2><div id="tl"></div></section>
+      <div class="split"><section class="panel"><h2>这个会话的花费 <small>按 API 公开价估算</small></h2><div id="use"></div></section>
+      <section class="panel"><h2>任务记录 <small id="histsub"></small></h2><div id="hist"></div></section></div>
+      <details class="log" id="logbox"><summary>事件明细<small>最近 40 条</small></summary><div id="log"></div></details>`;
   }
-  const allDone = kids.length && !anyLive;
-  const reviewing = allDone && st === 'running';
-  put('stem2', tree.querySelector('#stem2'), kids.length ? `<div class="stem ${reviewing ? 'live' : ''}"></div>` : '');
-  put('back', tree.querySelector('#back'), kids.length ? `<div class="back ${reviewing ? 'on' : ''}">回到主会话 · ${esc(s.effort || '')}<div class="s">${reviewing ? '正在复核子代理交回的结果…' : allDone ? '结果已交回主会话' : '等子代理交回结果后复核'}</div></div>${s.earlierAgents ? `<div class="earlier">本会话更早的回合还派过 ${s.earlierAgents} 个子代理</div>` : ''}` : '');
+  renderAlerts(); renderHead(s); renderFlow(s); renderTimeline(s); renderUse(s); renderHist(s); renderLog(s);
+  document.title = (state.needsYou.length ? `(${state.needsYou.length}) 等你确认 · ` : '') + 'Agent 看板';
+}
+
+function renderSpend() {
+  const t = state.totals;
+  const fams = ORDER.filter(k => t.byModel[k]);
+  const total = fams.reduce((n, k) => n + (t.byModel[k].cost || 0), 0) || 1;
+  const bars = fams.map(k => `<span class="${f(k)}" style="flex:${Math.max(.02, (t.byModel[k].cost || 0) / total)}" title="${NAMES[k]} ${money(t.byModel[k].cost)}"></span>`).join('');
+  const rows = fams.map(k => `<div class="mixrow ${f(k)}"><span class="n">${NAMES[k]}</span><span class="num">${kfmt(t.byModel[k].tokens)} token</span><span class="num">${money(t.byModel[k].cost)}</span></div>`).join('');
+  put('spend', `<h3>近 ${t.hours} 小时 · ${t.sessions} 个会话 · 完成 ${t.tasks} 个任务</h3>
+    <div class="big num">${money(t.cost)}</div>
+    ${t.saved != null && t.baseline > 0 ? `<div class="vs">全用 ${NAMES[t.baselineModel] || t.baselineModel} 约 ${money(t.baseline)}，<b>少花 ${Math.round(t.saved * 100)}%</b></div>` : '<div class="vs">还没有用量数据</div>'}
+    ${fams.length ? `<div class="mix">${bars}</div><div class="rows">${rows}</div>` : ''}
+    <div class="foot">按 API 公开价估算${t.unpriced ? '，有模型未定价' : ''}；用订阅时只作参考。</div>`);
+}
+
+function renderProjects(sel) {
+  const dup = {}; state.sessions.forEach(x => dup[x.project] = (dup[x.project] || 0) + 1);
+  const html = `<h3>项目</h3>` + state.sessions.map(x => {
+    const k = stKey(x);
+    const when = dup[x.project] > 1 ? `<span class="when">${hm(x.startedAt)} 开始</span>` : '';
+    return `<button class="proj ${f(x.family)} ${x.id === (sel && sel.id) ? 'sel' : ''} ${k === 'need' ? 'need' : ''}" onclick="select('${esc(x.id)}')" title="${esc(x.cwd)}">
+      <span class="st ${k}"><i>${k === 'need' ? '!' : ''}</i></span><span class="name">${esc(x.project)}${when}</span>
+      <span class="sub">${chip(x.family, x.model)}<span>${k === 'need' ? '等你确认' : k === 'running' ? '运行中' : esc(ago(x.lastTs))}</span></span></button>`;
+  }).join('');
+  put('projects', state.sessions.length ? html : '<h3>项目</h3><div style="color:var(--muted);font-size:13px">还没有会话</div>');
+}
+
+function renderRemote() {
+  const r = state.remote || {};
+  let html = '<h3>在其他设备上看</h3>';
+  if (r.mode === 'off') html += '远程访问已关闭（config.json 里 remote 设为 off）。';
+  else if (r.urls && r.urls.length) {
+    html += `你的其他电脑和手机登录同一个 Tailscale 账号后，打开：` + r.urls.slice(0, 2).map((u, i) =>
+      `<div class="url"><code>${esc(u)}</code>${i === 0 ? `<button class="btn" onclick="copyUrl('${esc(u)}', this)">复制</button>` : ''}</div>`).join('');
+  } else html += `装好 Tailscale 并登录后，你的其他电脑和手机就能打开这个看板，只有你自己的设备能访问。<div class="url"><a href="https://tailscale.com/download" target="_blank" rel="noopener">下载 Tailscale</a></div>`;
+  put('remote', html);
+}
+function copyUrl(u, btn) {
+  const done = () => { btn.textContent = '已复制'; setTimeout(() => btn.textContent = '复制', 1500); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(u).then(done);
+  else { const t = document.createElement('textarea'); t.value = u; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); done(); }
+}
+
+// ---------- 等你确认：横幅 + 提醒 ----------
+let soundOn = false;
+try { soundOn = localStorage.getItem('viz.sound') === '1'; } catch (e) { }
+function renderAlerts() {
+  const n = state.needsYou;
+  const canNotify = 'Notification' in window && window.isSecureContext;
+  const ctrl = canNotify
+    ? (Notification.permission === 'default' ? `<button class="btn" onclick="Notification.requestPermission().then(render)">开启桌面提醒</button>` : Notification.permission === 'granted' ? '桌面提醒已开启' : '浏览器拦截了桌面提醒，可在地址栏左边的网站设置里允许')
+    : `<button class="btn" onclick="toggleSound()">${soundOn ? '关闭提示音' : '开启提示音'}</button>`;
+  put('alerts', n.map(x => `<div class="alert" role="alert"><span class="ic">!</span><div class="tx"><b>${esc(x.project)}</b> 在等你确认${x.msg ? '：' + esc(x.msg) : ''}</div><button class="btn" onclick="select('${esc(x.id)}')">查看</button></div>`).join(''));
+  put('notify', `<h3>等你确认时提醒我</h3><div class="notify">${ctrl}</div>`);
+}
+function toggleSound() { soundOn = !soundOn; try { localStorage.setItem('viz.sound', soundOn ? '1' : '0'); } catch (e) { } if (soundOn) beep(); delete cache.alerts; render(); }
+function beep() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)(); const o = ac.createOscillator(); const g = ac.createGain();
+    o.frequency.value = 880; g.gain.setValueAtTime(.0001, ac.currentTime); g.gain.exponentialRampToValueAtTime(.2, ac.currentTime + .02); g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + .35);
+    o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + .4);
+  } catch (e) { }
+}
+function notifyNeeds() {
+  const ids = new Set(state.needsYou.map(x => x.id + '|' + (x.msg || '')));
+  for (const x of state.needsYou) {
+    const key = x.id + '|' + (x.msg || '');
+    if (seenNeeds.has(key)) continue;
+    seenNeeds.add(key);
+    if (!state.demo || seenNeeds.size > 1) {
+      if ('Notification' in window && window.isSecureContext && Notification.permission === 'granted') new Notification(`${x.project} 在等你确认`, { body: x.msg || '' });
+      else if (soundOn) beep();
+    }
+  }
+  for (const k of [...seenNeeds]) if (!ids.has(k)) seenNeeds.delete(k);
+}
+
+// ---------- 当前任务 ----------
+function renderHead(s) {
+  const k = stKey(s);
+  const lastTurn = (s.turns || []).filter(x => !x.handback).slice(-1)[0];
+  const t = s.task || (lastTurn && { prompt: lastTurn.prompt, startedAt: lastTurn.start, endedAt: lastTurn.end });
+  const r = s.route && s.route.last;
+  const pillCls = k === 'need' ? 'need' : k;
+  put('head', `<div class="where"><span class="p">${esc(s.project)}</span><span class="pill ${pillCls}">${k === 'need' ? '等你确认' : STATUS[k] || STATUS[s.status]}</span><span>会话开始于 ${hm(s.startedAt)}</span></div>
+    <h1 class="${t ? '' : 'quiet'}">${t ? esc(t.prompt) : '还没有收到任务'}</h1>
+    <div class="meta">${chip(s.family, s.model || '模型未知')}${meter(s.effort, s.family)}
+      ${t ? `<span>这一轮${t.endedAt || !s.active ? '用了' : '已用'} ${timer(t.startedAt, t.endedAt || (s.active ? null : s.lastTs))}</span>` : ''}
+      ${r ? `<span class="reason"><em>为什么选它：</em>${esc(r.reason)}${s.route.mode && s.route.mode !== 'auto' ? `（模式：${esc(s.route.mode)}）` : ''}${s.route.pendingDown ? `；下一轮还简单就换 ${esc(NAMES[s.route.pendingDown] || s.route.pendingDown)}` : ''}</span>` : ''}</div>`);
+}
+
+function renderFlow(s) {
+  const k = stKey(s);
+  const pct = s.contextLimit ? s.context / s.contextLimit : 0;
+  const ctxCls = pct > .85 ? 'bad' : pct > .6 ? 'warn' : '';
+  const a = s.advisor || {};
+  const doing = s.currentTool ? `<span>正在</span><span class="mono">${esc(s.currentTool)}</span>` : k === 'running' ? '<span>思考中…</span>' : k === 'need' ? `<span style="color:var(--alert);font-weight:700">等你在终端里确认</span>` : s.lastTool ? `<span>上一步</span><span class="mono">${esc(s.lastTool)}</span>` : '<span>空闲</span>';
+  const main = `<div class="node mainnode ${f(s.family)}">
+    <div class="top"><span class="model">${esc(s.model || '主会话')}</span><span style="color:var(--muted);font-size:13px">主会话</span></div>
+    <div class="role">负责计划、派活、汇总和最后检查</div>
+    <div class="kv"><span>effort</span>${meter(s.effort, s.family)}</div>
+    <div class="kv"><span>上下文</span><b class="num">${kfmt(s.context)} / ${kfmt(s.contextLimit)}</b></div>
+    <div class="ctx ${ctxCls}"><i style="width:${Math.min(100, pct * 100).toFixed(1)}%"></i></div>
+    <div class="kv"><span>工具调用</span><b class="num">${s.toolCount} 次</b></div>
+    <div class="doing">${doing}</div>
+    ${s.test ? `<div class="test ${s.test.failed ? 'bad' : 'good'}">${s.test.failed ? '测试有失败' : '测试通过'}：${s.test.passed}/${s.test.total}</div>` : ''}
+    ${a.calls ? `<div class="advice"><b>顾问已介入 ${a.calls} 次</b>${a.last ? '：' + esc(a.last.slice(0, 160)) + (a.last.length > 160 ? '…' : '') : ''}</div>` : ''}
+  </div>`;
+  const kids = s.agents || [];
+  const live = kids.filter(x => x.status === 'running').length;
+  const agents = kids.length ? `<div class="agents ${live ? 'live' : ''}">
+      <div class="agents-h">派出 <b>${kids.length}</b> 个子代理${live ? `，<b>${live}</b> 个在跑` : '，都已交回结果'}</div>
+      <div class="agrid">${kids.map(x => `<div class="node agent ${f(x.family)} ${esc(x.status)}">
+        <div class="top"><span class="type">${esc(x.type)}</span><span class="sstate">${esc(STATUS[x.status] || x.status)}</span></div>
+        <div class="mline">${chip(x.family, x.model)}${meter(x.effort, x.family)}</div>
+        <div class="desc">${esc(x.description || '（没有取到任务描述）')}</div>
+        <div class="foot"><span>${x.status === 'running' ? (x.currentTool ? `<span class="mono">${esc(x.currentTool)}</span>` : '思考中…') : `用了 ${x.toolCount} 次工具`}</span><span class="num">${timer(x.startedAt, x.endedAt)}</span></div>
+        ${x.lastMessage && x.status !== 'running' ? `<div class="back">交回：${esc(x.lastMessage)}</div>` : ''}
+      </div>`).join('')}</div></div>`
+    : `<div class="agents"><div class="noagents">这一轮没有派子代理，主会话自己在做。</div></div>`;
+  put('flowsub', s.earlierAgents ? `这个会话更早还派过 ${s.earlierAgents} 个子代理` : '');
+  put('flow', `<div class="flow">${main}${agents}</div>`);
+}
+
+// ---------- 模型时间轴 ----------
+function renderTimeline(s) {
+  const turns = (s.turns || []).slice(-12);
+  const lanes = (s.lanes || []).filter(l => !turns.length || l.start >= turns[0].start - 5).slice(-8);
+  if (!turns.length && !lanes.length) { put('tl', '<div class="tl-empty">发出第一个任务后，这里会画出每一轮用的模型。</div>'); return; }
+  const t1 = s.active ? nowS() : Math.max(s.lastTs, ...turns.map(t => t.end || 0), ...lanes.map(l => l.end || 0));
+  const first = Math.min(...turns.map(t => t.start), ...lanes.map(l => l.start));
+  const raw = Math.max(60, t1 - first);
+  const t0 = first - raw * 0.02;                 // 左边留一点空
+  const span = Math.max(60, t1 - t0);
+  const x = ts => Math.max(0, Math.min(100, (ts - t0) / span * 100));
+  const steps = [10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400];
+  const maxTicks = window.innerWidth < 600 ? 3 : 6;
+  const step = steps.find(v => span / v <= maxTicks) || 28800;
+  const ticks = []; for (let v = Math.ceil(t0 / step) * step; v <= t1; v += step) ticks.push(v);
+  const grid = ticks.map(v => `<span class="tl-grid" style="left:${x(v)}%"></span>`).join('');
+  const now = s.active ? `<span class="tl-now" style="left:${x(t1)}%" title="现在"></span>` : '';
+  const segs = turns.map((t, ti) => t.segs.map((g, i) => {
+    const a = Math.max(g.start, t.start), b = i < t.segs.length - 1 ? t.segs[i + 1].start : (t.end || t1);
+    const w = x(b) - x(a);
+    const tip = `<b>${esc(NAMES[g.family] || g.model || '未知')}</b>${g.effort ? ' · ' + esc(g.effort) : ''}<br>${esc(t.prompt)}<br><span class='d'>${hm(a)} 开始 · ${t.end ? dur(b - a) : '进行中'}${g.reason ? '<br>' + esc(g.by ? g.by + '：' : '') + esc(g.reason) : ''}</span>`;
+    return `<span class="seg main ${f(g.family)} ${t.end ? '' : 'open'} ${t.handback ? 'hb' : ''}" style="left:${x(a)}%;width:${w}%" data-tip="${esc(tip)}">${w > 7 ? esc(NAMES[g.family] || '') : ''}</span>`;
+  }).join('')).join('');
+  const rows = lanes.map(l => {
+    const b = l.end || t1, w = x(b) - x(l.start);
+    const tip = `<b>${esc(l.type)}</b> · ${esc(l.model || '')}<br>${esc(l.description || '')}<br><span class='d'>${hm(l.start)} 开始 · ${l.end ? dur(b - l.start) : '进行中'}</span>`;
+    return `<div class="tl-row"><div class="tl-label" title="${esc(l.type)}">${esc(l.type)}</div><div class="tl-track">${grid}<span class="seg ${f(l.family)} ${l.end ? '' : 'open'}" style="left:${x(l.start)}%;width:${w}%" data-tip="${esc(tip)}">${w > 9 ? esc(l.model || '') : ''}</span></div></div>`;
+  }).join('');
+  const used = [...new Set([...turns.flatMap(t => t.segs.map(g => g.family)), ...lanes.map(l => l.family)].filter(Boolean))];
+  put('tl', `<div class="tl"><div class="tl-axis">${ticks.map(v => `<span style="left:${x(v)}%">${step < 60 ? hm(v) + ':' + String(Math.round(v) % 60).padStart(2, '0') : hm(v)}</span>`).join('')}</div>
+    <div class="tl-row"><div class="tl-label"><b>主会话</b></div><div class="tl-track">${grid}${segs}${now}</div></div>${rows}</div>
+    <div class="tl-legend">${ORDER.filter(k => used.includes(k)).map(k => `<span class="${f(k)}">${NAMES[k]}</span>`).join('')}<span style="--c:repeating-linear-gradient(135deg,#98A2B3 0 4px,#D0D5DD 4px 8px)">斜纹 = 还在进行</span></div>`);
+}
+const tip = $('#tip');
+document.addEventListener('mousemove', e => {
+  const el = e.target.closest && e.target.closest('[data-tip]');
+  if (!el) { tip.classList.remove('on'); return; }
+  tip.innerHTML = el.dataset.tip; tip.classList.add('on');
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(window.innerWidth - w - 8, e.clientX + 12) + 'px';
+  tip.style.top = (e.clientY + 16 + h > window.innerHeight ? e.clientY - h - 12 : e.clientY + 16) + 'px';
+});
+
+// ---------- 花费 ----------
+function renderUse(s) {
+  const u = s.usage || { byModel: {} };
+  const fams = ORDER.filter(k => u.byModel[k]);
+  if (!fams.length) { put('use', '<div class="tl-empty">还没有读到这个会话的用量。</div>'); return; }
+  const rows = fams.map(k => { const b = u.byModel[k]; return `<tr><td>${chip(k)}</td><td class="r num">${kfmt(b.in + b.cw)}</td><td class="r num">${kfmt(b.cr)}</td><td class="r num">${kfmt(b.out)}</td><td class="r num"><b>${money(b.cost)}</b></td></tr>`; }).join('');
+  put('use', `<table class="use"><thead><tr><th>模型</th><th class="r">新输入</th><th class="r">缓存读取</th><th class="r">输出</th><th class="r">估算</th></tr></thead><tbody>${rows}
+    <tr><td><b>合计</b></td><td></td><td></td><td></td><td class="r num"><b>${money(u.cost)}</b></td></tr></tbody></table>
+    ${u.saved != null && u.baseline > 0 ? (u.saved >= 0.01 ? `<div class="save">同样的活全用 ${NAMES[state.totals.baselineModel] || 'Opus'}，大约要 ${money(u.baseline)}；自动选模型让这个会话<b>少花 ${Math.round(u.saved * 100)}%</b>。</div>`
+      : `<div class="fine">这个会话目前都在用 ${NAMES[state.totals.baselineModel] || 'Opus'}，跟全用它花的一样。</div>`) : ''}
+    <div class="fine">单位是 token。缓存读取最便宜，所以长对话里换模型会多花一次"重新读取"的钱。</div>`);
+}
+
+function renderHist(s) {
+  const turns = (s.turns || []).slice().reverse();
+  put('histsub', turns.length ? `共 ${turns.filter(t => !t.handback).length} 轮，最新在上` : '');
+  if (!turns.length) { put('hist', '<div class="tl-empty">还没有任务。</div>'); return; }
+  put('hist', `<ul class="hist">${turns.slice(0, 12).map(t => {
+    const fams = [...new Set(t.segs.map(g => g.family).filter(Boolean))];
+    return `<li class="${t.end ? '' : 'cur'}"><span class="t num">${hm(t.start)}</span><span class="p ${t.handback ? 'hb' : ''}" title="${esc(t.prompt)}">${esc(t.prompt)}</span><span class="d num">${t.end ? dur(t.end - t.start) : '进行中'}</span>
+      <span class="m">${fams.map(k => chip(k)).join('')}</span></li>`;
+  }).join('')}</ul>`);
 }
 
 function renderLog(s) {
-  const famOf = who => { if (who === 'main') return s.family; if (who === 'advisor') return state.settings.advisorFamily || 'fable'; if (who === 'you') return 'none'; if (who === 'router') return 'haiku'; const a = (s.agents || []).find(x => x.type === who); return a ? a.family : 'none'; };
-  const label = who => who === 'main' ? '主会话' : who === 'advisor' ? '顾问' : who === 'you' ? '你' : who === 'router' ? '自动选模型' : who;
-  const rows = s.timeline.slice().reverse().slice(0, 20);
-  const html = `<div class="lt">session log · 最近 20 条，最新在上</div>` + rows.map(r => {
-    const key = r.ts + r.text; const fresh = !firstRender && !lastLogKey.has(key);
-    return `<div class="row k-${esc(r.kind)} ${fresh ? 'fresh' : ''}"><span class="t">${clock(r.ts)}</span><span class="w ${fam(famOf(r.who))}">${esc(label(r.who))}</span><span class="x">${esc(r.text)}</span></div>`;
-  }).join('');
-  if (cache.log !== html.replace(/ fresh/g, '')) { $('#log').innerHTML = html; cache.log = html.replace(/ fresh/g, ''); }
-  lastLogKey = new Set(rows.map(r => r.ts + r.text));
+  const famOf = w => w === 'main' ? s.family : w === 'advisor' ? 'fable' : w === 'router' ? 'haiku' : w === 'you' ? 'none' : ((s.lanes || []).find(l => l.type === w) || {}).family;
+  const label = w => ({ main: '主会话', advisor: '顾问', you: '你', router: '自动选模型' })[w] || w;
+  put('log', s.timeline.slice().reverse().map(r => `<div class="lrow k-${esc(r.kind)}"><span class="t num">${hm(r.ts)}</span><span class="w ${f(famOf(r.who))}">${esc(label(r.who))}</span><span class="x">${esc(r.text)}</span></div>`).join(''));
 }
 
-function renderStatus(s) {
-  const kids = s.agents || [];
-  const subEff = [...new Set(kids.map(a => a.effort).filter(Boolean))].join('/') || '—';
-  const pct = s.contextLimit ? Math.round(s.context / s.contextLimit * 100) : 0;
-  put('status', $('#status'), `<span class="p">~/${esc(s.project)} $ claude</span>
-    <span>effort <b>[${esc(s.effort || '—')}/${esc(subEff)}]</b></span>
-    <span>subagents <b>[${kids.filter(a => a.status === 'running').length}/${kids.length}]</b></span>
-    <span>顾问 <b>[${(s.advisor && s.advisor.calls) || 0} 次]</b></span>
-    <span>上下文 <b>[${pct}%]</b></span>
-    <span>事件 <b>[${state.stats.events}]</b></span>`);
-}
-
-setInterval(tick, 1000);
+setInterval(() => { const t = nowS(); document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(t - Number(el.dataset.since)); }); }, 1000);
+setInterval(() => { if (state) { delete cache.tl; renderTimeline(pick() || {}); } }, 5000);
 connect();
 </script>
 </body>
