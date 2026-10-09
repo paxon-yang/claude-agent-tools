@@ -21,6 +21,8 @@ git clone https://github.com/paxon-yang/claude-agent-tools.git ~/claude-agent-to
 bash ~/claude-agent-tools/update.sh
 ```
 
+也可以直接在 Claude Code 里说一句："运行 bash ~/claude-agent-tools/update.sh"，让它替你更新。更新完重开 Claude Code 生效。
+
 ## 日常用法
 
 - `/route` 查看当前模型和最近的选择；`/route rules` 查看规则
