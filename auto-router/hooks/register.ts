@@ -524,7 +524,7 @@ async function runGate($: EngineInterface, cwdIn: string): Promise<string | unde
   } catch {
     $.ui.toast(M().gateTimeout(g.timeoutSec))
     gateLog = { at: Date.now(), result: 'timeout', command: cmd, by: who }
-    void writeLog($)
+    await writeLog($)
     return undefined
   }
   gate.lastRunAt = ++seq
@@ -532,22 +532,22 @@ async function runGate($: EngineInterface, cwdIn: string): Promise<string | unde
     gate.lastRunOk = true
     $.ui.toast(M().gatePass)
     gateLog = { at: Date.now(), result: 'pass', command: cmd, by: who }
-    void writeLog($)
+    await writeLog($)
     return undefined
   }
   gate.lastRunOk = false
   if (gate.tries >= g.maxRetries) {
     $.ui.toast(M().gateGiveUp)
     gateLog = { at: Date.now(), result: 'giveup', command: cmd, by: who, code: res.exitCode }
-    void writeLog($)
+    await writeLog($)
     return undefined
   }
   gate.tries++
   const to = g.escalateTo
+  gateLog = { at: Date.now(), result: 'fail', command: cmd, by: who, code: res.exitCode }
   // 固定模型（/route haiku 之类）时不换模型，只让它接着修
   if (mode === 'auto' && current && ORDER.indexOf(current) < ORDER.indexOf(to)) escalate($, 'main', to, M().gateFailed(NAMES[to]))
-  gateLog = { at: Date.now(), result: 'fail', command: cmd, by: who, code: res.exitCode }
-  void writeLog($)
+  await writeLog($)
   return M().gateBlock(NAMES[who], cmd, res.exitCode, tailOutput(res.stdout, res.stderr))
 }
 
