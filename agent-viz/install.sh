@@ -30,6 +30,18 @@ ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; }
 warn() { printf "  \033[33m!\033[0m %s\n" "$1"; }
 fail() { printf "  \033[31m✗\033[0m %s\n" "$1"; exit 1; }
 
+# launchd：先等旧服务真正退出，再注册新的；注册失败就重试几次（bootout 后立刻 bootstrap 常报 "Input/output error"）
+# launchd: wait for the old job to go away, then register; retry, since bootstrap right after bootout often fails
+la_stop() { launchctl bootout "gui/$(id -u)/$1" >/dev/null 2>&1; for _ in 1 2 3 4 5 6 7 8 9 10; do launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1 || return 0; sleep 0.5; done; }
+la_start() {
+  for _ in 1 2 3 4 5; do
+    launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1 && { launchctl kickstart "gui/$(id -u)/$1" >/dev/null 2>&1; return 0; }
+    launchctl bootstrap "gui/$(id -u)" "$2" >/dev/null 2>&1 || launchctl load -w "$2" >/dev/null 2>&1
+    sleep 1
+  done
+  launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1
+}
+
 echo ""
 echo "$(t '=== Claude Code 代理看板 · 安装 ===' '=== Claude Code Agent Board · Install ===')"
 echo ""
@@ -87,7 +99,7 @@ wait_up() {
 case "$(uname -s)" in
 Darwin)
   mkdir -p "$HOME/Library/LaunchAgents"
-  launchctl bootout "gui/$(id -u)/$LABEL" >/dev/null 2>&1
+  la_stop "$LABEL"
   cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -104,9 +116,7 @@ Darwin)
 </dict>
 </plist>
 EOF
-  if ! launchctl bootstrap "gui/$(id -u)" "$PLIST" >/dev/null 2>&1; then
-    launchctl load -w "$PLIST" >/dev/null 2>&1
-  fi
+  la_start "$LABEL" "$PLIST"
   wait_up
   if [ -n "$OKUP" ]; then ok "$(t '看板服务已在后台运行，以后开机会自动启动' "The board is running in the background and will start automatically at login")"
   else warn "$(t "看板服务没能启动。请把这个文件的最后几行发给 Claude：$VIZ/server.log" "The board didn't start. Send the last few lines of this file to Claude: $VIZ/server.log")"; fi

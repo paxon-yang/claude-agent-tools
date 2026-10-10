@@ -29,6 +29,18 @@ ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; }
 warn() { printf "  \033[33m!\033[0m %s\n" "$1"; }
 fail() { printf "  \033[31m✗\033[0m %s\n" "$1"; exit 1; }
 
+# launchd：先等旧服务真正退出，再注册新的；注册失败就重试几次（bootout 后立刻 bootstrap 常报 "Input/output error"）
+# launchd: wait for the old job to go away, then register; retry, since bootstrap right after bootout often fails
+la_stop() { launchctl bootout "gui/$(id -u)/$1" >/dev/null 2>&1; for _ in 1 2 3 4 5 6 7 8 9 10; do launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1 || return 0; sleep 0.5; done; }
+la_start() {
+  for _ in 1 2 3 4 5; do
+    launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1 && { launchctl kickstart "gui/$(id -u)/$1" >/dev/null 2>&1; return 0; }
+    launchctl bootstrap "gui/$(id -u)" "$2" >/dev/null 2>&1 || launchctl load -w "$2" >/dev/null 2>&1
+    sleep 1
+  done
+  launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1
+}
+
 if [ "$HOST" = "--remove" ]; then
   launchctl bootout "gui/$(id -u)/$LABEL" >/dev/null 2>&1
   rm -f "$PLIST" "$VIZ/remote.json"
@@ -97,7 +109,7 @@ echo ""
 echo "$(t '[4/4] 开机自动运行' '[4/4] Start at login')"
 if [ "$(uname)" = "Darwin" ]; then
   mkdir -p "$HOME/Library/LaunchAgents"
-  launchctl bootout "gui/$(id -u)/$LABEL" >/dev/null 2>&1
+  la_stop "$LABEL"
   cat > "$PLIST" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -113,7 +125,7 @@ if [ "$(uname)" = "Darwin" ]; then
 </dict>
 </plist>
 PL
-  launchctl bootstrap "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || launchctl load -w "$PLIST" >/dev/null 2>&1
+  la_start "$LABEL" "$PLIST"
   ok "$(t '隧道已在后台运行，开机自动启动' 'Tunnel is running in the background and starts at login')"
 else
   warn "$(t '这不是 Mac，请手动运行：' "This isn't a Mac — run it yourself: ")cloudflared tunnel --config $CONF run $ID"
