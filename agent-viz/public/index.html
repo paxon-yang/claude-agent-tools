@@ -246,6 +246,8 @@ main { min-width: 0; padding-bottom: 64px; }
 .ag.bgtask .glyph { background: linear-gradient(180deg, #8E8E93, #636366); font-size: 14px; }
 .fold { border: 0; background: none; color: rgba(235, 235, 245, .66); font-size: 12px; padding: 3px 4px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(235, 235, 245, .3); }
 .fold:hover { color: #fff; }
+.live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: 1px; }
+@media (prefers-reduced-motion: no-preference) { .live-dot { animation: blink 1.6s ease-in-out infinite; } }
 .fsvg .eg.failed path, .fsvg .eg.stopped path { stroke: rgba(255, 105, 97, .6); stroke-dasharray: 2 4; }
 .fsvg .eg { transition: opacity .25s; }
 .fsvg .eg.hl path { stroke-width: 2.5; stroke: var(--c); filter: drop-shadow(0 0 6px var(--c)); }
@@ -484,7 +486,7 @@ const I18N = {
     f_all: '全部', f_running: '在跑', f_done: '已完成', f_failed: '出错',
     agHead: (n, live) => `派出 <b>${n}</b> 个子代理${live ? `，<b>${live}</b> 个在跑` : '，都已交回'}`,
     showLess: '收起', showAll: n => `显示全部 ${n} 个`, soloNote: '这一轮没有派子代理，主会话自己在做。',
-    earlier: n => `这个会话更早还派过 ${n} 个子代理`, tapCard: '点卡片看详情', subagent: '子代理', aSubagent: '子代理', tool: '工具',
+    earlier: n => `更早还派过 ${n} 个，已收起`, tapCard: '点卡片看详情', lastAct: x => `最后动作 ${x}`, secAgo: n => n < 5 ? '刚刚' : `${n} 秒前`, subagent: '子代理', aSubagent: '子代理', tool: '工具',
     noSteps: '还没有记录到工具调用。', failed: '失败', inProgress: '进行中',
     mainOf: p => `主会话 · ${p}`, ctxPct: (k, p) => `${k}（${p}%）`, toolCalls: '工具调用', times: n => `${n} 次`, subagents: '子代理', count: n => `${n} 个`,
     whyModel: '为什么用这个模型', byReason: (by, r) => (by ? by + '：' : '') + r,
@@ -547,7 +549,7 @@ const I18N = {
     f_all: 'All', f_running: 'Running', f_done: 'Done', f_failed: 'Failed',
     agHead: (n, live) => `<b>${n}</b> ${pl(n, 'subagent', 'subagents')} dispatched${live ? ` · <b>${live}</b> running` : ' · all back'}`,
     showLess: 'Show less', showAll: n => `Show all ${n}`, soloNote: 'No subagents this turn — the main session is handling it.',
-    earlier: n => `${n} earlier ${pl(n, 'subagent', 'subagents')} in this session`, tapCard: 'Click a card for details', subagent: 'Subagent', aSubagent: 'a subagent', tool: 'tool',
+    earlier: n => `${n} earlier ${pl(n, 'subagent', 'subagents')} hidden`, tapCard: 'Click a card for details', lastAct: x => `Last activity ${x}`, secAgo: n => n < 5 ? 'just now' : `${n}s ago`, subagent: 'Subagent', aSubagent: 'a subagent', tool: 'tool',
     noSteps: 'No tool calls yet.', failed: 'Failed', inProgress: 'In progress',
     mainOf: p => `Main session · ${p}`, ctxPct: (k, p) => `${k} (${p}%)`, toolCalls: 'Tool calls', times: n => String(n), subagents: 'Subagents', count: n => String(n),
     whyModel: 'Why this model', byReason: (by, r) => (by ? by + ': ' : '') + r,
@@ -989,7 +991,8 @@ function renderFlow(s) {
   const gl = [`radial-gradient(420px 320px at 18% 50%, color-mix(in srgb, var(--${famKey(s.family)}) 30%, transparent), transparent 70%)`]
     .concat(fams.slice(0, 3).map((fm, i) => `radial-gradient(360px 260px at 78% ${20 + i * 30}%, color-mix(in srgb, var(--${famKey(fm)}) 24%, transparent), transparent 70%)`));
   put('glow', `<div style="position:absolute;inset:0;background:${gl.join(',')}"></div>`);
-  put('flowsub', s.earlierAgents ? t('earlier', s.earlierAgents) : t('tapCard'));
+  put('flowsub', [s.active && s.lastEventAt ? `<span class="live-dot"></span>${t('lastAct', `<span data-ago="${s.lastEventAt}">${esc(agoS(s.lastEventAt))}</span>`)}` : '',
+    s.earlierAgents ? t('earlier', s.earlierAgents) : t('tapCard')].filter(Boolean).join(' · '));
   requestAnimationFrame(() => { drawEdges(); applyHover(); });
   if (flowState.open) renderSheet(s);
 }
@@ -1225,7 +1228,9 @@ function renderLog(s) {
   put('log', s.timeline.slice().reverse().map(r => `<div class="lrow k-${esc(r.kind)}"><span class="t num">${hm(r.ts)}</span><span class="w ${f(famOf(r.who))}">${esc(label(r.who))}</span><span class="x">${esc(logText(r.text))}</span></div>`).join(''));
 }
 
-setInterval(() => { const n = nowS(); document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(n - Number(el.dataset.since)); }); }, 1000);
+setInterval(() => { const n = nowS(); document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(n - Number(el.dataset.since)); });
+  document.querySelectorAll('[data-ago]').forEach(el => { el.textContent = agoS(Number(el.dataset.ago)); }); }, 1000);
+function agoS(ts) { const d = Math.max(0, Math.round(nowS() - ts)); return d < 60 ? t('secAgo', d) : ago(ts); }
 setInterval(() => { if (state) { delete cache.tl; renderTimeline(pick() || {}); } }, 5000);
 applyLang(resolveLang());
 connect();

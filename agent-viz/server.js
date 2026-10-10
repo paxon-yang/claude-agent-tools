@@ -344,7 +344,11 @@ function handle(line) {
           log(s, ts, agent ? agent.type : 'main', ['tests', t.passed, t.total], t.failed ? 'warn' : 'good');
         }
       }
-      if (isSpawn(d.tool_name)) {
+      // 后台子代理：Agent 工具调用马上返回，但子代理还在跑——不能当成已完成
+      // Background sub-agents: the Agent call returns right away while the agent keeps working
+      const asyncSpawn = isSpawn(d.tool_name) && !failed && ((d.tool_input && d.tool_input.run_in_background) ||
+        /async|background|launched|running in the background/i.test(typeof d.tool_response === 'string' ? d.tool_response : JSON.stringify(d.tool_response || '').slice(0, 2000)));
+      if (isSpawn(d.tool_name) && !asyncSpawn) {
         // 派出的子代理整体结束（SubagentStop 没到时的兜底）
         for (const a of s.agents.values()) {
           if (a.toolUseId === d.tool_use_id && a.status === 'running') { a.status = failed ? 'failed' : 'done'; a.endedAt = ts; }
@@ -639,17 +643,20 @@ function resolveAgentModel(s, a) {
 }
 function sessionModel(s) { return s.actualModel || s.model || settings.model || null; }
 
+const i0 = (arr, x) => arr.indexOf(x);
 function view(s) {
   const t = now();
   const active = !s.ended && t - s.lastTs < IDLE_MIN * 60;
   const all = [...s.agents.values()].filter(a => !isHelper(a)).sort((x, y) => x.startedAt - y.startedAt);
-  const cur = s.task ? all.filter(a => a.taskId === s.task.id) : all;
   // 更早派出、现在还在跑的子代理也要显示 / keep earlier sub-agents that are still running
-  const shown = cur.length ? all.filter(a => cur.includes(a) || a.status === 'running') : all.filter((a, i) => a.status === 'running' || i >= all.length - 6);
+  // 只显示"现在"的：这一轮派出的，加上任何还在跑的；上一轮已经做完的不再冒充当前状态
+  // Only what is current: this turn's sub-agents plus anything still running; finished work from earlier turns is not shown as current
+  const shown = all.filter(a => a.status === 'running' || (s.task && a.taskId === s.task.id) || (!s.task && i0(all, a) >= all.length - 6));
   expireBg(s, t);
   const bgAll = [...s.bg.values()];
-  const bgShown = bgAll.filter(b => b.status === 'running' || (s.task && b.taskRef === s.task.id) || (b.endedAt && t - b.endedAt < 600)).slice(-8);
-  const bgRunning = bgAll.filter(b => b.status === 'running').length;
+  const bgShown = bgAll.filter(b => b.status === 'running' || (s.task && b.taskRef === s.task.id)).slice(-8);
+  // 后台子代理也算"后台在跑" / background sub-agents count as background work too
+  const bgRunning = bgAll.filter(b => b.status === 'running').length + all.filter(a => a.status === 'running').length;
   const model = sessionModel(s);
   return {
     id: s.id, project: path.basename(s.cwd || ''), cwd: s.cwd,
@@ -672,7 +679,7 @@ function view(s) {
         startedAt: a.startedAt, endedAt: a.endedAt, currentTool: a.currentTool, lastTool: a.lastTool, toolCount: a.toolCount,
         lastMessage: a.lastMessage, test: a.test, steps: (a.steps || []).slice(-30) };
     }),
-    earlierAgents: all.length - shown.length, totalAgents: all.length,
+    earlierAgents: all.length - shown.length, totalAgents: all.length, lastEventAt: s.lastTs,
     timeline: s.timeline.slice(-40),
     needMsg: s.needMsg || null,
     steps: (s.steps || []).slice(-30),
