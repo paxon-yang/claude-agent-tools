@@ -16,5 +16,10 @@ t() { if [ "$L" = zh ]; then printf '%s' "$1"; else printf '%s' "$2"; fi; }   # 
 bash "$DIR/auto-router/install.sh" || { echo "$(t 'auto-router 安装失败，上面有原因' 'auto-router install failed; see the reason above')"; exit 1; }
 echo ""
 bash "$DIR/agent-viz/install.sh" || { echo "$(t 'agent-viz 安装失败，上面有原因' 'agent-viz install failed; see the reason above')"; exit 1; }
+# 装过桌面小卡片的，顺带更新它 / if the desktop card is installed, update it too
+if [ -f "$HOME/.claude/viz/widget/main.js" ]; then
+  echo ""
+  bash "$DIR/agent-viz/widget/install.sh" || echo "$(t '桌面卡片更新失败，不影响其他功能' 'Updating the desktop card failed; everything else still works')"
+fi
 echo ""
 echo "$(t '两个都装好了。关掉所有 Claude Code，重新打开就生效。' 'Both tools are installed. Quit every Claude Code session and open it again to take effect.')"

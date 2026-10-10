@@ -73,6 +73,25 @@ Darwin)
 </dict>
 </plist>
 PL
+  # 「Agent 卡片」小程序：放在 ~/Applications 里，聚焦搜索（⌘ 空格）输入 Agent 就能把卡片叫出来
+  # a tiny "Agent Card" app in ~/Applications: Spotlight (⌘ Space) → "Agent" brings the card back
+  APPDIR="$HOME/Applications"; mkdir -p "$APPDIR"
+  for n in "Agent 卡片" "Agent Card"; do rm -rf "$APPDIR/$n.app"; done
+  APPNAME="$(t 'Agent 卡片' 'Agent Card')"
+  if osacompile -o "$APPDIR/$APPNAME.app" -e "do shell script quoted form of \"$ELECTRON\" & \" \" & quoted form of \"$DEST\" & \" > /dev/null 2>&1 &\"" >/dev/null 2>&1; then
+    # 用看板的图标 / use the board's icon
+    ICON_SRC="$SRC/../public/icon-512.png"
+    if [ -f "$ICON_SRC" ] && command -v iconutil >/dev/null 2>&1; then
+      SET="$(mktemp -d)/agent.iconset"; mkdir -p "$SET"
+      for s in 16 32 128 256 512; do
+        sips -z $s $s "$ICON_SRC" --out "$SET/icon_${s}x${s}.png" >/dev/null 2>&1
+        sips -z $((s*2)) $((s*2)) "$ICON_SRC" --out "$SET/icon_${s}x${s}@2x.png" >/dev/null 2>&1
+      done
+      iconutil -c icns "$SET" -o "$APPDIR/$APPNAME.app/Contents/Resources/applet.icns" >/dev/null 2>&1
+    fi
+    touch "$APPDIR/$APPNAME.app"
+    ok "$(t "关掉卡片后，⌘ 空格搜「Agent」就能再打开（$APPDIR/$APPNAME.app）" "After closing the card, ⌘ Space → \"Agent\" opens it again ($APPDIR/$APPNAME.app)")"
+  fi
   if la_start "$LABEL" "$PLIST"; then ok "$(t '卡片已经出现在屏幕右上角；菜单栏里有它的图标，可以隐藏、置顶、退出' 'The card is at the top right of your screen; its menu-bar icon lets you hide it, pin it or quit')"
   else warn "$(t "没能自动启动，可以手动运行：\"$ELECTRON\" \"$DEST\"" "Couldn't start it automatically; run: \"$ELECTRON\" \"$DEST\"")"; fi
   ;;

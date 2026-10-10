@@ -44,7 +44,9 @@ function createWindow() {
   load();
   win.webContents.on('did-fail-load', () => setTimeout(load, 3000));   // 看板还没启动时，过一会儿再试 / retry until the board is up
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
-  win.once('ready-to-show', () => { if (prefs.visible !== false) win.showInactive(); });
+  // 每次启动都显示（隐藏只在这一次运行里有效）；再次打开程序也会把卡片叫出来
+  // always shown at start (hiding lasts for this run only); opening the app again brings the card back
+  win.once('ready-to-show', () => { win.showInactive(); prefs.visible = true; savePrefs(); buildMenu(); });
   win.on('moved', () => { const [bx, by] = win.getPosition(); prefs.x = bx; prefs.y = by; savePrefs(); });
 }
 function load() { if (win && !win.isDestroyed()) win.loadURL(BASE + '/mini').catch(() => setTimeout(load, 3000)); }
@@ -93,3 +95,4 @@ app.whenReady().then(() => {
   buildMenu();
 });
 app.on('window-all-closed', e => e.preventDefault());
+app.on('activate', () => showCard());
