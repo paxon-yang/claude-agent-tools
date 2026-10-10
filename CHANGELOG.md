@@ -11,6 +11,9 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 - The Android card follows Apple's widget style: no big title, light and dark follow the system, the weekly plan usage as a ring, and motion where widgets allow it — a pulsing status dot, a ticking turn timer, running sub-agents rotating in with a fade, and an activity line while work is running.
 - `agent-viz/phone.sh`: connects a phone without the Cloudflare Zero Trust dashboard — adds a card-only address to the existing tunnel, protected by a random pairing key, and shows a QR code; the phone opens a page to install the app and pair in one tap. The full board stays behind its login.
 
+### Fixed
+- Android card: after an app update the home-screen card could stay on its placeholder look (phones like ColorOS block the background update). Opening the app now redraws and refreshes the card, it redraws itself after an update or reboot, and the placeholder says "Connecting…" instead of showing sample data.
+
 ## [0.4.0] — 2026-10-10
 
 ### Added

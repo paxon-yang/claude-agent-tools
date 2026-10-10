@@ -42,7 +42,18 @@ class CardWidget : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         // 点卡片：进入实时模式（有会话在跑时每 15 秒刷新）/ tap: live mode, refreshing every 15 s while busy
-        if (intent.action == ACTION_TAP) LiveService.start(context)
+        when (intent.action) {
+            ACTION_TAP -> LiveService.start(context)
+            // 装了新版本或开机：先用上次的数据重画（不然桌面会停在空白的初始样子），再去拉新的
+            // after an app update or reboot: redraw from the last data at once, then fetch fresh
+            Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_BOOT_COMPLETED -> {
+                renderAll(context)
+                if (Prefs(context).url.isNotBlank()) {
+                    RefreshWorker.schedule(context)
+                    RefreshWorker.now(context)
+                }
+            }
+        }
     }
 
     companion object {

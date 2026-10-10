@@ -34,6 +34,8 @@ class MainActivity : Activity() {
     private lateinit var preview: FrameLayout
     /** 已经问过的配对链接（屏幕旋转、换语言时界面会重建，别重复问）/ the pairing link already answered, kept across recreation */
     private var handledPair: String? = null
+    /** 调试版截图用样例数据时，打开 App 不去拉真数据（会把样例盖掉）/ debug screenshots with sample data: don't fetch over it */
+    private var sampleMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +76,7 @@ class MainActivity : Activity() {
             if (intent?.getBooleanExtra("pin", false) == true) addWidget()
             // 截图用的样例数据（base64 JSON）/ sample data for screenshots, base64 JSON
             intent?.getStringExtra("sample")?.let {
+                sampleMode = true
                 LiveService.stop(this)
                 prefs.lastJson = String(Base64.decode(it, Base64.DEFAULT), Charsets.UTF_8)
                 prefs.lastOkAt = System.currentTimeMillis()
@@ -131,7 +134,17 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // 打开 App 就把桌面卡片也刷一遍：有些手机（ColorOS 等）会拦住后台更新，桌面卡片会停在旧样子
+        // opening the app also refreshes the home-screen card: some phones (ColorOS…) block background updates
+        CardWidget.renderAll(this)
         showPreview()
+        if (prefs.url.isNotBlank() && !sampleMode) {
+            RefreshWorker.schedule(this)
+            thread {
+                Api.refresh(this)
+                runOnUiThread { if (!isFinishing && !isDestroyed) showPreview() }
+            }
+        }
     }
 
     private fun saveAndTest() {

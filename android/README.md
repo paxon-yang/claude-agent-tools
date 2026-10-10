@@ -16,7 +16,7 @@ A home-screen widget that shows your Claude Code agent board at a glance: the cu
    ```
    它会在同一条隧道上加一个只给卡片用的网址（默认 `agent-card.你的域名`），生成一串配对码，然后在终端里显示一个二维码。
 2. 用手机相机扫这个二维码，打开的页面上按三步做：**下载安装 App → 打开 App 并连接 → 添加到桌面**。
-3. ColorOS 会清理后台：设置 → 应用 → Agent 卡片，打开**自启动**和**允许后台运行**（或在电池里设为"不限制"），否则卡片会停更。
+3. ColorOS 会清理后台：设置 → 应用 → Agent 卡片，打开**自启动**和**允许后台运行**（或在电池里设为"不限制"），否则卡片会停更。卡片要是停在旧样子，打开一次 App 就会刷新。
 
 以后要再显示二维码：`phone.sh --qr`；换一个配对码（旧手机要重扫）：`phone.sh --new-key`；停用：`phone.sh --remove`。
 
@@ -46,7 +46,7 @@ APK 也可以单独下载：https://github.com/paxon-yang/claude-agent-tools/rel
    ```
    It adds a card-only address to the same tunnel (default `agent-card.<your domain>`), creates a pairing key and shows a QR code in the terminal.
 2. Scan it with the phone camera and follow the page: **install the app → open the app and connect → add it to the home screen**.
-3. On ColorOS, MIUI and similar, allow auto-launch / background activity for the app, or the system pauses it.
+3. On ColorOS, MIUI and similar, allow auto-launch / background activity for the app, or the system pauses it. If the card ever looks stale, opening the app once refreshes it.
 
 Show the QR code again: `phone.sh --qr`; new key (phones must rescan): `phone.sh --new-key`; turn it off: `phone.sh --remove`.
 

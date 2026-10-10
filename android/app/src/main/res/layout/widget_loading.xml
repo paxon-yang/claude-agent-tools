@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 卡片刚放上桌面、还没收到数据时显示的（不放样例数据，免得被当成真的）
+     Shown before the card's first update; no sample data so nothing stale looks real. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/card_surface"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <ProgressBar
+        style="@style/Pulse"
+        android:layout_width="10dp"
+        android:layout_height="10dp"
+        android:indeterminateDrawable="@drawable/pulse_blue" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="@string/widget_loading"
+        android:textColor="@color/c_label"
+        android:textSize="14sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center"
+        android:text="@string/widget_loading_hint"
+        android:textColor="@color/c_label2"
+        android:textSize="12sp" />
+</LinearLayout>

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Agent 卡片</string>
+    <string name="widget_loading">正在连接…</string>
+    <string name="widget_loading_hint">一直这样就打开一次 Agent 卡片 App</string>
     <string name="widget_description">Claude Code 一眼看清：任务、模型、子代理、花费</string>
 
     <string name="preview_project">monthly-report-app</string>

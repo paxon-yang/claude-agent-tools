@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Agent Card</string>
+    <string name="widget_loading">Connecting…</string>
+    <string name="widget_loading_hint">Open Agent Card once if this stays</string>
     <string name="widget_description">Claude Code at a glance: task, model, sub-agents, cost</string>
 
     <!-- 小组件选择器里的预览 / picker preview -->

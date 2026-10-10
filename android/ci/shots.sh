@@ -100,5 +100,9 @@ adb shell am force-stop $PKG
 adb shell am start -n $PKG/.MainActivity
 sleep 8
 shot app-en
+# 打开 App 之后桌面卡片也要跟着刷新（ColorOS 会拦后台更新）/ opening the app must also refresh the home card
+adb shell input keyevent KEYCODE_HOME
+sleep 4
+shot home-en-after-open
 adb logcat -d | grep -iE 'AgentCard|AndroidRuntime|FATAL EXCEPTION|START u0.*agentcard' | grep -v 'WindowManagerShell\|CoreBackPreview' | tail -300 > out/logcat.txt || true
 ls -la out
