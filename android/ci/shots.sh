@@ -84,6 +84,17 @@ shot app-sample
 adb shell input keyevent KEYCODE_BACK
 sleep 4
 shot home-sample
+sleep 5
+shot home-sample-2
+# 深色模式 / dark mode
+adb shell cmd uimode night yes
+sleep 3
+adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE"
+sleep 5
+adb shell input keyevent KEYCODE_BACK
+sleep 4
+shot home-sample-dark
+adb shell cmd uimode night no
 adb shell cmd locale set-app-locales $PKG --locales en-US
 adb shell am force-stop $PKG
 adb shell am start -n $PKG/.MainActivity

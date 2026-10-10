@@ -20,7 +20,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.TextView
 import kotlin.concurrent.thread
 
@@ -161,16 +160,11 @@ class MainActivity : Activity() {
         }
     }
 
-    /** 设置页上的预览：和桌面卡片用同一套画法 / the preview here uses the same painter as the home-screen card */
+    /** 设置页上的预览：就是桌面卡片本身 / the preview here is the home-screen card itself */
     private fun showPreview() {
         preview.removeAllViews()
-        val dm = resources.displayMetrics
-        val w = if (preview.width > 0) preview.width else dm.widthPixels - (40 * dm.density).toInt()
-        val h = preview.layoutParams.height
-        val img = ImageView(this)
-        img.setImageBitmap(Render.card(this, w, h, dm.density))
-        img.contentDescription = getString(R.string.preview_label)
-        preview.addView(img, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        val v: View = CardWidget.build(this).apply(this, preview)
+        preview.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
     private fun addWidget() {

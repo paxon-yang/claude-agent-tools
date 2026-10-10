@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 小组件选择器里的额度圆环样子 / the ring as shown in the widget picker -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:left="3dp" android:top="3dp" android:right="3dp" android:bottom="3dp">
+        <shape android:shape="oval">
+            <stroke android:width="6dp" android:color="@color/c_green" />
+        </shape>
+    </item>
+</layer-list>

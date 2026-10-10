@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一个在跑的子代理或后台任务 / one running sub-agent or background task -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="34dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="10dp"
+    android:paddingEnd="12dp">
+
+    <TextView
+        android:id="@+id/r_glyph"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:background="@drawable/g_haiku"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:textColor="#FFFFFFFF"
+        android:textSize="10sp" />
+
+    <TextView
+        android:id="@+id/r_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:textColor="@color/c_label"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/r_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/c_label2"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/r_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:fontFeatureSettings="tnum"
+        android:maxLines="1"
+        android:textColor="@color/c_label3"
+        android:textSize="11sp" />
+</LinearLayout>

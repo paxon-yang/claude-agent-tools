@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android" android:oneshot="false">
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#FF8E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#FF8E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#E68E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#BF8E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#998E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#738E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#598E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#738E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#998E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#BF8E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#E68E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+    <item android:duration="110"><shape android:shape="oval"><solid android:color="#FF8E8E93" /><size android:width="8dp" android:height="8dp" /></shape></item>
+</animation-list>

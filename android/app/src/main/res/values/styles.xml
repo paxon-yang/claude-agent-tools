@@ -26,4 +26,10 @@
         <item name="android:layout_marginTop">14dp</item>
         <item name="android:textAllCaps">false</item>
     </style>
+    <style name="Pulse">
+        <item name="android:layout_width">8dp</item>
+        <item name="android:layout_height">8dp</item>
+        <item name="android:indeterminate">true</item>
+        <item name="android:indeterminateOnly">true</item>
+    </style>
 </resources>

@@ -7,10 +7,15 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.util.SizeF
+import android.os.SystemClock
+import android.util.TypedValue
+import android.view.View
 import android.widget.RemoteViews
+import java.text.DateFormat
+import java.util.Date
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** 桌面卡片 / the home-screen card */
 class CardWidget : AppWidgetProvider() {
@@ -21,9 +26,8 @@ class CardWidget : AppWidgetProvider() {
         RefreshWorker.now(context)
     }
 
-    // 用户拖动改了卡片大小，或者折叠屏展开/合上：按新大小重画 / resized, or a foldable opened/closed: redraw at the new size
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, newOptions: Bundle) {
-        manager.updateAppWidget(id, views(context, newOptions))
+        manager.updateAppWidget(id, build(context))
     }
 
     override fun onEnabled(context: Context) {
@@ -47,7 +51,8 @@ class CardWidget : AppWidgetProvider() {
         fun renderAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, CardWidget::class.java))
-            for (id in ids) manager.updateAppWidget(id, views(context, manager.getAppWidgetOptions(id)))
+            if (ids.isEmpty()) return
+            manager.updateAppWidget(ids, build(context))
         }
 
         private fun pi(context: Context, code: Int, intent: Intent, activity: Boolean): PendingIntent {
@@ -56,34 +61,24 @@ class CardWidget : AppWidgetProvider() {
             else PendingIntent.getBroadcast(context, code, intent, flags)
         }
 
-        /**
-         * 按小组件的实际大小画。安卓 12 起一个小组件可能有好几种大小（横屏、竖屏、折叠屏），每种画一张。
-         * Paint at the widget's real size. From Android 12 a widget can have several sizes (portrait, landscape,
-         * folded/unfolded); one picture per size.
-         */
-        fun views(context: Context, options: Bundle?): RemoteViews {
-            val sizes = if (Build.VERSION.SDK_INT >= 31) {
-                @Suppress("DEPRECATION")
-                options?.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)?.filter { it.width > 0 && it.height > 0 }
-            } else null
-            if (Build.VERSION.SDK_INT >= 31 && !sizes.isNullOrEmpty()) {
-                val distinct = sizes.distinctBy { "${it.width.toInt()}x${it.height.toInt()}" }.take(3)
-                if (distinct.size > 1) return RemoteViews(distinct.associateWith { build(context, it.width, it.height) })
-                return build(context, distinct[0].width, distinct[0].height)
-            }
-            // 竖屏时宽取最小宽度、高取最大高度 / portrait: min width, max height
-            val w = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)?.takeIf { it > 0 } ?: 320
-            val h = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)?.takeIf { it > 0 } ?: 180
-            return build(context, w.toFloat(), h.toFloat())
+        private fun glyphRes(family: String?): Int = when (family) {
+            "haiku" -> R.drawable.g_haiku
+            "sonnet" -> R.drawable.g_sonnet
+            "opus" -> R.drawable.g_opus
+            "fable", "mythos" -> R.drawable.g_fable
+            else -> R.drawable.g_grey
         }
 
-        /** 一种大小的卡片（dp）/ the card at one size, in dp */
-        fun build(context: Context, wDp: Float, hDp: Float): RemoteViews {
+        /** 状态点：在跑、等你、后台三种会一闪一闪，其他是灰色静止的 / status dot: pulses when running, needs you or background */
+        private fun dot(rv: RemoteViews, which: Int?) {
+            for (id in intArrayOf(R.id.pulse_green, R.id.pulse_red, R.id.pulse_blue)) rv.setViewVisibility(id, if (id == which) View.VISIBLE else View.GONE)
+            rv.setViewVisibility(R.id.dot_still, if (which == null) View.VISIBLE else View.GONE)
+        }
+
+        fun build(context: Context): RemoteViews {
             val prefs = Prefs(context)
             val rv = RemoteViews(context.packageName, R.layout.widget_card)
-            val (wPx, hPx, scale) = Render.pixels(wDp, hDp, context.resources.displayMetrics.density)
-            rv.setImageViewBitmap(R.id.img, Render.card(context, wPx, hPx, scale))
-            rv.setContentDescription(R.id.img, describe(context))
+            val color = { id: Int -> context.getColor(id) }
 
             val settings = pi(context, 2, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true)
             if (prefs.url.isBlank()) {
@@ -93,14 +88,155 @@ class CardWidget : AppWidgetProvider() {
                 rv.setOnClickPendingIntent(R.id.card, pi(context, 1, Intent(context, CardWidget::class.java).setAction(ACTION_TAP), false))
                 rv.setOnClickPendingIntent(R.id.open, pi(context, 3, Intent(Intent.ACTION_VIEW, Uri.parse(prefs.boardOrUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true))
             }
-            return rv
-        }
 
-        /** 读屏用的文字说明 / a spoken summary for screen readers */
-        private fun describe(context: Context): String {
-            val d = Prefs(context).data() ?: return context.getString(R.string.app_name)
-            val s = d.session ?: return context.getString(R.string.st_none)
-            return listOfNotNull(s.project, s.task, s.model, s.needMsg, d.limits?.sevenDay?.let { context.getString(R.string.q_week) + " " + it.pct.toInt() + "%" }).joinToString(", ")
+            val d = prefs.data()
+            val err = prefs.lastError
+            if (d == null) {
+                // 还没连上 / not connected yet
+                dot(rv, null)
+                rv.setTextViewText(R.id.status, context.getString(R.string.app_name))
+                rv.setTextColor(R.id.status, color(R.color.c_label))
+                rv.setTextViewText(R.id.project, "")
+                rv.setViewVisibility(R.id.glyph, View.GONE)
+                rv.setTextViewTextSize(R.id.model, TypedValue.COMPLEX_UNIT_SP, 16f)
+                rv.setTextViewText(R.id.model, errorText(context, if (prefs.url.isBlank()) Fail.NO_URL.name else err.ifBlank { Fail.NETWORK.name }))
+                rv.setTextViewText(R.id.sub, prefs.url.removePrefix("https://").removePrefix("http://"))
+                rv.setChronometer(R.id.timer, SystemClock.elapsedRealtime(), null, false)
+                rv.setViewVisibility(R.id.timer, View.GONE)
+                rv.setViewVisibility(R.id.quota, View.GONE)
+                rv.setViewVisibility(R.id.activity, View.GONE)
+                rv.setViewVisibility(R.id.line, View.GONE)
+                rv.setTextViewText(R.id.cost, "")
+                rv.setTextViewText(R.id.updated, "")
+                return rv
+            }
+
+            val sinceFetch = ((System.currentTimeMillis() - prefs.lastOkAt).coerceAtLeast(0)) / 1000.0
+            val nowSec = d.now + sinceFetch
+            val s = d.session
+            val st = Model.status(s)
+
+            // 状态 / status
+            val (label, tint, pulse) = when (st) {
+                Status.RUNNING -> Triple(R.string.st_running, R.color.c_green, R.id.pulse_green)
+                Status.NEEDS_YOU -> Triple(R.string.st_need, R.color.c_red, R.id.pulse_red)
+                Status.BACKGROUND -> Triple(R.string.st_bg, R.color.c_blue, R.id.pulse_blue)
+                Status.IDLE -> Triple(R.string.st_idle, R.color.c_label2, null)
+                Status.ENDED -> Triple(R.string.st_ended, R.color.c_label2, null)
+                Status.NONE -> Triple(R.string.st_none, R.color.c_label2, null)
+            }
+            dot(rv, pulse)
+            rv.setTextViewText(R.id.status, context.getString(label))
+            rv.setTextColor(R.id.status, color(tint))
+            rv.setTextViewText(R.id.project, (s?.project ?: "") + if (d.others.isNotEmpty()) "  +${d.others.size}" else "")
+
+            // 模型 / model
+            rv.setTextViewTextSize(R.id.model, TypedValue.COMPLEX_UNIT_SP, 21f)
+            if (s?.model != null) {
+                rv.setViewVisibility(R.id.glyph, View.VISIBLE)
+                rv.setInt(R.id.glyph, "setBackgroundResource", glyphRes(s.family))
+                rv.setTextViewText(R.id.glyph, Model.glyph(s.family, s.model))
+                rv.setTextViewText(R.id.model, s.model)
+            } else {
+                rv.setViewVisibility(R.id.glyph, View.GONE)
+                rv.setTextViewText(R.id.model, context.getString(R.string.app_name))
+            }
+            val sub = listOfNotNull(
+                s?.effort,
+                s?.agentsRunning?.takeIf { it > 0 }?.let { context.getString(R.string.sub_agents, it) },
+                s?.bgRunning?.takeIf { it > 0 }?.let { context.getString(R.string.sub_bg, it) },
+            ).joinToString(" · ")
+            rv.setTextViewText(R.id.sub, sub)
+            // 这一轮的计时器：自己按秒走 / the turn timer ticks by itself
+            val started = s?.taskStartedAt
+            if (s != null && started != null && s.taskEndedAt == null && s.active && st != Status.IDLE) {
+                val base = SystemClock.elapsedRealtime() - ((nowSec - started) * 1000).toLong()
+                rv.setChronometer(R.id.timer, base, if (sub.isEmpty()) "%s" else " · %s", true)
+                rv.setViewVisibility(R.id.timer, View.VISIBLE)
+            } else {
+                rv.setChronometer(R.id.timer, SystemClock.elapsedRealtime(), null, false)
+                rv.setViewVisibility(R.id.timer, View.GONE)
+            }
+
+            // 本周额度圆环 / weekly-usage ring
+            val wk = d.limits?.sevenDay
+            if (wk != null) {
+                rv.setViewVisibility(R.id.quota, View.VISIBLE)
+                rv.setImageViewBitmap(R.id.ring, Ring.draw(context, wk.pct))
+                rv.setContentDescription(R.id.ring, context.getString(R.string.q_week) + " " + wk.pct.roundToInt() + "%")
+                val five = d.limits?.fiveHour
+                rv.setTextViewText(R.id.quota_sub, if (five != null) context.getString(R.string.q_5h, five.pct.roundToInt()) else "")
+            } else {
+                rv.setViewVisibility(R.id.quota, View.GONE)
+            }
+
+            // 中间 / middle
+            rv.removeAllViews(R.id.flipper)
+            val running = s?.running.orEmpty()
+            when {
+                st == Status.NEEDS_YOU -> {
+                    rv.setViewVisibility(R.id.activity, View.GONE)
+                    rv.setViewVisibility(R.id.line, View.VISIBLE)
+                    rv.setInt(R.id.line, "setBackgroundResource", R.drawable.need_fill)
+                    rv.setTextColor(R.id.line, color(R.color.c_red))
+                    rv.setTextViewText(R.id.line, s?.needMsg ?: context.getString(R.string.st_need))
+                }
+                running.isNotEmpty() -> {
+                    rv.setViewVisibility(R.id.line, View.GONE)
+                    rv.setViewVisibility(R.id.activity, View.VISIBLE)
+                    running.forEachIndexed { i, r ->
+                        val row = RemoteViews(context.packageName, R.layout.widget_run_row)
+                        val bg = r.kind == "bg"
+                        row.setInt(R.id.r_glyph, "setBackgroundResource", if (bg) R.drawable.g_grey else glyphRes(r.family))
+                        row.setTextViewText(R.id.r_glyph, if (bg) "›_" else Model.glyph(r.family, r.model ?: r.name))
+                        row.setTextViewText(R.id.r_name, r.name)
+                        row.setTextViewText(R.id.r_text, listOfNotNull(r.model, r.text).joinToString(" · "))
+                        row.setTextViewText(R.id.r_count, if (running.size > 1) context.getString(R.string.agent_more, i + 1, running.size) else "")
+                        rv.addView(R.id.flipper, row)
+                    }
+                }
+                else -> {
+                    rv.setViewVisibility(R.id.activity, View.GONE)
+                    val text = when {
+                        st == Status.RUNNING && s?.now != null -> s.now
+                        st == Status.IDLE && s?.task != null -> context.getString(R.string.waiting_you)
+                        else -> null
+                    }
+                    rv.setViewVisibility(R.id.line, if (text == null) View.GONE else View.VISIBLE)
+                    rv.setInt(R.id.line, "setBackgroundResource", R.drawable.row_fill)
+                    rv.setTextColor(R.id.line, color(R.color.c_label2))
+                    rv.setTextViewText(R.id.line, text ?: "")
+                }
+            }
+
+            // 页脚 / footer
+            val t = d.totals
+            val cost = t.cost
+            rv.setTextViewText(
+                R.id.cost,
+                when {
+                    cost == null -> ""
+                    t.saved != null && t.saved >= 0.01 -> context.getString(R.string.cost_short, t.hours, Model.money(cost), (t.saved * 100).roundToInt())
+                    else -> context.getString(R.string.cost_short_plain, t.hours, Model.money(cost))
+                },
+            )
+            val clock = { ms: Long -> if (ms <= 0) "—" else DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms)) }
+            when {
+                err.isNotBlank() -> {
+                    rv.setTextViewText(R.id.updated, context.getString(R.string.stale, clock(prefs.lastOkAt)))
+                    rv.setTextColor(R.id.updated, color(R.color.c_red))
+                }
+                prefs.liveUntil > System.currentTimeMillis() -> {
+                    rv.setTextViewText(R.id.updated, context.getString(R.string.live))
+                    rv.setTextColor(R.id.updated, color(R.color.c_green))
+                }
+                else -> {
+                    rv.setTextViewText(R.id.updated, clock(max(prefs.lastOkAt, 0)))
+                    rv.setTextColor(R.id.updated, color(R.color.c_label3))
+                }
+            }
+            rv.setContentDescription(R.id.card, listOfNotNull(s?.project, context.getString(label), s?.model, wk?.let { context.getString(R.string.q_week) + " " + it.pct.roundToInt() + "%" }).joinToString(", "))
+            return rv
         }
 
         fun errorText(context: Context, code: String): String = context.getString(

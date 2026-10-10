@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="c_surface">#FF1C1C1E</color>
+    <color name="c_label">#FFFFFFFF</color>
+    <color name="c_label2">#99EBEBF5</color>
+    <color name="c_label3">#4DEBEBF5</color>
+    <color name="c_hair">#1FFFFFFF</color>
+    <color name="c_fill">#0FFFFFFF</color>
+    <color name="c_blue">#FF0A84FF</color>
+    <color name="c_green">#FF30D158</color>
+    <color name="c_red">#FFFF453A</color>
+    <color name="c_orange">#FFFF9F0A</color>
+    <color name="c_grey">#FF8E8E93</color>
+</resources>

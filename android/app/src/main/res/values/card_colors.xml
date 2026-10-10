@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 卡片配色：苹果风格，浅色/深色跟随系统 / card colours, Apple style, light and dark follow the system -->
+<resources>
+    <color name="c_surface">#FFFFFFFF</color>
+    <color name="c_label">#FF1D1D1F</color>
+    <color name="c_label2">#993C3C43</color>
+    <color name="c_label3">#4D3C3C43</color>
+    <color name="c_hair">#143C3C43</color>
+    <color name="c_fill">#0A000000</color>
+    <color name="c_blue">#FF007AFF</color>
+    <color name="c_green">#FF34C759</color>
+    <color name="c_red">#FFFF3B30</color>
+    <color name="c_orange">#FFFF9500</color>
+    <color name="c_grey">#FF8E8E93</color>
+</resources>
