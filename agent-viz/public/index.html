@@ -122,6 +122,10 @@ main { min-width: 0; padding-bottom: 64px; }
 .head { padding: 40px 0 8px; }
 .head h1 { margin: 0 0 16px; font-family: var(--display); font-size: 40px; line-height: 1.1; font-weight: 600; letter-spacing: -.374px; max-width: 24em; text-wrap: balance; }
 .head h1.quiet { color: var(--faint); }
+.head h1[title] { cursor: help; }
+.fullbtn { border: 0; background: rgba(0, 0, 0, .05); color: var(--ink80); font-size: 12px; padding: 3px 10px; border-radius: 999px; cursor: pointer; }
+.fullbtn:hover { background: rgba(0, 0, 0, .08); }
+.fulltext { margin: 14px 0 0; max-width: 60em; font-size: 14px; line-height: 1.55; color: var(--ink80); white-space: pre-wrap; word-break: break-word; background: var(--canvas); border: 1px solid var(--hair); border-radius: var(--r-md); padding: 12px 14px; max-height: 220px; overflow-y: auto; }
 .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; color: var(--ink80); font-size: 14px; }
 .reason { color: var(--ink80); }
 .reason em { font-style: normal; color: var(--muted); }
@@ -456,7 +460,7 @@ const I18N = {
     notifyOn: '开启桌面提醒', notifyGranted: '桌面提醒已开启', notifyBlocked: '浏览器拦截了桌面提醒，可在地址栏左边的网站设置里允许',
     soundOff: '关闭提示音', soundOn: '开启提示音',
     alertText: (p, m) => `<b>${p}</b> 在等你确认${m ? '：' + m : ''}`, view: '查看', notifyTitle: '等你确认时提醒我', notifTitle: p => `${p} 在等你确认`,
-    sessionSince: hm => `会话开始于 ${hm}`, noTask: '还没有收到任务', unknownModel: '模型未知',
+    sessionSince: hm => `会话开始于 ${hm}`, noTask: '还没有收到任务', noTaskEnded: '这个会话没有记录到任务', fullShow: '看全文', fullHide: '收起', unknownModel: '模型未知',
     turnTime: (done, tm) => `这一轮${done ? '用了' : '已用'} ${tm}`,
     whyThis: '为什么选它：', routeMode: m => `（模式：${m}）`, pendingDown: m => `；下一轮还简单就换 ${m}`, ctxUsed: p => `上下文占用 ${p}%`,
     nowDoing: '正在', waitingKids: n => `等 ${n} 个子代理交回结果`, thinking: '思考中…', approveInTerminal: '等你在终端里确认', lastStep: '上一步', idleNow: '空闲',
@@ -485,7 +489,7 @@ const I18N = {
     by_plan: '计划模式', by_midTurn: '本轮中途升档', by_handback: '子代理交回', by_manual: '你指定', by_pin: '/route 固定', by_continue: '沿用上一轮',
     by_escalate: '自动升档', by_rule: '规则', by_haiku: 'Haiku 判断', by_fallback: '默认', by_guard: '保护', by_phase: '计划执行',
     log_sessionStart: '会话开始', log_sessionResumed: '恢复会话', log_sessionEnd: '会话结束', log_handback: '收到子代理交回的结果，整理中',
-    log_newTask: p => '新任务：' + p, log_spawned: (ty, d) => `派出 ${ty}：${d}`, log_tests: (p, n) => `测试 ${p}/${n} 通过`,
+    log_newTask: p => '新任务：' + brief(p), log_spawned: (ty, d) => `派出 ${ty}：${d}`, log_tests: (p, n) => `测试 ${p}/${n} 通过`,
     log_toolFailed: l => `工具失败：${l}`,
     log_agentEnded: (st, d) => `${st === 'failed' ? '出错结束' : st === 'stopped' ? '被中断' : '完成'} · 用时 ${d}`,
     log_turnDone: '本轮回复完成，等你下一步', log_needsYou: m => '需要你确认：' + m, log_modelSwitch: m => `切换模型 → ${m}`,
@@ -516,7 +520,7 @@ const I18N = {
     notifyOn: 'Turn on notifications', notifyGranted: 'Notifications are on', notifyBlocked: 'Notifications are blocked — allow them in site settings, left of the address bar',
     soundOff: 'Turn off sound', soundOn: 'Turn on sound',
     alertText: (p, m) => `<b>${p}</b> needs your approval${m ? ': ' + m : ''}`, view: 'View', notifyTitle: 'Alert me when approval is needed', notifTitle: p => `${p} needs your approval`,
-    sessionSince: hm => `Started ${hm}`, noTask: 'No task yet', unknownModel: 'Unknown model',
+    sessionSince: hm => `Started ${hm}`, noTask: 'No task yet', noTaskEnded: 'No task recorded in this session', fullShow: 'Full prompt', fullHide: 'Hide', unknownModel: 'Unknown model',
     turnTime: (done, tm) => `${done ? 'This turn took' : 'This turn so far:'} ${tm}`,
     whyThis: 'Why this model: ', routeMode: m => ` (mode: ${m})`, pendingDown: m => `; switches to ${m} next turn if it stays simple`, ctxUsed: p => `Context ${p}% used`,
     nowDoing: 'Now', waitingKids: n => `Waiting on ${n} ${pl(n, 'subagent', 'subagents')}`, thinking: 'Thinking…', approveInTerminal: 'Approve in your terminal', lastStep: 'Last step', idleNow: 'Idle',
@@ -545,7 +549,7 @@ const I18N = {
     by_plan: 'Plan mode', by_midTurn: 'Mid-turn escalation', by_handback: 'Subagent hand-back', by_manual: 'Your pick', by_pin: 'Pinned via /route', by_continue: 'Same as last turn',
     by_escalate: 'Auto-escalated', by_rule: 'Rule', by_haiku: 'Haiku’s call', by_fallback: 'Default', by_guard: 'Guardrail', by_phase: 'Plan execution',
     log_sessionStart: 'Session started', log_sessionResumed: 'Session resumed', log_sessionEnd: 'Session ended', log_handback: 'Subagent results are back — summarizing',
-    log_newTask: p => 'New task: ' + p, log_spawned: (ty, d) => `Dispatched ${ty}: ${d}`, log_tests: (p, n) => `Tests: ${p}/${n} passed`,
+    log_newTask: p => 'New task: ' + brief(p), log_spawned: (ty, d) => `Dispatched ${ty}: ${d}`, log_tests: (p, n) => `Tests: ${p}/${n} passed`,
     log_toolFailed: l => `Tool failed: ${l}`,
     log_agentEnded: (st, d) => `${st === 'failed' ? 'Failed after' : st === 'stopped' ? 'Interrupted after' : 'Finished in'} ${d}`,
     log_turnDone: 'Turn complete — your move', log_needsYou: m => 'Needs your approval: ' + m, log_modelSwitch: m => `Switched model → ${m}`,
@@ -787,6 +791,38 @@ function notifyNeeds() {
 }
 
 // ---------- 当前任务 ----------
+// 把你发的一大段话压成一句标题：去掉"帮我/请"这类开头，取第一个够长的分句，中文约 20 字、英文约 56 个字符
+// Turn a long prompt into a short title: drop polite openers, keep the first meaningful clause, cap the length
+function brief(p) {
+  const full = String(p == null ? '' : p).replace(/```[\s\S]*?```/g, ' ').replace(/`([^`]*)`/g, '$1')
+    .replace(/https?:\/\/\S+/g, ' ').replace(/[#>*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let s = full.replace(/^(?:(?:请你|请帮我|你帮我|帮我|帮忙|麻烦你?|你能不能|能不能|可以帮我|我想让你|我需要你|我想|请|好的|那)[，,\s]*)+/, '')
+    .replace(/^(?:(?:please|can you|could you|would you|help me|i want you to|i need you to|i'd like you to|ok(?:ay)?|so)[,\s]+)+/i, '');
+  if (!s) s = full;
+  const cjk = /[\u3400-\u9fff]/.test(s);
+  // 按显示宽度算：汉字 1，英文字母约 0.55 / measure by visual width: CJK 1, Latin ~0.55
+  const W = str => { let w = 0; for (const ch of str) w += /[\u2e80-\uffef]/.test(ch) ? 1 : 0.55; return w; };
+  const max = cjk ? 20 : 31, min = cjk ? 6 : 10, slack = cjk ? 6 : 8;
+  const trimEnd = x => x.replace(/[。！？!?；;：:，,、\s]+$/, '');
+  let out = '';
+  for (const c of s.split(/(?<=[。！？!?；;：:，,\n])\s*/)) { out += c; if (W(trimEnd(out)) >= min) break; }
+  out = trimEnd(out);
+  let cut = out.length < trimEnd(s).length;
+  if (W(out) > max + slack) {                        // 稍微超一点就整句保留 / keep a clause that is only a little over
+    let head = '', w = 0;
+    for (const ch of out) { const cw = /[\u2e80-\uffef]/.test(ch) ? 1 : 0.55; if (w + cw > max) break; head += ch; w += cw; }
+    const rest = out.slice(head.length);
+    if (/[A-Za-z0-9]$/.test(head) && /^[A-Za-z0-9]/.test(rest)) head = head.replace(/[A-Za-z0-9._-]+$/, '');   // 不把英文单词切一半 / don't split a word
+    if (!cjk && /\s/.test(head)) head = head.replace(/\s+\S*$/, '');
+    out = trimEnd(head) || out.slice(0, 12);
+    cut = true;
+  }
+  if (!cjk) out = out.charAt(0).toUpperCase() + out.slice(1);
+  return out + (cut ? '…' : '');
+}
+const headFull = { id: null, open: false };
+function toggleFull() { headFull.open = !headFull.open; const s = pick(); if (s) renderHead(s); }
+
 function renderHead(s) {
   const k = stKey(s);
   const lastTurn = (s.turns || []).filter(x => !x.handback).slice(-1)[0];
@@ -794,10 +830,16 @@ function renderHead(s) {
   const r = s.route && s.route.last;
   const pillCls = k === 'need' ? 'need' : k;
   put('subnav', `<span class="p">${esc(projName(s))}</span><span class="pill ${pillCls}">${k === 'need' ? t('st_need') : statusLabel(k)}</span><span class="since">${t('sessionSince', hm(s.startedAt))}</span>`);
-  put('head', `<h1 class="${task ? '' : 'quiet'}">${task ? esc(task.prompt) : t('noTask')}</h1>
+  const tid = s.id + '|' + (task ? task.startedAt : '');
+  if (headFull.id !== tid) { headFull.id = tid; headFull.open = false; }
+  const title = task ? brief(task.prompt) : '';
+  const long = task && title !== String(task.prompt || '').trim();
+  put('head', `<h1 class="${task ? '' : 'quiet'}"${long ? ` title="${esc(task.prompt)}"` : ''}>${task ? esc(title) : t(s.active ? 'noTask' : 'noTaskEnded')}</h1>
     <div class="meta">${chip(s.family, s.model || t('unknownModel'))}${meter(s.effort, s.family)}
       ${task ? `<span>${t('turnTime', !!(task.endedAt || !s.active), timer(task.startedAt, task.endedAt || (s.active ? null : s.lastTs)))}</span>` : ''}
-      ${r ? `<span class="reason"><em>${t('whyThis')}</em>${esc(r.reason)}${s.route.mode && s.route.mode !== 'auto' ? t('routeMode', esc(s.route.mode)) : ''}${s.route.pendingDown ? t('pendingDown', esc(NAMES[s.route.pendingDown] || s.route.pendingDown)) : ''}</span>` : ''}</div>`);
+      ${r ? `<span class="reason"><em>${t('whyThis')}</em>${esc(r.reason)}${s.route.mode && s.route.mode !== 'auto' ? t('routeMode', esc(s.route.mode)) : ''}${s.route.pendingDown ? t('pendingDown', esc(NAMES[s.route.pendingDown] || s.route.pendingDown)) : ''}</span>` : ''}
+      ${long ? `<button class="fullbtn" onclick="toggleFull()" aria-expanded="${headFull.open}">${t(headFull.open ? 'fullHide' : 'fullShow')}</button>` : ''}</div>
+    ${long && headFull.open ? `<div class="fulltext">${esc(task.prompt)}</div>` : ''}`);
 }
 
 const SI = { done: '✓', failed: '✕', stopped: '■', running: '' };
@@ -1081,7 +1123,7 @@ function renderTimeline(s) {
   const segs = turns.map(tu => tu.segs.map((g, i) => {
     const a = Math.max(g.start, tu.start), b = i < tu.segs.length - 1 ? tu.segs[i + 1].start : (tu.end || t1);
     const w = x(b) - x(a);
-    const tip = `<b>${esc(NAMES[g.family] || g.model || t('unknown'))}</b>${g.effort ? ' · ' + esc(g.effort) : ''}<br>${esc(turnPrompt(tu))}<br><span class='d'>${esc(t('tipStart', hm(a), tu.end ? dur(b - a) : t('inProgress')))}${g.reason ? '<br>' + esc(t('byReason', byLabel(g.by), g.reason)) : ''}</span>`;
+    const tip = `<b>${esc(NAMES[g.family] || g.model || t('unknown'))}</b>${g.effort ? ' · ' + esc(g.effort) : ''}<br>${esc(tu.handback ? turnPrompt(tu) : brief(tu.prompt))}<br><span class='d'>${esc(t('tipStart', hm(a), tu.end ? dur(b - a) : t('inProgress')))}${g.reason ? '<br>' + esc(t('byReason', byLabel(g.by), g.reason)) : ''}</span>`;
     return `<span class="seg main ${f(g.family)} ${tu.end ? '' : 'open'} ${tu.handback ? 'hb' : ''}" style="left:${x(a)}%;width:${w}%" data-tip="${esc(tip)}">${w > 7 ? esc(NAMES[g.family] || '') : ''}</span>`;
   }).join('')).join('');
   const rows = lanes.map(l => {
@@ -1125,7 +1167,7 @@ function renderHist(s) {
   put('hist', `<ul class="hist">${turns.slice(0, 12).map(tu => {
     const fams = [...new Set(tu.segs.map(g => g.family).filter(Boolean))];
     const p = turnPrompt(tu);
-    return `<li class="${tu.end ? '' : 'cur'}"><span class="t num">${hm(tu.start)}</span><span class="p ${tu.handback ? 'hb' : ''}" title="${esc(p)}">${esc(p)}</span><span class="d num">${tu.end ? dur(tu.end - tu.start) : t('inProgress')}</span>
+    return `<li class="${tu.end ? '' : 'cur'}"><span class="t num">${hm(tu.start)}</span><span class="p ${tu.handback ? 'hb' : ''}" title="${esc(p)}">${esc(tu.handback ? p : brief(p))}</span><span class="d num">${tu.end ? dur(tu.end - tu.start) : t('inProgress')}</span>
       <span class="m">${fams.map(k => chip(k)).join('')}</span></li>`;
   }).join('')}</ul>`);
 }
