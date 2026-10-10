@@ -11,7 +11,9 @@ class ModelTest {
         {"v":1,"now":1000,"lang":"zh","demo":false,
          "session":{"id":"a","project":"web","status":"running","active":true,"task":"给月报加 PDF 导出","taskStartedAt":900,"taskEndedAt":null,
            "model":"Opus 5.5","family":"opus","effort":"high","agentsRunning":2,"agentsDone":1,"bgRunning":1,"now":"Bash · npm test",
-           "needMsg":null,"reason":"x","cacheUntil":1601,"gate":"pass","lastEventAt":999},
+           "needMsg":null,"reason":"x","cacheUntil":1601,"gate":"pass","lastEventAt":999,
+           "running":[{"kind":"agent","name":"explorer","model":"Haiku 5.5","family":"haiku","text":"Grep · auth"},{"kind":"bg","name":"Bash","model":null,"family":null,"text":"npm run dev"}]},
+         "limits":{"at":999,"sevenDay":{"pct":37.5,"resetsAt":"2026-10-14T09:00:00Z"},"fiveHour":{"pct":18,"resetsAt":null}},
          "others":[{"project":"docs","status":"idle"}],"needsYou":0,
          "totals":{"cost":2.104,"baseline":5.99,"saved":0.6488,"hours":24,"baselineModel":"opus"}}
     """.trimIndent()
@@ -28,6 +30,17 @@ class ModelTest {
         assertEquals(0.6488, d.totals.saved!!, 1e-9)
         assertEquals(Status.RUNNING, Model.status(s))
         assertTrue(Model.busy(d))
+    }
+
+    @Test fun runningAndLimits() {
+        val d = Model.parse(sample)
+        assertEquals(listOf(Run("agent", "explorer", "Haiku 5.5", "haiku", "Grep · auth"), Run("bg", "Bash", null, null, "npm run dev")), d.session!!.running)
+        assertEquals(Limit(37.5, "2026-10-14T09:00:00Z"), d.limits!!.sevenDay)
+        assertEquals(Limit(18.0, null), d.limits!!.fiveHour)
+        assertEquals(3, Model.effortBars("high"))
+        assertEquals("O", Model.glyph("opus", "Opus 5.5"))
+        assertEquals(1, Model.quotaLevel(60.0))
+        assertEquals(2, Model.quotaLevel(91.0))
     }
 
     @Test fun metaTags() {

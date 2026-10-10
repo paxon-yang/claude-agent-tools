@@ -12,12 +12,14 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Base64
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import kotlin.concurrent.thread
 
@@ -67,6 +69,15 @@ class MainActivity : Activity() {
                 saveAndTest()
             }
             if (intent?.getBooleanExtra("pin", false) == true) addWidget()
+            // 截图用的样例数据（base64 JSON）/ sample data for screenshots, base64 JSON
+            intent?.getStringExtra("sample")?.let {
+                LiveService.stop(this)
+                prefs.lastJson = String(Base64.decode(it, Base64.DEFAULT), Charsets.UTF_8)
+                prefs.lastOkAt = System.currentTimeMillis()
+                prefs.lastError = ""
+                prefs.liveUntil = System.currentTimeMillis() + 60_000
+                CardWidget.renderAll(this)
+            }
         }
         handlePair(intent)
     }
@@ -138,10 +149,16 @@ class MainActivity : Activity() {
         }
     }
 
+    /** 设置页上的预览：和桌面卡片用同一套画法 / the preview here uses the same painter as the home-screen card */
     private fun showPreview() {
         preview.removeAllViews()
-        val v: View = CardWidget.build(this).apply(this, preview)
-        preview.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        val dm = resources.displayMetrics
+        val w = if (preview.width > 0) preview.width else dm.widthPixels - (40 * dm.density).toInt()
+        val h = preview.layoutParams.height
+        val img = ImageView(this)
+        img.setImageBitmap(Render.card(this, w, h, dm.density))
+        img.contentDescription = getString(R.string.preview_label)
+        preview.addView(img, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
     private fun addWidget() {

@@ -88,6 +88,13 @@ body:not(.widget) .ctl .w { display: none; }
 .done { font-size: 11.5px; color: var(--faint); padding: 0 2px; }
 .done b { color: var(--green-l); font-weight: 600; }
 
+.quota { margin-top: 12px; }
+.quota .qh { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; color: var(--muted); }
+.quota .qh b { color: #fff; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.quota .q5 { color: var(--faint); } .quota .qr { margin-left: auto; color: var(--faint); }
+.quota .qbar { height: 5px; margin-top: 5px; border-radius: 999px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.quota .qbar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--green), var(--green-l)); }
+.quota.q-mid .qbar i { background: linear-gradient(90deg, #FF9F0A, #FFB340); } .quota.q-hi .qbar i { background: linear-gradient(90deg, var(--red), var(--red-l)); }
 .foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hair); font-size: 11.5px; color: var(--muted); }
 .foot b { color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
 .foot .sv { color: var(--green-l); font-weight: 600; }
@@ -110,12 +117,12 @@ const NAMES = { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', fable: 'Fable', 
 const EFF = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
 const I18N = {
   zh: { running: '运行中', bg: '后台在跑', need: '等你确认', idle: '等你下一步', ended: '已结束', noTask: '还没有收到任务', now: '正在', thinking: '思考中…',
-    waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端或 Claude App 里确认', cacheLeft: m => `缓存 ${m} 分`, cacheCold: '缓存已过期', gate_pass: '测试 ✓', gate_fail: '测试 ✕ 修复中', gate_giveup: '测试 ✕', gate_timeout: '测试超时', gate_skip: '测试跳过', last: '上一步', idle2: '空闲',
+    waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端或 Claude App 里确认', qWeek: '本周额度', q5h: n => `5 小时 ${n}%`, qReset: s => `${s} 重置`, cacheLeft: m => `缓存 ${m} 分`, cacheCold: '缓存已过期', gate_pass: '测试 ✓', gate_fail: '测试 ✕ 修复中', gate_giveup: '测试 ✕', gate_timeout: '测试超时', gate_skip: '测试跳过', last: '上一步', idle2: '空闲',
     needs: (p, m) => `<b>${p}</b> 在等你确认${m ? '：' + m : ''}`, done: n => `<b>✓ ${n}</b> 个已完成`, why: '为什么：', today: h => `近 ${h} 小时`, saved: n => `少花 ${n}%`,
     full: '打开完整看板 ↗', empty: '现在没有 Claude Code 在运行', emptySub: '在任意项目里输入 claude，这里会自动出现。', live: '实时', off: '重连中', pin: '总在最前', close: '隐藏',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: '后台监视', Bash: '后台命令' }, subagent: '子代理', unknown: '模型未知' },
   en: { running: 'Running', bg: 'Background', need: 'Needs you', idle: 'Your turn', ended: 'Ended', noTask: 'No task yet', now: 'Now', thinking: 'Thinking…',
-    waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal or the Claude app', cacheLeft: m => `cache ${m}m`, cacheCold: 'cache cold', gate_pass: 'tests ✓', gate_fail: 'tests ✕ fixing', gate_giveup: 'tests ✕', gate_timeout: 'tests timed out', gate_skip: 'tests skipped', last: 'Last', idle2: 'Idle',
+    waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal or the Claude app', qWeek: 'This week', q5h: n => `5h ${n}%`, qReset: s => `resets ${s}`, cacheLeft: m => `cache ${m}m`, cacheCold: 'cache cold', gate_pass: 'tests ✓', gate_fail: 'tests ✕ fixing', gate_giveup: 'tests ✕', gate_timeout: 'tests timed out', gate_skip: 'tests skipped', last: 'Last', idle2: 'Idle',
     needs: (p, m) => `<b>${p}</b> needs your approval${m ? ': ' + m : ''}`, done: n => `<b>✓ ${n}</b> finished`, why: 'Why: ', today: h => `Last ${h}h`, saved: n => `${n}% saved`,
     full: 'Open full board ↗', empty: 'No Claude Code running', emptySub: 'Run claude in any project and it shows up here.', live: 'Live', off: 'Reconnecting', pin: 'Always on top', close: 'Hide',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: 'Monitor', Bash: 'Background command' }, subagent: 'Subagent', unknown: 'Unknown model' },
@@ -172,11 +179,27 @@ function pick() {
 function go(d) { const n = sessions().length; if (!n) return; pick.manual = true; idx = (idx + d + n) % n; render(); }
 function jump(id) { const i = sessions().findIndex(s => s.id === id); if (i >= 0) { pick.manual = true; idx = i; render(); } }
 
+function resetLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const hmS = d.toLocaleTimeString(LANG === 'zh' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (d - Date.now() < 20 * 3600e3) return hmS;
+  const wd = LANG === 'zh' ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()] : d.toLocaleDateString('en-GB', { weekday: 'short' });
+  return wd + ' ' + hmS;
+}
+// 本周额度条 / weekly plan usage bar
+function quotaHtml(L) {
+  if (!L || !L.sevenDay) return '';
+  const p = Math.max(0, Math.min(100, L.sevenDay.pct));
+  const lvl = p >= 85 ? 'hi' : p >= 60 ? 'mid' : 'ok';
+  const rs = resetLabel(L.sevenDay.resetsAt);
+  return `<div class="quota q-${lvl}"><div class="qh"><span>${t('qWeek')}</span><b>${Math.round(p)}%</b>${L.fiveHour ? `<span class="q5">${t('q5h', Math.round(L.fiveHour.pct))}</span>` : ''}${rs ? `<span class="qr">${t('qReset', rs)}</span>` : ''}</div><div class="qbar"><i style="width:${p}%"></i></div></div>`;
+}
 function render() {
   if (!state) return;
   const s = pick(), ss = sessions();
   const T = state.totals || {};
-  const foot = `<div class="foot"><span class="live ${conn ? '' : 'off'}"><i></i>${t(conn ? 'live' : 'off')}</span><span>${t('today', T.hours || 24)} <b>${money(T.cost)}</b></span>
+  const foot = quotaHtml(state.limits) + `<div class="foot"><span class="live ${conn ? '' : 'off'}"><i></i>${t(conn ? 'live' : 'off')}</span><span>${t('today', T.hours || 24)} <b>${money(T.cost)}</b></span>
     ${T.saved != null && T.baseline > 0 && T.saved >= .01 ? `<span class="sv">${t('saved', Math.round(T.saved * 100))}</span>` : ''}<a onclick="openFull()">${t('full')}</a></div>`;
   const others = (state.needsYou || []).filter(n => !s || n.id !== s.id);
   const alerts = others.map(n => `<div class="alert" onclick="jump('${esc(n.id)}')"><span class="ic">!</span><span>${t('needs', esc(n.project || '—'), esc(n.msg || ''))}</span></div>`).join('');

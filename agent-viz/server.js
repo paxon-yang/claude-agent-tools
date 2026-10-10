@@ -581,9 +581,21 @@ function onAgentTranscript(s, a, o) {
   }
 }
 
+// 订阅额度：取所有会话里最新的一份（额度是整个账号共用的）/ plan usage: the newest reading from any session (limits are account-wide)
+let planLimits = null;
+if (DEMO) {   // 演示数据 / demo values
+  const t0 = Date.now();
+  planLimits = { at: t0, list: [{ kind: 'seven_day', pct: 37, resetsAt: new Date(t0 + 3.6 * 86400e3).toISOString() }, { kind: 'five_hour', pct: 18, resetsAt: new Date(t0 + 2.3 * 3600e3).toISOString() }] };
+}
+function limitsView() {
+  if (!planLimits || !Array.isArray(planLimits.list)) return null;
+  const get = k => { const x = planLimits.list.find(l => l.kind === k); return x ? { pct: Number(x.pct) || 0, resetsAt: x.resetsAt || null } : null; };
+  return { at: planLimits.at / 1000, sevenDay: get('seven_day'), fiveHour: get('five_hour') };
+}
 function pollRouter(s) {
   const r = readJSON(path.join(VIZ, 'router', s.id + '.json'));
   if (!r || !Array.isArray(r.decisions)) return;
+  if (r.limits && r.limits.at && (!planLimits || r.limits.at > planLimits.at)) { planLimits = r.limits; changed(); }
   const last = r.decisions[r.decisions.length - 1] || null;
   const key = JSON.stringify([r.mode, r.decisions.length, last && last.at, r.gate && r.gate.at, r.cache && r.cache.warmUntil]);
   if (key === s.routeKey) return;
@@ -734,6 +746,7 @@ function snapshot() {
     sessions: list, stats: { events: stats.events, badLines: stats.badLines },
     totals: { ...all, tasks, sessions: recent.length, hours: KEEP_HOURS, baselineModel: BASELINE },
     needsYou: list.filter(x => x.active && x.status === 'needs-you').map(x => ({ id: x.id, project: x.project, msg: x.needMsg })),
+    limits: limitsView(),
     remote: remoteInfo() };
 }
 
@@ -782,12 +795,17 @@ function widgetView() {
     cacheUntil: s.route && s.route.cacheUntil ? s.route.cacheUntil : null,
     gate: s.route && s.route.gate ? s.route.gate.result : null,
     lastEventAt: s.lastEventAt || null,
+    // 在跑的子代理和后台任务（最多 3 个）/ running sub-agents and background tasks, up to 3
+    running: s.agents.filter(a => a.status === 'running').map(a => ({ kind: 'agent', name: a.type, model: a.model || null, family: a.family || null, text: a.currentTool || a.description || null, startedAt: a.startedAt || null }))
+      .concat((s.background || []).filter(b => b.status === 'running').map(b => ({ kind: 'bg', name: b.tool, model: null, family: null, text: b.description || b.label || null, startedAt: b.startedAt || null })))
+      .slice(0, 3),
   };
   return {
     v: 1, now: snap.now, lang: LANG, demo: DEMO,
     session: one,
     others: act.filter(x => x !== s).slice(0, 5).map(x => ({ project: x.project, status: x.status })),
     needsYou: snap.needsYou.length,
+    limits: snap.limits,
     totals: { cost: snap.totals.cost, baseline: snap.totals.baseline, saved: snap.totals.saved, hours: snap.totals.hours, baselineModel: snap.totals.baselineModel },
   };
 }

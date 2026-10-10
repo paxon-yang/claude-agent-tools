@@ -22,7 +22,7 @@ function world(on: On, w: World) {
   })
   on('session.id', () => v('sess-1'))
   on('session.cwd', () => v('/proj'))
-  on('session.usage', () => v({ startedAt: 0, context: { tokens: 20_000, window: 1_000_000 }, rateLimits: [] }))
+  on('session.usage', () => v({ startedAt: 0, context: { tokens: 20_000, window: 1_000_000 }, rateLimits: [{ kind: 'seven_day', percentUsed: 37.5, resetsAt: '2026-10-15T07:00:00Z' }, { kind: 'five_hour', percentUsed: 12 }] }))
   on('agent.list', () => v([]))
   on('command.register', ($, e) => v({ command: e.name }))
   on('ui.status', () => v(undefined))
@@ -162,4 +162,15 @@ test('/route works without the dashboard', async ($, on) => {
   const r = await $.command.run({ command: 'route', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
   expect(r.text ?? '').toContain('Main session now: not started yet')
   expect(r.text ?? '').toContain('(none yet)')
+})
+
+test('plan usage windows go to the dashboard log', async ($, on) => {
+  const w: World = { files: { ...PKG }, exit: 0, runs: [] }
+  world(on, w)
+  on('turn.complete', () => ({ text: '' }))
+  await $.session.start({ cwd: '/proj', surface: null, isInteractive: true })
+  await $.turn.start({ text: 'explain auth.ts', turnId: 't1' })
+  await $.turn.complete({ answer: 'ok', durationMs: 10, isAborted: false, turnId: 't1', reason: 'answer' })
+  const log = JSON.parse(w.log ?? '{}')
+  expect(log.limits.list).toEqual([{ kind: 'seven_day', pct: 37.5, resetsAt: '2026-10-15T07:00:00Z' }, { kind: 'five_hour', pct: 12, resetsAt: null }])
 })

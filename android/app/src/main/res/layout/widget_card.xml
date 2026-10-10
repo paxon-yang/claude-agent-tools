@@ -1,171 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面卡片。默认文字就是小组件选择器里的预览 / the home-screen card; the default texts are the picker preview -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 桌面卡片：整张图由 Render.kt 画好；右下角叠一个透明按钮，点了打开完整看板
+     The card is one picture painted by Render.kt; a transparent button over the bottom-right corner opens the full board -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/card"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/card_bg"
-    android:orientation="vertical"
-    android:paddingStart="16dp"
-    android:paddingTop="13dp"
-    android:paddingEnd="14dp"
-    android:paddingBottom="11dp">
+    android:layout_height="match_parent">
 
-    <LinearLayout
+    <ImageView
+        android:id="@+id/img"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_height="match_parent"
+        android:contentDescription="@string/app_name"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_preview" />
 
-        <TextView
-            android:id="@+id/project"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/preview_project"
-            android:textColor="@color/ink"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/pill_running"
-            android:paddingStart="9dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="9dp"
-            android:paddingBottom="2dp"
-            android:text="@string/st_running"
-            android:textColor="@color/green_l"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/task"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:ellipsize="end"
-        android:maxLines="2"
-        android:text="@string/preview_task"
-        android:textColor="@color/ink"
-        android:textSize="17sp"
-        android:textStyle="bold" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:id="@+id/dot"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:layout_marginEnd="6dp"
-            android:contentDescription="@null"
-            android:src="@drawable/dot" />
-
-        <TextView
-            android:id="@+id/model"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:maxLines="1"
-            android:text="@string/preview_model"
-            android:textColor="@color/ink"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-
-        <Chronometer
-            android:id="@+id/timer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:maxLines="1"
-            android:textColor="@color/muted"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/meta"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/preview_meta"
-            android:textColor="@color/muted"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/need"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:background="@drawable/need_bg"
-        android:ellipsize="end"
-        android:maxLines="2"
-        android:paddingStart="10dp"
-        android:paddingTop="5dp"
-        android:paddingEnd="10dp"
-        android:paddingBottom="5dp"
-        android:textColor="@color/red_l"
-        android:textSize="12sp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/now"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:text="@string/preview_now"
-        android:textColor="@color/muted"
-        android:textSize="12sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="bottom"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/cost"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/preview_cost"
-            android:textColor="@color/muted"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/updated"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:maxLines="1"
-            android:text="@string/preview_updated"
-            android:textColor="@color/faint"
-            android:textSize="11sp" />
-
-        <ImageView
-            android:id="@+id/open"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:layout_marginStart="6dp"
-            android:contentDescription="@string/open_board"
-            android:padding="3dp"
-            android:src="@drawable/ic_open" />
-    </LinearLayout>
-</LinearLayout>
+    <FrameLayout
+        android:id="@+id/open"
+        android:layout_width="52dp"
+        android:layout_height="44dp"
+        android:layout_gravity="bottom|end"
+        android:contentDescription="@string/open_board" />
+</FrameLayout>

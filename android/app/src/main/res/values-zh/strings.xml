@@ -48,6 +48,11 @@
     <string name="err_not_board">这个地址不是 Agent 看板</string>
     <string name="err_http">看板返回 %s</string>
 
+    <string name="q_week">本周额度</string>
+    <string name="q_5h">5 小时 %d%%</string>
+    <string name="q_reset">%s 重置</string>
+    <string name="foot_hours">近 %d 小时</string>
+    <string name="foot_saved">少花 %d%%</string>
     <string name="notif_channel">实时更新</string>
     <string name="notif_stop">停止</string>
     <string name="notif_connecting">正在连接…</string>

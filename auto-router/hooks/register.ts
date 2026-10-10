@@ -55,6 +55,24 @@ type Gate = { edits: Map<string, Tier>; lastEditAt: number; lastTestOkAt: number
 let seq = 0
 const newGate = (): Gate => ({ edits: new Map(), lastEditAt: 0, lastTestOkAt: 0, tries: 0, lastRunAt: 0, lastRunOk: null })
 let gate: Gate = newGate()
+// 订阅额度（5 小时、7 天窗口），给看板和手机卡片显示 / plan usage windows (5-hour, 7-day) for the board and the phone card
+type Limit = { kind: string; pct: number; resetsAt: string | null }
+let limits: { at: number; list: Limit[] } | undefined
+let limitsKey = ''
+async function noteLimits($: EngineInterface) {
+  try {
+    const rl = (await $.session.usage()).rateLimits ?? []
+    const list: Limit[] = rl.map(r => ({ kind: String(r.kind), pct: Number(r.percentUsed) || 0, resetsAt: r.resetsAt ?? null }))
+    if (!list.length) return
+    const key = JSON.stringify(list)
+    if (key === limitsKey) return
+    limitsKey = key
+    limits = { at: Date.now(), list }
+    await writeLog($)
+  } catch {
+    /* 没有额度信息（比如用 API key）就不显示 / no plan limits (e.g. an API key): nothing to show */
+  }
+}
 let gateLog: { at: number; result: 'pass' | 'fail' | 'giveup' | 'skip' | 'timeout'; command?: string; by?: Tier; code?: number } | undefined
 const avg = (xs: number[], d: number) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : d)
 
@@ -105,7 +123,10 @@ export const register: Register = on => {
     }
     const learned = Number(await $.store.get('cacheTtl'))
     ttl = typeof cfg.cache.ttlSeconds === 'number' ? cfg.cache.ttlSeconds : learned === 300 || learned === 3600 ? learned : 3600
-    $.clock.every(30000, () => renderStatus($))
+    $.clock.every(30000, () => {
+      renderStatus($)
+      void noteLimits($)
+    })
     await $.command.register({
       name: 'route',
       description: M().cmdDescription,
@@ -300,6 +321,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('turn.complete', async ($, e, next) => {
+    if (!e.agentId) await noteLimits($)
     if (!e.agentId) {
       lastTurnErrors = loops.get('main')?.errors ?? 0
       loops.delete('main')
@@ -670,6 +692,7 @@ async function writeLog($: EngineInterface) {
       mode, lang: cfg.lang, current, pendingDown, advisorCalls, decisions: history, subagents: [...bySub.values()].slice(-20),
       cache: { enabled: cfg.cache.enabled, ttl, warmUntil: { ...warmUntil } },
       gate: gateLog ?? null,
+      limits: limits ?? null,
     }, null, 1))
   } catch {
     /* 看板没装也没关系 */

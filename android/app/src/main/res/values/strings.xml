@@ -50,6 +50,11 @@
     <string name="err_not_board">That address isn\'t the agent board</string>
     <string name="err_http">The board answered %s</string>
 
+    <string name="q_week">This week</string>
+    <string name="q_5h">5h %d%%</string>
+    <string name="q_reset">resets %s</string>
+    <string name="foot_hours">%dh</string>
+    <string name="foot_saved">%d%% saved</string>
     <string name="notif_channel">Live updates</string>
     <string name="notif_stop">Stop</string>
     <string name="notif_connecting">Connecting…</string>

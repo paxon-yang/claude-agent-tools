@@ -78,6 +78,13 @@ body.standalone .backcard { display: inline; }
 .mixrow { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; font-size: 12px; padding: 4px 0; color: var(--muted); }
 .mixrow .n { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); }
 .mixrow .n::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.quota { margin-top: 16px; }
+.quota .qh { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--ink80); }
+.quota .qh b { font-size: 17px; font-weight: 600; color: var(--ink); }
+.quota .qbar { height: 6px; margin-top: 6px; border-radius: 999px; background: rgba(0, 0, 0, .08); overflow: hidden; }
+.quota .qbar i { display: block; height: 100%; border-radius: 999px; background: #34C759; }
+.quota.q-mid .qbar i { background: #FF9F0A; } .quota.q-hi .qbar i { background: #FF3B30; }
+.quota .qs { margin-top: 5px; font-size: 11px; color: var(--faint); }
 .spend .foot { margin-top: 10px; font-size: 11px; color: var(--faint); letter-spacing: -.08px; }
 
 .projects { display: flex; flex-direction: column; gap: 2px; }
@@ -523,6 +530,7 @@ const I18N = {
     log_newTask: p => '新任务：' + brief(p), log_spawned: (ty, d) => `派出 ${ty}：${d}`, log_tests: (p, n) => `测试 ${p}/${n} 通过`,
     log_toolFailed: l => `工具失败：${l}`,
     log_agentEnded: (st, d) => `${st === 'failed' ? '出错结束' : st === 'stopped' ? '被中断' : '完成'} · 用时 ${d}`,
+    qWeek: '本周额度', q5h: n => `5 小时窗口 ${n}%`, qReset: s => `${s} 重置`,
     log_turnDone: '本轮回复完成，等你下一步', log_needsYou: m => '需要你确认：' + m, log_modelSwitch: m => `切换模型 → ${m}`,
     log_compacted: '上下文已自动压缩',
     log_advisor: (mo, tx) => tx ? '顾问介入' + (mo ? '（' + mo + '）' : '') + '：' + tx : '顾问介入',
@@ -589,6 +597,7 @@ const I18N = {
     log_newTask: p => 'New task: ' + brief(p), log_spawned: (ty, d) => `Dispatched ${ty}: ${d}`, log_tests: (p, n) => `Tests: ${p}/${n} passed`,
     log_toolFailed: l => `Tool failed: ${l}`,
     log_agentEnded: (st, d) => `${st === 'failed' ? 'Failed after' : st === 'stopped' ? 'Interrupted after' : 'Finished in'} ${d}`,
+    qWeek: 'Weekly limit', q5h: n => `5-hour window ${n}%`, qReset: s => `resets ${s}`,
     log_turnDone: 'Turn complete — your move', log_needsYou: m => 'Needs your approval: ' + m, log_modelSwitch: m => `Switched model → ${m}`,
     log_compacted: 'Context auto-compacted',
     log_advisor: (mo, tx) => tx ? `Advisor stepped in${mo ? ' (' + mo + ')' : ''}: ${tx}` : 'Advisor stepped in',
@@ -761,6 +770,24 @@ function render() {
   renderAlerts(); renderHead(s); renderFlow(s); renderTimeline(s); renderUse(s); renderHist(s); renderLog(s);
 }
 
+// 订阅额度：本周用了多少、什么时候重置 / plan usage: how much of the week is used, when it resets
+function resetLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const hmS = d.toLocaleTimeString(LANG === 'zh' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (d - Date.now() < 20 * 3600e3) return hmS;
+  const wd = LANG === 'zh' ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()] : d.toLocaleDateString('en-GB', { weekday: 'short' });
+  return wd + ' ' + hmS;
+}
+function quotaHtml(L) {
+  if (!L || !L.sevenDay) return '';
+  const p = Math.max(0, Math.min(100, L.sevenDay.pct));
+  const lvl = p >= 85 ? 'hi' : p >= 60 ? 'mid' : 'ok';
+  const five = L.fiveHour ? t('q5h', Math.round(L.fiveHour.pct)) : '';
+  const rs = resetLabel(L.sevenDay.resetsAt);
+  return `<div class="quota q-${lvl}"><div class="qh"><span>${t('qWeek')}</span><b class="num">${Math.round(p)}%</b></div>
+    <div class="qbar"><i style="width:${p}%"></i></div><div class="qs">${[five, rs ? t('qReset', rs) : ''].filter(Boolean).join(' · ')}</div></div>`;
+}
 function renderSpend() {
   const tt = state.totals;
   const fams = ORDER.filter(k => tt.byModel[k]);
@@ -771,6 +798,7 @@ function renderSpend() {
     <div class="big num">${money(tt.cost)}</div>
     ${tt.saved != null && tt.baseline > 0 ? `<div class="vs">${t('spendVs', esc(NAMES[tt.baselineModel] || tt.baselineModel), money(tt.baseline), Math.round(tt.saved * 100))}</div>` : `<div class="vs">${t('noUsage')}</div>`}
     ${fams.length ? `<div class="mix">${bars}</div><div class="rows">${rows}</div>` : ''}
+    ${quotaHtml(state.limits)}
     <div class="foot">${t('spendFoot', tt.unpriced)}</div>`);
 }
 

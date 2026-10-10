@@ -22,7 +22,16 @@ data class Session(
     val needMsg: String?,
     val cacheUntil: Double?,
     val gate: String?,
+    val reason: String? = null,
+    val running: List<Run> = emptyList(),
 )
+
+/** 在跑的子代理或后台任务 / a running sub-agent or background task */
+data class Run(val kind: String, val name: String, val model: String?, val family: String?, val text: String?)
+
+/** 订阅额度的一个窗口 / one plan-usage window */
+data class Limit(val pct: Double, val resetsAt: String?)
+data class Limits(val sevenDay: Limit?, val fiveHour: Limit?)
 
 data class Other(val project: String, val status: String)
 
@@ -34,6 +43,7 @@ data class WidgetData(
     val others: List<Other>,
     val needsYou: Int,
     val totals: Totals,
+    val limits: Limits? = null,
 )
 
 /** 卡片上的状态 / the status the card shows */
@@ -71,6 +81,14 @@ object Model {
                 needMsg = it.str("needMsg"),
                 cacheUntil = it.num("cacheUntil"),
                 gate = it.str("gate"),
+                reason = it.str("reason"),
+                running = buildList {
+                    val a = it.optJSONArray("running")
+                    if (a != null) for (i in 0 until a.length()) {
+                        val x = a.optJSONObject(i) ?: continue
+                        add(Run(x.str("kind") ?: "agent", x.str("name") ?: "?", x.str("model"), x.str("family"), x.str("text")))
+                    }
+                },
             )
         }
         val others = buildList {
@@ -81,12 +99,17 @@ object Model {
             }
         }
         val t = o.optJSONObject("totals") ?: JSONObject()
+        val lim = o.optJSONObject("limits")?.let { l ->
+            fun one(k: String) = l.optJSONObject(k)?.let { x -> x.num("pct")?.let { Limit(it, x.str("resetsAt")) } }
+            Limits(one("sevenDay"), one("fiveHour")).takeIf { it.sevenDay != null || it.fiveHour != null }
+        }
         return WidgetData(
             now = o.optDouble("now", 0.0),
             session = s,
             others = others,
             needsYou = o.optInt("needsYou", 0),
             totals = Totals(t.num("cost"), t.num("baseline"), t.num("saved"), t.optInt("hours", 24), t.str("baselineModel") ?: "opus"),
+            limits = lim,
         )
     }
 
@@ -114,6 +137,40 @@ object Model {
             if (m > 0) add(Meta.CacheLeft(m))
         }
         s.gate?.let { add(Meta.Gate(it)) }
+    }
+
+    /** 效果档位 → 亮几格（共 4 格）/ effort → how many of the 4 bars are lit */
+    fun effortBars(e: String?): Int = when (e) {
+        "low" -> 1
+        "medium" -> 2
+        "high" -> 3
+        "xhigh", "max" -> 4
+        else -> 0
+    }
+
+    /** 模型名的首字母，放在彩色小方块里 / the model's letter in the coloured square */
+    fun glyph(family: String?, model: String?): String = when (family) {
+        "haiku" -> "H"
+        "sonnet" -> "S"
+        "opus" -> "O"
+        "fable", "mythos" -> "F"
+        else -> (model?.firstOrNull()?.uppercase() ?: "?")
+    }
+
+    /** 浅一点的模型颜色（文字和高亮用）/ the lighter model colour, for text and highlights */
+    fun familyLight(f: String?): Int = when (f) {
+        "haiku" -> 0xFF5AC8D8.toInt()
+        "sonnet" -> 0xFF409CFF.toInt()
+        "opus" -> 0xFFFFB340.toInt()
+        "fable", "mythos" -> 0xFFDA8FFF.toInt()
+        else -> 0xFFAEAEB2.toInt()
+    }
+
+    /** 额度条颜色：60% 以下绿，85% 以下橙，再高红 / bar colour: green < 60 %, orange < 85 %, red above */
+    fun quotaLevel(pct: Double): Int = when {
+        pct >= 85 -> 2
+        pct >= 60 -> 1
+        else -> 0
     }
 
     /** 模型颜色 / model colour */
