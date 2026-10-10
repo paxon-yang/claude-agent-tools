@@ -58,8 +58,8 @@
         const fade = Math.min(1, Math.max(0.12, 1.15 - Math.hypot(w - x, h - y) / R * 1.3));
         out.push({ t: 'dot', x, y, r: 0.9, color: ink, a: (dark ? 0.22 : 0.18) * fade });
       }
-      const u = Math.min(0.13 * S, 44), x0 = w - 2.5 * u - 16, y0 = h - 1.25 * u - 14;
-      blob(w - 1.2 * u - 16, h - 0.6 * u - 14, 2.4 * u, CLAY, 0.2);
+      const u = Math.min(0.13 * S, 44), x0 = w - 2.5 * u - 16, y0 = h - u - 46;
+      blob(w - 1.2 * u - 16, y0 + 0.5 * u, 2.4 * u, CLAY, 0.2);
       out.push({ t: 'line', pts: [[x0, y0], [x0 + 0.62 * u, y0 + 0.5 * u], [x0, y0 + u]], color: CLAY, a: 0.5, w: 0.12 * u, cap: true });
       out.push({ t: 'rect', x: x0 + 0.95 * u, y: y0 + 0.86 * u, w: 1.0 * u, h: 0.15 * u, color: CLAY, a: 0.42 });
     } else if (id === 'dunes') {

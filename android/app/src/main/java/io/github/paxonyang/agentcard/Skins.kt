@@ -157,8 +157,8 @@ object Skins {
                 }
                 val u = min(0.13 * s, 44.0)
                 val x0 = w - 2.5 * u - 16
-                val y0 = h - 1.25 * u - 14
-                blob(w - 1.2 * u - 16, h - 0.6 * u - 14, 2.4 * u, CLAY, 0.2)
+                val y0 = h - u - 46
+                blob(w - 1.2 * u - 16, y0 + 0.5 * u, 2.4 * u, CLAY, 0.2)
                 line(listOf(x0 to y0, (x0 + 0.62 * u) to (y0 + 0.5 * u), x0 to (y0 + u)), CLAY, 0.5, 0.12 * u, cap = true)
                 p.reset(); p.isAntiAlias = true; p.color = withAlpha(CLAY, 0.42)
                 val rx = (0.15 * u / 3).toFloat()
