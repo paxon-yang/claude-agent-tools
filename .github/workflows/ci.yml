@@ -51,7 +51,7 @@ jobs:
           node agent-viz/server.js --demo --port 4330 --lang en > server.log 2>&1 &
           for i in $(seq 1 20); do sleep 0.5; curl -s http://127.0.0.1:4330/api/health | grep -q '"ok":true' && break; done
           curl -sf http://127.0.0.1:4330/api/health
-          curl -sf http://127.0.0.1:4330/ | grep -q 'Agent'
+          curl -sf http://127.0.0.1:4330/ -o page.html && grep -q 'Agent' page.html
           sleep 3
           curl -sf http://127.0.0.1:4330/api/state | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);if(!j.sessions.length)throw new Error('no demo sessions');console.log('sessions:',j.sessions.length)})"
 
@@ -73,7 +73,7 @@ jobs:
           grep -q '"lang": "en"' "$HOME/.claude/auto-router/config.json"
           grep -q 'auto-router:start' "$HOME/.claude/CLAUDE.md"
           grep -q 'capture.js' "$HOME/.claude/settings.json"
-          claude plugin list | grep -q 'auto-router@paxon-local'
+          plugins="$(claude plugin list)"; echo "$plugins" | grep 'auto-router@paxon-local'
           if [ "$RUNNER_OS" != "Linux" ]; then
             # macOS (launchd) and Windows (Startup folder) start the board in the background
             for i in $(seq 1 20); do sleep 1; curl -s http://127.0.0.1:4321/api/health | grep -q '"ok":true' && break; done
