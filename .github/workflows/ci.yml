@@ -81,5 +81,5 @@ jobs:
           fi
           bash "$HOME/.claude/viz/app/uninstall.sh"
           bash "$HOME/.claude/auto-router/uninstall.sh"
-          ! grep -q 'capture.js' "$HOME/.claude/settings.json"
-          ! grep -q 'auto-router:start' "$HOME/.claude/CLAUDE.md"
+          if grep -q 'capture.js' "$HOME/.claude/settings.json"; then echo "capture hooks not removed"; exit 1; fi
+          if grep -q 'auto-router:start' "$HOME/.claude/CLAUDE.md"; then echo "CLAUDE.md block not removed"; exit 1; fi
