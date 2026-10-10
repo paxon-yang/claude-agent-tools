@@ -2,6 +2,12 @@
 
 All notable changes to this project. Versions follow [semver](https://semver.org/); dates are UTC.
 
+## [Unreleased]
+
+### Added
+- **Android home-screen card** (`android/`): a widget with the current task, model and effort, running sub-agents, cache time left, test gate and 24-hour cost; refreshes every 15 minutes, and every 15 seconds in live mode (tap the card) while a session is busy. Works over Tailscale or behind Cloudflare Access with a service token. Built and signed by GitHub Actions; the latest APK is always at the `card-android` release.
+- Dashboard: `/api/widget`, a small summary for the card.
+
 ## [0.4.0] — 2026-10-10
 
 ### Added

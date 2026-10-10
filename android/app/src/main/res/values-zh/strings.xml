@@ -35,7 +35,7 @@
     <string name="no_task">还没有任务</string>
     <string name="need_prefix">去终端或 Claude App 里确认 · %s</string>
     <string name="others_running">另有 %d 个会话</string>
-    <string name="cost_line">近 %1$d 小时 %2$s · 少花 %3$d%%</string>
+    <string name="cost_line">近 %1$d 小时 %2$s · 比全用 %4$s 少花 %3$d%%</string>
     <string name="cost_line_plain">近 %1$d 小时 %2$s</string>
     <string name="live">实时</string>
     <string name="updated_at">%s</string>

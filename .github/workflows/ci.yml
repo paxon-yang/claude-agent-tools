@@ -62,6 +62,8 @@ jobs:
           curl -sf http://127.0.0.1:4330/ -o page.html && grep -q 'Agent' page.html
           sleep 3
           curl -sf http://127.0.0.1:4330/api/state | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);if(!j.sessions.length)throw new Error('no demo sessions');console.log('sessions:',j.sessions.length)})"
+          curl -sf http://127.0.0.1:4330/api/widget | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);if(j.v!==1||!j.session||!j.totals)throw new Error('bad widget payload');console.log('widget:',j.session.project,j.session.status)})"
+          curl -sf http://127.0.0.1:4330/manifest.webmanifest | grep -q start_url
 
       - name: Full install + uninstall in a throwaway home
         env:
