@@ -5,7 +5,9 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -50,10 +52,17 @@ class MainActivity : Activity() {
             runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
         }
 
-        // 测试用：adb shell am start -n …/.MainActivity --es url http://10.0.2.2:4330
-        intent?.getStringExtra("url")?.let {
-            url.setText(it)
-            saveAndTest()
+        // 密码框的提示字别用等宽字体 / keep the password hint in the normal font
+        cfSecret.typeface = Typeface.DEFAULT
+
+        // 只在调试版里：CI 的模拟器用这两个参数自动填地址、添加卡片（正式版不接受，免得别的 App 改你的地址）
+        // debug builds only: CI's emulator fills the address and pins the card; release builds ignore them
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            intent?.getStringExtra("url")?.let {
+                url.setText(it)
+                saveAndTest()
+            }
+            if (intent?.getBooleanExtra("pin", false) == true) addWidget()
         }
     }
 

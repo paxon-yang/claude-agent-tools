@@ -4,7 +4,7 @@ A home-screen widget that shows your Claude Code agent board at a glance: the cu
 
 把 Agent 看板放到安卓手机桌面上：当前任务、模型和 effort、在跑的子代理、缓存还剩多久、测试关卡、近 24 小时花了多少、省了多少。
 
-![Agent Card](https://raw.githubusercontent.com/paxon-yang/claude-agent-tools/android-preview/shot-zh-2.png)
+![Agent Card](https://raw.githubusercontent.com/paxon-yang/claude-agent-tools/android-preview/home-zh-live.png)
 
 ## 安装（中文）
 

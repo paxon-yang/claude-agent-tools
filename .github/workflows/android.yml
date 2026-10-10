@@ -40,7 +40,7 @@ jobs:
         working-directory: android
         run: |
           # errors also go out as annotations, so they are readable without the raw log
-          if ! gradle --no-daemon --stacktrace testReleaseUnitTest lintRelease assembleRelease > build.log 2>&1; then
+          if ! gradle --no-daemon --stacktrace testReleaseUnitTest lintRelease assembleRelease assembleDebug > build.log 2>&1; then
             tail -80 build.log
             { grep -E '^e: |error:|Error:|What went wrong|FAILED|Expected|AssertionError|Exception' build.log || tail -30 build.log; } \
               | head -40 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}' | sed 's/^/::error title=android build::/'
@@ -53,12 +53,17 @@ jobs:
           fi
           tail -5 build.log
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/agent-card.apk"
-          ls -la "$RUNNER_TEMP/agent-card.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/agent-card-debug.apk"
+          ls -la "$RUNNER_TEMP"/agent-card*.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: agent-card-apk
           path: ${{ runner.temp }}/agent-card.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-card-debug-apk
+          path: ${{ runner.temp }}/agent-card-debug.apk
 
       - name: Publish to the fixed download link
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -89,7 +94,7 @@ jobs:
           node-version: 22
       - uses: actions/download-artifact@v4
         with:
-          name: agent-card-apk
+          name: agent-card-debug-apk
           path: apk
       - name: Enable KVM
         run: |
@@ -109,23 +114,12 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: |
-            adb install -r apk/agent-card.apk
-            adb shell cmd locale set-app-locales io.github.paxonyang.agentcard --locales zh-CN
-            adb shell am start -n io.github.paxonyang.agentcard/.MainActivity --es url http://10.0.2.2:4330
-            sleep 12
-            adb exec-out screencap -p > shot-zh-1.png
-            sleep 20
-            adb exec-out screencap -p > shot-zh-2.png
-            adb shell cmd locale set-app-locales io.github.paxonyang.agentcard --locales en-US
-            adb shell am force-stop io.github.paxonyang.agentcard
-            adb shell am start -n io.github.paxonyang.agentcard/.MainActivity
-            sleep 10
-            adb exec-out screencap -p > shot-en.png
-            adb logcat -d -t 400 | grep -iE 'agentcard|AndroidRuntime|FATAL' > logcat.txt || true
+          profile: pixel_6
+          script: bash android/ci/shots.sh apk/agent-card-debug.apk
       - name: Push screenshots to the android-preview branch
         run: |
-          mkdir -p out && cp shot-*.png logcat.txt board.log out/ 2>/dev/null || true
+          mkdir -p out && cp board.log out/ 2>/dev/null || true
+          rm -f out/ui.xml
           cd out
           git init -q -b android-preview
           git config user.name "github-actions"
