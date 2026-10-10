@@ -15,7 +15,7 @@ xml = open('out/ui.xml', encoding='utf-8').read()
 for m in re.finditer(r'<node [^>]*>', xml):
     n = m.group(0)
     t = re.search(r' text="([^"]*)"', n); d = re.search(r'content-desc="([^"]*)"', n)
-    label = (t.group(1) if t else '') + ' ' + (d.group(1) if d else '')
+    label = ((t.group(1) if t else '') + ' ' + (d.group(1) if d else '')).strip()
     if re.search(sys.argv[1], label, re.I):
         b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n)
         if b:
