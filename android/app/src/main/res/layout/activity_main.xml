@@ -49,6 +49,26 @@
 
         <TextView
             style="@style/Label"
+            android:labelFor="@+id/key"
+            android:text="@string/label_key" />
+
+        <EditText
+            android:id="@+id/key"
+            style="@style/Field"
+            android:autofillHints=""
+            android:hint="@string/hint_key"
+            android:inputType="text" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/key_help"
+            android:textColor="@color/page_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            style="@style/Label"
             android:labelFor="@+id/cf_id"
             android:text="@string/label_cf" />
 

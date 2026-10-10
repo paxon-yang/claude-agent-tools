@@ -2,6 +2,7 @@ package io.github.paxonyang.agentcard
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
@@ -24,6 +25,7 @@ import kotlin.concurrent.thread
 class MainActivity : Activity() {
     private lateinit var prefs: Prefs
     private lateinit var url: EditText
+    private lateinit var key: EditText
     private lateinit var cfId: EditText
     private lateinit var cfSecret: EditText
     private lateinit var result: TextView
@@ -34,12 +36,14 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         prefs = Prefs(this)
         url = findViewById(R.id.url)
+        key = findViewById(R.id.key)
         cfId = findViewById(R.id.cf_id)
         cfSecret = findViewById(R.id.cf_secret)
         result = findViewById(R.id.result)
         preview = findViewById(R.id.preview)
 
         url.setText(prefs.url)
+        key.setText(prefs.key)
         cfId.setText(prefs.cfId)
         cfSecret.setText(prefs.cfSecret)
 
@@ -64,6 +68,43 @@ class MainActivity : Activity() {
             }
             if (intent?.getBooleanExtra("pin", false) == true) addWidget()
         }
+        handlePair(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePair(intent)
+    }
+
+    /**
+     * 扫码配对：agentcard://pair?url=…&key=…&board=…（电脑上 phone.sh 生成的配对页里的按钮）。
+     * 先问一句再保存，免得别的网页偷偷改掉你的看板地址。
+     * QR pairing link from the page phone.sh sets up; asks before saving so no web page can silently swap the address.
+     */
+    private fun handlePair(i: Intent?) {
+        if (i == null) return
+        val data = i.data ?: return
+        if (data.scheme != "agentcard" || data.host != "pair") return
+        val u = Model.normalizeUrl(data.getQueryParameter("url") ?: return)
+        val k = data.getQueryParameter("key") ?: ""
+        val b = data.getQueryParameter("board")?.let { Model.normalizeUrl(it) } ?: ""
+        if (u.isBlank() || k.length < 16) return
+        i.data = null
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pair_title)
+            .setMessage(getString(R.string.pair_message, u.removePrefix("https://").removePrefix("http://")))
+            .setPositiveButton(R.string.pair_ok) { _, _ ->
+                url.setText(u)
+                key.setText(k)
+                // 卡片专用网址不在 Cloudflare Access 后面，服务令牌用不上，清掉 / the card address isn't behind Access
+                cfId.setText("")
+                cfSecret.setText("")
+                prefs.board = b
+                saveAndTest()
+            }
+            .setNegativeButton(R.string.pair_cancel, null)
+            .show()
     }
 
     override fun onResume() {
@@ -75,6 +116,7 @@ class MainActivity : Activity() {
         val u = Model.normalizeUrl(url.text.toString())
         url.setText(u)
         prefs.url = u
+        prefs.key = key.text.toString().trim()
         prefs.cfId = cfId.text.toString().trim()
         prefs.cfSecret = cfSecret.text.toString().trim()
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

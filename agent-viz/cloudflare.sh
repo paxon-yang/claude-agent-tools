@@ -85,6 +85,12 @@ if [ ! -f "$CRED" ]; then
   "$CFD" tunnel token --cred-file "$CRED" "$ID" >/dev/null 2>&1 || fail "$(t '隧道凭证文件缺失，且无法重新生成' "The tunnel credentials file is missing and couldn't be regenerated")"
 fi
 ok "$(t "隧道 $NAME（$ID）" "Tunnel $NAME ($ID)")"
+# 手机卡片专用网址（phone.sh 设置的）也要保留 / keep the phone card's hostname (set by phone.sh)
+CARD_HOST="$(node -e "try{const c=require('$VIZ/app/config.json').card;console.log(c&&c.host||'')}catch(e){console.log('')}" 2>/dev/null)"
+CARD_RULE=""
+[ -n "$CARD_HOST" ] && CARD_RULE="  - hostname: $CARD_HOST
+    service: http://127.0.0.1:$PORT
+"
 cat > "$CONF" <<CONF
 # 由 agent-viz/cloudflare.sh 生成：只给看板用
 tunnel: $ID
@@ -92,7 +98,7 @@ credentials-file: $CRED
 ingress:
   - hostname: $HOST
     service: http://127.0.0.1:$PORT
-  - service: http_status:404
+${CARD_RULE}  - service: http_status:404
 CONF
 ok "$(t '配置写入 ' 'Config written to ')$CONF"
 

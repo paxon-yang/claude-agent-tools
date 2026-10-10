@@ -65,7 +65,7 @@ class CardWidget : AppWidgetProvider() {
                 rv.setOnClickPendingIntent(R.id.open, settings)
             } else {
                 rv.setOnClickPendingIntent(R.id.card, pi(context, 1, Intent(context, CardWidget::class.java).setAction(ACTION_TAP), false))
-                rv.setOnClickPendingIntent(R.id.open, pi(context, 3, Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true))
+                rv.setOnClickPendingIntent(R.id.open, pi(context, 3, Intent(Intent.ACTION_VIEW, Uri.parse(prefs.boardOrUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true))
             }
 
             val data = prefs.data()
@@ -200,6 +200,7 @@ class CardWidget : AppWidgetProvider() {
                 Fail.NO_URL.name -> R.string.err_no_url
                 Fail.AUTH_NEEDED.name -> R.string.err_auth_needed
                 Fail.AUTH_FAILED.name -> R.string.err_auth_failed
+                Fail.KEY_REJECTED.name -> R.string.err_key
                 Fail.NOT_BOARD.name -> R.string.err_not_board
                 else -> R.string.err_network
             },

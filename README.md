@@ -202,7 +202,7 @@ Dashboard settings live in `~/.claude/viz/app/config.json` (port, prices used fo
 
 - **Drive Claude from your phone** with Claude Code's own [Remote Control](https://code.claude.com/docs/en/remote-control): `/config` → *Enable Remote Control for all sessions*, plus *Push when actions required* for approval alerts. Approvals, questions and pushes are all handled there.
 - **Type `/route`** in the Claude app to see what the router is doing: the same card as in the terminal.
-- **Android home-screen card** — a real widget for Android phones: task, model, sub-agents, cache, tests and cost on the home screen, live while a session is busy. [Download the APK and setup guide](android/README.md).
+- **Android home-screen card** — a real widget for Android phones: task, model, sub-agents, cache, tests and cost on the home screen, live while a session is busy. Set up with one command and a QR scan: `bash ~/claude-agent-tools/agent-viz/phone.sh` ([guide](android/README.md)).
 - **Add the board to your home screen** (Safari: Share → Add to Home Screen; Chrome: ⋮ → Add to Home screen) through your Tailscale or Cloudflare address. It opens full-screen on the card; *Open full board* and *‹ Card* switch between the two.
 
 ## Uninstall

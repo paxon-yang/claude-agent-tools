@@ -18,6 +18,15 @@ class Prefs(context: Context) {
     var cfSecret: String
         get() = p.getString("cfSecret", "") ?: ""
         set(v) = p.edit().putString("cfSecret", v).apply()
+    /** 配对码（phone.sh 生成的卡片专用网址要用）/ pairing key for the card-only address set up by phone.sh */
+    var key: String
+        get() = p.getString("key", "") ?: ""
+        set(v) = p.edit().putString("key", v).apply()
+    /** ↗ 打开的完整看板网址（配对时给的；没有就用 url）/ the full board the ↗ opens (from pairing; url when absent) */
+    var board: String
+        get() = p.getString("board", "") ?: ""
+        set(v) = p.edit().putString("board", v).apply()
+    val boardOrUrl: String get() = board.ifBlank { url }
 
     /** 上一次成功拿到的数据（原样 JSON）/ the last good payload, raw JSON */
     var lastJson: String
@@ -38,7 +47,7 @@ class Prefs(context: Context) {
 }
 
 /** 拿数据失败的几种原因 / why a fetch failed */
-enum class Fail { NO_URL, NETWORK, AUTH_NEEDED, AUTH_FAILED, NOT_BOARD, HTTP }
+enum class Fail { NO_URL, NETWORK, AUTH_NEEDED, AUTH_FAILED, KEY_REJECTED, NOT_BOARD, HTTP }
 
 class FetchResult(val data: WidgetData?, val fail: Fail?, val detail: String = "", val raw: String = "")
 
@@ -48,7 +57,7 @@ object Api {
         val prefs = Prefs(context)
         val base = prefs.url
         if (base.isBlank()) return FetchResult(null, Fail.NO_URL).also { prefs.lastError = Fail.NO_URL.name }
-        val r = get(base, prefs.cfId, prefs.cfSecret)
+        val r = get(base, prefs.cfId, prefs.cfSecret, prefs.key)
         if (r.data != null) {
             prefs.lastJson = r.raw
             prefs.lastOkAt = System.currentTimeMillis()
@@ -59,7 +68,7 @@ object Api {
         return r
     }
 
-    fun get(base: String, cfId: String, cfSecret: String): FetchResult {
+    fun get(base: String, cfId: String, cfSecret: String, key: String = ""): FetchResult {
         var conn: HttpURLConnection? = null
         return try {
             conn = (URL("$base/api/widget").openConnection() as HttpURLConnection).apply {
@@ -68,6 +77,7 @@ object Api {
                 instanceFollowRedirects = false
                 setRequestProperty("Accept", "application/json")
                 setRequestProperty("User-Agent", "AgentCard/1 (Android)")
+                if (key.isNotBlank()) setRequestProperty("X-Card-Key", key.trim())
                 // Cloudflare Access 服务令牌 / Cloudflare Access service token
                 if (cfId.isNotBlank() && cfSecret.isNotBlank()) {
                     setRequestProperty("CF-Access-Client-Id", cfId.trim())
@@ -78,6 +88,7 @@ object Api {
             val location = conn.getHeaderField("Location") ?: ""
             when {
                 code in 300..399 && location.contains("cloudflareaccess.com") -> FetchResult(null, Fail.AUTH_NEEDED)
+                code == 401 && conn.getHeaderField("X-Agent-Card") != null -> FetchResult(null, Fail.KEY_REJECTED)
                 code == 401 || code == 403 -> FetchResult(null, if (cfId.isBlank()) Fail.AUTH_NEEDED else Fail.AUTH_FAILED, "HTTP $code")
                 code == 404 -> FetchResult(null, Fail.NOT_BOARD, "HTTP 404")
                 code !in 200..299 -> FetchResult(null, Fail.HTTP, "HTTP $code")

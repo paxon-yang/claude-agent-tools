@@ -71,7 +71,7 @@ echo ""
 echo "$(t "[2/4] 复制看板程序到 $APP" "[2/4] Copying the board to $APP")"
 mkdir -p "$APP/public" || fail "$(t "无法创建文件夹 $APP" "Couldn't create folder $APP")"
 if [ "$SRC" != "$APP" ]; then
-  cp "$SRC/server.js" "$SRC/capture.js" "$SRC/setup-hooks.js" "$SRC/install.sh" "$SRC/uninstall.sh" "$SRC/cloudflare.sh" "$SRC/demo-events.jsonl" "$SRC/demo-events.en.jsonl" "$APP/" || fail "$(t '复制文件失败' 'Copying files failed')"
+  cp "$SRC/server.js" "$SRC/capture.js" "$SRC/setup-hooks.js" "$SRC/install.sh" "$SRC/uninstall.sh" "$SRC/cloudflare.sh" "$SRC/phone.sh" "$SRC/demo-events.jsonl" "$SRC/demo-events.en.jsonl" "$APP/" || fail "$(t '复制文件失败' 'Copying files failed')"
   if [ -f "$SRC/report.js" ]; then cp "$SRC/report.js" "$APP/" || fail "$(t '复制文件失败' 'Copying files failed')"; fi
   cp "$SRC/public/index.html" "$SRC/public/mini.html" "$APP/public/" || fail "$(t '复制网页文件失败' 'Copying the web page failed')"
   # 手机"添加到主屏幕"用的图标 / icons for "Add to Home Screen"

@@ -101,7 +101,7 @@ class LiveService : Service() {
         }
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         val stop = PendingIntent.getService(this, 10, Intent(this, LiveService::class.java).setAction(ACTION_STOP), flags)
-        val url = Prefs(this).url
+        val url = Prefs(this).boardOrUrl
         val open = if (url.isNotBlank()) PendingIntent.getActivity(this, 11, Intent(Intent.ACTION_VIEW, Uri.parse(url)), flags) else null
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat)

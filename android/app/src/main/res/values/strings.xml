@@ -55,10 +55,18 @@
     <string name="notif_connecting">Connecting…</string>
     <string name="notif_idle">Nothing running</string>
 
-    <string name="intro">A home-screen card for your Claude Code agent board. Enter the address you use to open the board on this phone.</string>
+    <string name="intro">A home-screen card for your Claude Code agent board. Scan the QR code from phone.sh on your computer, or enter the address yourself.</string>
     <string name="label_url">Board address</string>
     <string name="hint_url">https://board.example.com or http://100.x.y.z:4321</string>
-    <string name="label_cf">Cloudflare Access service token (only if the board is behind Cloudflare Access)</string>
+    <string name="label_key">Pairing key</string>
+    <string name="hint_key">Filled in when you scan the QR code</string>
+    <string name="key_help">Easiest: on the computer run  bash ~/claude-agent-tools/agent-viz/phone.sh  and scan the QR code with this phone. The address and key are filled in for you, no Cloudflare dashboard needed.</string>
+    <string name="pair_title">Connect to this board?</string>
+    <string name="pair_message">The card will read your agent board from %s.</string>
+    <string name="pair_ok">Connect</string>
+    <string name="pair_cancel">Cancel</string>
+    <string name="err_key">Pairing key rejected: run phone.sh --qr on the computer and scan again</string>
+    <string name="label_cf">Or: Cloudflare Access service token (not needed with the QR code)</string>
     <string name="hint_cf_id">Client ID</string>
     <string name="hint_cf_secret">Client Secret</string>
     <string name="cf_help">Cloudflare Zero Trust → Access → Service Auth → Create Service Token. Then add a policy to the board\'s Access application: Action Service Auth, Include Service Token = this token.</string>

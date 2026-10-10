@@ -103,10 +103,14 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Start the demo board
         run: |
+          # 模拟器从 10.0.2.2 访问，当作"卡片专用网址"，要带配对码 / the emulator reaches 10.0.2.2: treat it as the card-only address, key required
+          node -e "const f='agent-viz/config.json';const c=require('./'+f);c.card={host:'10.0.2.2',key:'ci0123456789abcdef0123456789abcd',board:'http://10.0.2.2:4330'};require('fs').writeFileSync(f,JSON.stringify(c,null,2))"
+          echo "CARD_KEY=ci0123456789abcdef0123456789abcd" >> "$GITHUB_ENV"
           nohup node agent-viz/server.js --demo --port 4330 --lang zh > board.log 2>&1 &
           for i in $(seq 1 20); do sleep 0.5; curl -s http://127.0.0.1:4330/api/widget | grep -q '"v":1' && break; done
           sleep 8
-          curl -s http://127.0.0.1:4330/api/widget | head -c 400
+          curl -s -H "Host: 10.0.2.2" http://127.0.0.1:4330/api/widget -o /dev/null -w "card host without key: %{http_code}\n"
+          curl -s -H "Host: 10.0.2.2" -H "X-Card-Key: $CARD_KEY" http://127.0.0.1:4330/api/widget | head -c 300
       - name: Install, open, screenshot
         uses: reactivecircus/android-emulator-runner@v2
         with:

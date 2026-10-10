@@ -199,7 +199,7 @@ Claude Code · 自动选模型省了多少
 
 - **在手机上指挥 Claude**：用 Claude Code 自带的 [Remote Control](https://code.claude.com/docs/en/remote-control)。`/config` 里打开 *Enable Remote Control for all sessions*，再打开 *Push when actions required*（等你批准时推送）。批准、回答问题、推送通知都在那里。
 - **在 Claude App 里输入 `/route`**，看自动选模型现在在干什么，和终端里是同一张卡片。
-- **安卓桌面卡片**：真正的桌面小组件，任务、模型、子代理、缓存、测试和花费都在桌面上，有会话在跑时实时刷新。[下载 APK 和设置说明](android/README.md)。
+- **安卓桌面卡片**：真正的桌面小组件，任务、模型、子代理、缓存、测试和花费都在桌面上，有会话在跑时实时刷新。一条命令加扫码就能连好：`bash ~/claude-agent-tools/agent-viz/phone.sh`（[说明](android/README.md)）。
 - **把看板添加到主屏幕**（Safari：分享 → 添加到主屏幕；Chrome：⋮ → 添加到主屏幕），用你的 Tailscale 或 Cloudflare 地址打开。点开全屏显示卡片，"打开完整看板"和"‹ 卡片"来回切换。
 
 ## 卸载

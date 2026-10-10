@@ -851,8 +851,76 @@ setInterval(changed, 5000); // 让"已运行时长"和折叠状态定期刷新
 
 // ---------- 网页服务（只监听本机） ----------
 const INDEX = path.join(APP, 'public', 'index.html');
+// ---------- 手机卡片专用网址 / the phone card's own address ----------
+// phone.sh 在同一条隧道上加一个只给卡片用的网址（不经过 Cloudflare Access），靠一串随机配对码保护；
+// 这个网址只回答 /api/widget（卡片数据）和 /pair（配对页），看板本身照样只在原来的网址、照样要登录。
+// phone.sh adds a card-only hostname to the same tunnel (not behind Cloudflare Access), protected by a random key.
+// That hostname answers only /api/widget and /pair; the board itself stays on its own address, behind its login.
+let cardCache = { at: 0, v: null };
+function cardConf() {
+  const t = Date.now();
+  if (t - cardCache.at > 5000) {
+    const c = (readJSON(path.join(APP, 'config.json')) || {}).card || null;
+    cardCache = { at: t, v: c && c.host && c.key ? { host: String(c.host).toLowerCase(), key: String(c.key), board: c.board || null } : null };
+  }
+  return cardCache.v;
+}
+const APK_URL = 'https://github.com/paxon-yang/claude-agent-tools/releases/download/card-android/agent-card.apk';
+function keyOk(given, want) {
+  const a = Buffer.from(String(given || '')), b = Buffer.from(String(want || ''));
+  return a.length === b.length && a.length >= 16 && require('crypto').timingSafeEqual(a, b);
+}
+function handleCard(req, res, url, cc) {
+  const q = new URL(req.url, 'http://x').searchParams;
+  const given = req.headers['x-card-key'] || q.get('k') || '';
+  const plain = (code, text, extra) => { res.writeHead(code, Object.assign({ 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }, extra || {})); res.end(text); };
+  if (url === '/icon-192.png' || url === '/apple-touch-icon.png') {
+    fs.readFile(path.join(APP, 'public', url.slice(1)), (err, buf) => { if (err) return plain(404, ''); res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(buf); });
+    return;
+  }
+  if (url !== '/api/widget' && url !== '/pair') return plain(404, 'not found');
+  if (!keyOk(given, cc.key)) return plain(401, 'bad key', { 'X-Agent-Card': 'bad-key' });
+  if (url === '/api/widget') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(widgetView()));
+    return;
+  }
+  // 配对页：手机扫码后打开，下载 App、一键连接 / pairing page: opened from the QR code; get the app, connect in one tap
+  const self = 'https://' + cc.host;
+  const board = cc.board || self;
+  const intent = `intent://pair?url=${encodeURIComponent(self)}&key=${encodeURIComponent(cc.key)}&board=${encodeURIComponent(board)}#Intent;scheme=agentcard;package=io.github.paxonyang.agentcard;S.browser_fallback_url=${encodeURIComponent(APK_URL)};end`;
+  const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const T = LANG === 'zh' ? {
+    title: 'Agent 卡片 · 连接手机', s1: '下载并安装 App', s1b: '下载 Agent 卡片（APK）', s1n: '安装时如果提示"未知来源"，选择允许。',
+    s2: '连接', s2b: '打开 App 并连接', s2n: '会弹出确认框，点"连接"。', s3: '添加到桌面', s3n: 'App 里点"把卡片添加到桌面"，或长按桌面 → 插件 → Agent 卡片。',
+    man: '手动填写', addr: '地址：', key: '配对码：', keep: 'ColorOS 等系统请给 App 打开"自启动"和"允许后台运行"。',
+  } : {
+    title: 'Agent Card · connect your phone', s1: 'Install the app', s1b: 'Download Agent Card (APK)', s1n: 'Allow installs from this source if asked.',
+    s2: 'Connect', s2b: 'Open the app and connect', s2n: 'Confirm with "Connect".', s3: 'Add it to the home screen', s3n: 'Tap "Add the card to the home screen" in the app, or long-press the home screen → Widgets → Agent Card.',
+    man: 'Enter by hand', addr: 'Address: ', key: 'Pairing key: ', keep: 'On ColorOS, MIUI and similar, allow auto-launch and background activity for the app.',
+  };
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex' });
+  res.end(`<!doctype html><html lang="${LANG === 'zh' ? 'zh-CN' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>${T.title}</title><link rel="icon" href="/icon-192.png">
+<style>body{margin:0;font:16px/1.5 -apple-system,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f5f7;color:#1d1d1f}
+main{max-width:520px;margin:0 auto;padding:28px 18px 40px}h1{font-size:26px;margin:8px 0 22px;display:flex;gap:12px;align-items:center}h1 img{width:44px;height:44px;border-radius:11px}
+.s{background:#fff;border-radius:18px;padding:16px 18px;margin:12px 0}.s h2{font-size:17px;margin:0 0 8px}.n{color:#6e6e73;font-size:14px;margin:8px 0 0}
+a.b{display:block;text-align:center;background:#0a7aff;color:#fff;text-decoration:none;font-weight:600;padding:13px;border-radius:12px}
+code{font:13px ui-monospace,Menlo,monospace;word-break:break-all;background:#f0f0f3;padding:2px 6px;border-radius:6px}
+@media (prefers-color-scheme:dark){body{background:#000;color:#f5f5f7}.s{background:#1c1c1e}.n{color:#98989d}code{background:#2c2c2e}}</style></head>
+<body><main><h1><img src="/icon-192.png" alt="">${T.title}</h1>
+<div class="s"><h2>1 · ${T.s1}</h2><a class="b" href="${esc(APK_URL)}">${T.s1b}</a><p class="n">${T.s1n}</p></div>
+<div class="s"><h2>2 · ${T.s2}</h2><a class="b" href="${esc(intent)}">${T.s2b}</a><p class="n">${T.s2n}</p></div>
+<div class="s"><h2>3 · ${T.s3}</h2><p class="n">${T.s3n}</p><p class="n">${T.keep}</p></div>
+<div class="s"><h2>${T.man}</h2><p class="n">${T.addr}<code>${esc(self)}</code></p><p class="n">${T.key}<code>${esc(cc.key)}</code></p></div>
+</main></body></html>`);
+}
+
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
+  // 卡片专用网址只放行卡片的两个地址 / the card-only hostname serves the card and nothing else
+  const cc = cardConf();
+  if (cc && String(req.headers.host || '').split(':')[0].toLowerCase() === cc.host) return handleCard(req, res, url, cc);
   if (url === '/api/stream') {
     // no-transform / X-Accel-Buffering：经过 Cloudflare 隧道时不要缓冲，事件要立刻送到浏览器
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no', Connection: 'keep-alive' });

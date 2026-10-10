@@ -53,10 +53,18 @@
     <string name="notif_connecting">正在连接…</string>
     <string name="notif_idle">没有在跑的任务</string>
 
-    <string name="intro">把 Claude Code 的 Agent 看板放到手机桌面上。填上你在这台手机上打开看板用的地址。</string>
+    <string name="intro">把 Claude Code 的 Agent 看板放到手机桌面上。在电脑上运行 phone.sh 后扫二维码就能连好，也可以自己填地址。</string>
     <string name="label_url">看板地址</string>
     <string name="hint_url">https://board.example.com 或 http://100.x.y.z:4321</string>
-    <string name="label_cf">Cloudflare Access 服务令牌（看板挂在 Cloudflare Access 后面时才需要）</string>
+    <string name="label_key">配对码</string>
+    <string name="hint_key">扫码后会自动填好</string>
+    <string name="key_help">最省事：在电脑上运行  bash ~/claude-agent-tools/agent-viz/phone.sh ，用这台手机扫屏幕上的二维码，地址和配对码会自动填好，不用进 Cloudflare 后台。</string>
+    <string name="pair_title">连接到这个看板？</string>
+    <string name="pair_message">卡片会从 %s 读取你的 Agent 看板。</string>
+    <string name="pair_ok">连接</string>
+    <string name="pair_cancel">取消</string>
+    <string name="err_key">配对码不对：在电脑上运行 phone.sh --qr，重新扫码</string>
+    <string name="label_cf">或者：Cloudflare Access 服务令牌（用了二维码就不需要）</string>
     <string name="hint_cf_id">Client ID</string>
     <string name="hint_cf_secret">Client Secret</string>
     <string name="cf_help">Cloudflare Zero Trust → Access → Service Auth → Create Service Token。然后在看板的 Access 应用里加一条策略：Action 选 Service Auth，Include 选 Service Token = 这个令牌。</string>

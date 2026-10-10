@@ -28,8 +28,12 @@ mkdir -p out
 adb install -r "$APK"
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS
 adb shell cmd locale set-app-locales $PKG --locales zh-CN
-adb shell am start -n $PKG/.MainActivity --es url http://10.0.2.2:4330
-sleep 12
+# 和手机扫码一样：配对页上的链接打开 App，确认后连接 / same as scanning the QR code: the pairing link opens the app
+adb shell am start -a android.intent.action.VIEW -d "agentcard://pair?url=http%3A%2F%2F10.0.2.2%3A4330\&key=$CARD_KEY\&board=http%3A%2F%2F10.0.2.2%3A4330"
+sleep 6
+shot pair-confirm
+tap_text '^(连接|Connect)$'
+sleep 10
 shot app-zh
 adb shell am start -S -n $PKG/.MainActivity --ez pin true
 sleep 5
