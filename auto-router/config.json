@@ -1,4 +1,5 @@
 {
+  "lang": "en",
   "models": {
     "haiku": "claude-haiku-5-5",
     "sonnet": "claude-sonnet-5-5",

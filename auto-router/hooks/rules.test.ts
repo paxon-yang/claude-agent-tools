@@ -110,3 +110,85 @@ test('effort 跟着问题走', () => {
   expect(rd('解释一下 auth.ts 里登录失败之后的重试逻辑，为什么第三次重试会跳过 token 刷新，和 session.ts 里的过期判断有什么关系，哪里会出问题', undefined, 0, D)?.effort).toBe('medium')
   expect(pc('{"tier":"haiku","effort":"high","reason":"细节容易错"}', D)?.effort).toBe('high')
 })
+
+// ---- English prompts / 英文提示 ----
+import { has, isContinue, classifierSystem, mergeConfig } from './rules'
+const zhCfg = mergeConfig(DEFAULTS, { lang: 'zh' })
+
+test('English keywords route like the Chinese ones', () => {
+  expect(tier('explain what auth.ts does')).toBe('haiku')
+  expect(tier('Where is the login handler?')).toBe('haiku')
+  expect(tier('summarize this file')).toBe('haiku')
+  expect(tier('refactor the auth architecture')).toBe('opus')
+  expect(tier('Refactoring the payments module')).toBe('opus')
+  expect(tier('find the root cause of this deadlock')).toBe('opus')
+  expect(tier('do a code review of the PR')).toBe('opus')
+  expect(tier('ultrathink about this')).toBe('opus')
+  expect(tier('explain the bug and then fix it')).toBe(undefined)
+  expect(tier('add an export to PDF button')).toBe(undefined)
+})
+
+test('English multi-step tasks', () => {
+  expect(tier('implement the spec in docs/plan.md')).toBe('opus')
+  expect(tier('Follow the plan we wrote yesterday')).toBe('opus')
+  expect(tier('please build it according to our design doc')).toBe('opus')
+  expect(isBigTask('implement design changes on the button', c)).toBe(false)
+})
+
+test('English continue replies', () => {
+  expect(tier('ok', 'opus')).toBe('opus')
+  expect(tier('OK, go ahead!', 'haiku')).toBe('haiku')
+  expect(tier('yes please', 'sonnet')).toBe('sonnet')
+  expect(tier('Sounds good, thanks', 'opus')).toBe('opus')
+  expect(tier('lgtm', 'opus')).toBe('opus')
+  expect(tier("let's do it", 'opus')).toBe('opus')
+  expect(isContinue('ok now add tests for the parser', c)).toBe(false)
+  expect(isContinue('go fix it', c)).toBe(false)
+  expect(isContinue('golang', c)).toBe(false)
+  expect(isContinue('ok了', c)).toBe(true)
+  expect(isContinue('okr', c)).toBe(false)
+})
+
+test('English "still failing" escalates', () => {
+  expect(tier('still failing', 'sonnet')).toBe('opus')
+  expect(tier("that didn't fix it", 'sonnet')).toBe('opus')
+  expect(tier('Same error as before', 'haiku')).toBe('opus')
+  expect(ruleDecide('still broken', 'sonnet', 0, c)?.source).toBe('escalate')
+})
+
+test('English words match on word boundaries', () => {
+  expect(has('refresh the token', ['ok'])).toBe(false)
+  expect(has('update the address field', ['add'])).toBe(false)
+  expect(has('add a field', ['add'])).toBe(true)
+  expect(has('added a field', ['add'])).toBe(true)
+  expect(has('the preview pane', ['review'])).toBe(false)
+  expect(has('reviewing the diff', ['review'])).toBe(true)
+  expect(has('run the migrations', ['migrate'])).toBe(true)
+  expect(has('fix the formatting', ['format'])).toBe(true)
+  expect(has('information', ['format'])).toBe(false)
+  expect(has("What’s this", ["what's"])).toBe(true)
+  expect(has('帮我refactor一下', ['refactor'])).toBe(true)
+  expect(has('按照 PRD 来', ['按照 prd'])).toBe(true)
+  // 'list' must not fire inside other words
+  expect(tier('check the playlist component')).toBe(undefined)
+  expect(tier('where is the token stored')).toBe('haiku')
+})
+
+test('reasons follow cfg.lang', () => {
+  expect(ruleDecide('explain auth.ts', undefined, 0, c)?.reason).toBe('Question/lookup/small change')
+  expect(ruleDecide('explain auth.ts', undefined, 0, zhCfg)?.reason).toBe('提问/查找/小改动')
+  expect(ruleDecide('继续', 'opus', 0, c)?.reason).toBe('Continuing last turn')
+  expect(ruleDecide('继续', 'opus', 0, zhCfg)?.reason).toBe('接着上一轮做')
+  expect(ruleDecide('x', 'sonnet', 3, c)?.reason).toBe('3 failures last turn, stepping up')
+  expect(ruleDecide('x', 'sonnet', 3, zhCfg)?.reason).toBe('上一轮失败 3 次，升档')
+  expect(parseClassifier('{"tier":"sonnet"}', c)?.reason).toBe('Classified by Haiku')
+  expect(parseClassifier('{"tier":"sonnet"}', zhCfg)?.reason).toBe('Haiku 判断')
+  expect((parseClassifier('{"tier":"sonnet","reason":"' + 'a'.repeat(80) + '"}', c)?.reason ?? '').length).toBe(40)
+  const hd = { tier: 'haiku' as const, effort: 'low' as const, reason: 'Q', source: 'rule' as const }
+  expect(guardHysteresis(hd, 'opus', undefined, zhCfg).decision.reason).toBe('Q；先不降档，下一轮仍简单再换 Haiku 5.5')
+  expect(guardWindow(hd, 'opus', 190000, c).reason).toBe('Context 190k too big for Haiku 5.5, using Opus 5.5')
+  expect(classifierSystem('en')).toContain('in English')
+  expect(classifierSystem('zh')).toContain('Chinese')
+  expect(mergeConfig(DEFAULTS, {}).lang).toBe('en')
+  expect(mergeConfig(DEFAULTS, { lang: 'fr' }).lang).toBe('en')
+})

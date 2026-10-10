@@ -6,8 +6,10 @@
 Haiku answers the lookups, Sonnet does the daily work, Opus plans the big jobs —
 and you watch every agent, model and dollar in real time.
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+**[▶ Try the live demo](https://paxon-yang.github.io/claude-agent-tools/)** · [English](README.md) · [简体中文](README.zh-CN.md)
 
+[![CI](https://github.com/paxon-yang/claude-agent-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/paxon-yang/claude-agent-tools/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/paxon-yang/claude-agent-tools?color=1d1d1f)](https://github.com/paxon-yang/claude-agent-tools/releases)
 ![macOS](https://img.shields.io/badge/macOS-supported-1d1d1f?logo=apple)
 ![Windows](https://img.shields.io/badge/Windows-beta-0078D4?logo=windows)
 ![Linux](https://img.shields.io/badge/Linux-manual%20start-555)
@@ -16,7 +18,7 @@ and you watch every agent, model and dollar in real time.
 
 <img src="docs/demo.gif" alt="Live agent dashboard: Opus orchestrates while Haiku and Sonnet sub-agents run" width="100%">
 
-<sub>Demo data. Full-quality video: <a href="docs/demo.mp4">docs/demo.mp4</a></sub>
+<sub>Demo data. <a href="https://paxon-yang.github.io/claude-agent-tools/">Open the live demo</a> · <a href="docs/demo.mp4">full-quality video</a></sub>
 
 </div>
 
@@ -28,8 +30,20 @@ This repo ships two small tools that fix both:
 
 | | What it does |
 |---|---|
-| **auto-router** | A Claude Code plugin that picks the model and effort **every turn**, and for every sub-agent. Simple questions go to Haiku, everyday coding to Sonnet, architecture and multi-step jobs to Opus (which plans and delegates). In real sessions it cut estimated cost by **30–40%** versus running everything on Opus. |
+| **auto-router** | A Claude Code plugin that picks the model and effort **every turn**, and for every sub-agent. Simple questions go to Haiku, everyday coding to Sonnet, architecture and multi-step jobs to Opus (which plans and delegates). A built-in report shows what it saves you versus running everything on Opus — measured on your own transcripts, not promised. |
 | **agent-viz** | A local dashboard at `http://localhost:4321`: every project, the current task, a live tree of the main session and its sub-agents, which model each one runs, a model timeline, estimated cost and savings, and an alert when Claude is waiting for your approval. Works on your phone too. |
+
+## How it compares
+
+| | **claude-agent-tools** | [claude-code-router](https://github.com/musistudio/claude-code-router) | [ccusage](https://github.com/ryoppippi/ccusage) | `/model` by hand |
+|---|---|---|---|---|
+| What it is | Plugin + local dashboard | Proxy in front of Claude Code | Usage analyzer CLI | Built in |
+| Picks the model | **Every turn and every sub-agent**, automatically | By scenario (background, thinking, long context…), to any provider | — | You, when you remember |
+| Stays on Anthropic models, no proxy | ✓ | Routes through its proxy | ✓ | ✓ |
+| Sees sub-agents live | ✓ | — | — | — |
+| Shows cost | Live, plus a savings-vs-Opus report | — | ✓ detailed usage & cost reports | — |
+
+Use it alongside ccusage if you like its reports; use claude-code-router if you want non-Anthropic models. This project is for people who want to stay on Claude and stop overpaying for easy turns.
 
 ## Features
 
@@ -42,6 +56,8 @@ This repo ships two small tools that fix both:
 - **Model timeline & cost** — which model ran each turn and each sub-agent, token use per model, estimated cost and *how much you saved*.
 - **"Needs you" alerts** — banner, desktop notification or sound when a session is blocked on your approval.
 - **Anywhere access** — Tailscale (private, zero config) or your own domain via Cloudflare Tunnel + Access email login.
+- **Savings report** — `node ~/.claude/viz/app/report.js` reads your local transcripts: spend per model, all-Opus baseline, routed vs. un-routed sessions; `--md` for a shareable write-up.
+- **English and 中文** — router messages, dashboard (with an EN | 中文 switch) and installers follow your system language.
 - **Apple-style liquid-glass UI**, light theme, mobile layout, reduced-motion support.
 
 <table>
@@ -111,6 +127,29 @@ Each turn's choice, and why, shows up in the Claude Code status line, in `/route
 | `#opus refactor the auth module` | Use Opus for this prompt only |
 | Shift+Tab, then *"go ahead"* | Opus plans, Sonnet executes |
 
+## How much did it save me?
+
+```bash
+node ~/.claude/viz/app/report.js            # last 7 days
+node ~/.claude/viz/app/report.js --days 30 --md   # write claude-savings-YYYY-MM-DD.md to share
+```
+
+```
+Claude Code · model routing savings
+Last 7 days · 3 sessions · 7 model replies
+
+  Model     Replies  Input  Cache read  Output  Est. cost  Share
+  Haiku           3   190k        1.5M     80k      $0.10    <1%
+  Sonnet          1   200k          2M    100k      $1.80    16%
+  Opus            2   400k          3M    230k      $9.40    83%
+
+  Estimated cost       $11.30
+  All on Opus          $16.96
+  Saved           33% ($5.66)
+```
+
+<sub>Sample output from the test fixtures. Estimates use public API prices; on a subscription it's an equivalent value, not your bill.</sub>
+
 ## Configuration
 
 Edit `~/.claude/auto-router/config.json` and restart Claude Code. The most useful keys:
@@ -123,8 +162,9 @@ Edit `~/.claude/auto-router/config.json` and restart Claude Code. The most usefu
 | `subagents` | explorer→haiku, worker→sonnet … | Model per sub-agent type |
 | `haikuGuard.maxFiles` | `3` | Files Haiku may edit before Sonnet takes over |
 | `autoFable` | `false` | Let the hardest tasks go to Fable automatically |
+| `lang` | your system | `en` or `zh` for router messages |
 
-Dashboard settings live in `~/.claude/viz/app/config.json` (port, prices used for estimates, remote access).
+Dashboard settings live in `~/.claude/viz/app/config.json` (port, prices used for estimates, remote access, `lang`). Set `CAT_LANG=en` or `CAT_LANG=zh` before installing to force the installer language.
 
 ## Open the dashboard from other devices
 
@@ -152,12 +192,11 @@ Both make a backup before editing `~/.claude/settings.json` or `~/.claude/CLAUDE
 
 ## Roadmap
 
-- English / Chinese UI switch (the UI and installer messages are Chinese today)
-- Daily and weekly cost history
+- Daily and weekly cost history on the dashboard
 - Router feedback: tell it "wrong model" and it learns
 - Native Linux autostart (systemd)
 
-Issues and PRs are welcome — see [CONTRIBUTING](CONTRIBUTING.md).
+Issues and PRs are welcome — see [CONTRIBUTING](CONTRIBUTING.md) and the [changelog](CHANGELOG.md).
 
 ## License
 

@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Syntax checks
+        run: |
+          for f in agent-viz/*.js scripts/*.js; do node --check "$f"; done
+          for f in install.sh update.sh auto-router/*.sh agent-viz/*.sh; do bash -n "$f"; done
+          node -e "const s=require('fs').readFileSync('agent-viz/public/index.html','utf8');const m=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).join('\n');new Function(m)"
+
+      - name: auto-router — validate plugin
+        run: claude plugin validate auto-router
+
+      - name: auto-router — routing tests
+        run: claude plugin test auto-router
+
+      - name: auto-router — no unresolved identifiers
+        if: runner.os == 'Linux'
+        run: |
+          out=$(npx -y -p typescript@5.6.3 tsc --noEmit --skipLibCheck --target es2022 --module esnext --moduleResolution bundler auto-router/hooks/*.ts 2>&1 || true)
+          echo "$out" | grep -E 'TS2304|TS2552' && exit 1 || echo "ok"
+
+      - name: agent-viz — savings report tests
+        run: node --test agent-viz/test/report.test.js
+
+      - name: agent-viz — demo server smoke test
+        run: |
+          node agent-viz/server.js --demo --port 4330 --lang en > server.log 2>&1 &
+          for i in $(seq 1 20); do sleep 0.5; curl -s http://127.0.0.1:4330/api/health | grep -q '"ok":true' && break; done
+          curl -sf http://127.0.0.1:4330/api/health
+          curl -sf http://127.0.0.1:4330/ | grep -q 'Agent'
+          sleep 3
+          curl -sf http://127.0.0.1:4330/api/state | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);if(!j.sessions.length)throw new Error('no demo sessions');console.log('sessions:',j.sessions.length)})"
+
+      - name: Full install + uninstall in a throwaway home
+        env:
+          CAT_LANG: en
+        run: |
+          export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            export USERPROFILE="$(cygpath -w "$HOME")"
+            export APPDATA="$(cygpath -w "$HOME/AppData/Roaming")"; mkdir -p "$HOME/AppData/Roaming"
+          fi
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            # launchd needs a GUI session; the macOS runner has one, but keep the run self-contained
+            mkdir -p "$HOME/Library/LaunchAgents"
+          fi
+          bash install.sh
+          test -f "$HOME/.claude/auto-router/config.json"
+          grep -q '"lang": "en"' "$HOME/.claude/auto-router/config.json"
+          grep -q 'auto-router:start' "$HOME/.claude/CLAUDE.md"
+          grep -q 'capture.js' "$HOME/.claude/settings.json"
+          claude plugin list | grep -q 'auto-router@paxon-local'
+          if [ "$RUNNER_OS" != "Linux" ]; then
+            # macOS (launchd) and Windows (Startup folder) start the board in the background
+            for i in $(seq 1 20); do sleep 1; curl -s http://127.0.0.1:4321/api/health | grep -q '"ok":true' && break; done
+            curl -sf http://127.0.0.1:4321/api/health
+          fi
+          bash "$HOME/.claude/viz/app/uninstall.sh"
+          bash "$HOME/.claude/auto-router/uninstall.sh"
+          ! grep -q 'capture.js' "$HOME/.claude/settings.json"
+          ! grep -q 'auto-router:start' "$HOME/.claude/CLAUDE.md"

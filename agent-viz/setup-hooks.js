@@ -15,6 +15,22 @@ const MARK = '.claude/viz/app/capture.js';
 const WIN = process.platform === 'win32';
 const fwd = p => String(p).replace(/\\/g, '/');
 
+// 语言 / language: CAT_LANG (en|zh) > LC_ALL / LC_MESSAGES / LANG > macOS AppleLanguages > en
+function detectLang() {
+  const env = String(process.env.CAT_LANG || '').toLowerCase();
+  if (env === 'en' || env === 'zh') return env;
+  if (/^zh/i.test(process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || '')) return 'zh';
+  if (process.platform === 'darwin') {
+    try {
+      const out = require('child_process').execFileSync('defaults', ['read', '-g', 'AppleLanguages'], { encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] });
+      if (/^zh/i.test(out.replace(/[\s"(]/g, ''))) return 'zh';
+    } catch { }
+  }
+  return 'en';
+}
+const LANG = detectLang();
+const L = (zh, en) => LANG === 'zh' ? zh : en;
+
 // 有 matcher 的事件用 "*"（全部匹配），没有 matcher 的事件不写 matcher
 const EVENTS = {
   SessionStart: false, SessionEnd: false, UserPromptSubmit: false,
@@ -28,9 +44,9 @@ function load() {
   const text = fs.readFileSync(SETTINGS, 'utf8');
   if (!text.trim()) return {};
   try { return JSON.parse(text); } catch (e) {
-    console.error('✗ 你的 settings.json 格式有错误（不是合法的 JSON），为了安全，没有做任何修改。');
-    console.error('  文件位置：' + SETTINGS);
-    console.error('  错误信息：' + e.message);
+    console.error(L('✗ 你的 settings.json 格式有错误（不是合法的 JSON），为了安全，没有做任何修改。', '✗ Your settings.json is not valid JSON, so nothing was changed (to be safe).'));
+    console.error(L('  文件位置：', '  File: ') + SETTINGS);
+    console.error(L('  错误信息：', '  Error: ') + e.message);
     process.exit(2);
   }
 }
@@ -73,14 +89,14 @@ function install(nodePath) {
   }
   fs.mkdirSync(path.dirname(SETTINGS), { recursive: true });
   fs.writeFileSync(SETTINGS, JSON.stringify(s, null, 2) + '\n');
-  if (bak) console.log('✓ 已备份原设置到 ' + bak);
-  console.log(added ? `✓ 已加入 ${added} 个采集事件（全部为后台异步，不会拖慢 Claude Code）`
-                    : '✓ 采集事件之前已经装过，已更新为最新路径');
+  if (bak) console.log(L('✓ 已备份原设置到 ', '✓ Backed up your settings to ') + bak);
+  console.log(added ? L(`✓ 已加入 ${added} 个采集事件（全部为后台异步，不会拖慢 Claude Code）`, `✓ Added ${added} capture hooks (all async — they won't slow Claude Code down)`)
+                    : L('✓ 采集事件之前已经装过，已更新为最新路径', '✓ Capture hooks were already installed — updated to the latest path'));
 }
 
 function remove() {
   const s = load();
-  if (!s.hooks) { console.log('✓ 设置里没有看板的采集事件，无需移除'); return; }
+  if (!s.hooks) { console.log(L('✓ 设置里没有看板的采集事件，无需移除', '✓ No board capture hooks in your settings — nothing to remove')); return; }
   const bak = backup();
   let removed = 0;
   for (const ev of Object.keys(s.hooks)) {
@@ -96,8 +112,8 @@ function remove() {
   }
   if (!Object.keys(s.hooks).length) delete s.hooks;
   fs.writeFileSync(SETTINGS, JSON.stringify(s, null, 2) + '\n');
-  if (bak) console.log('✓ 已备份原设置到 ' + bak);
-  console.log(`✓ 已移除 ${removed} 个看板采集事件，其他设置未改动`);
+  if (bak) console.log(L('✓ 已备份原设置到 ', '✓ Backed up your settings to ') + bak);
+  console.log(L(`✓ 已移除 ${removed} 个看板采集事件，其他设置未改动`, `✓ Removed ${removed} board capture hooks; everything else is untouched`));
 }
 
 if (args.includes('--remove')) remove();
@@ -106,5 +122,5 @@ else if (args.includes('--install')) {
   const nodePath = i >= 0 && args[i + 1] ? args[i + 1] : process.execPath;
   install(nodePath);
 } else {
-  console.log('用法：node setup-hooks.js --install [--node 路径] | --remove');
+  console.log(L('用法：node setup-hooks.js --install [--node 路径] | --remove', 'Usage: node setup-hooks.js --install [--node <path>] | --remove'));
 }

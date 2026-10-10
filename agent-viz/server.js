@@ -4,6 +4,9 @@
 // 拼成"项目 → 任务 → 主会话 → 子代理"的树，推送给浏览器。全程只读，不改 Claude Code 的任何文件。
 // 启动：node server.js            正式模式，打开 http://localhost:4321
 //       node server.js --demo     演示模式（模拟数据），可配合 --port 4322
+//       --lang en|zh              指定语言（控制台提示、演示数据、网页默认语言）；默认跟随 config.json 的 lang / 系统语言
+// Usage: node server.js [--demo] [--port 4322] [--lang en|zh] [--log events.jsonl]
+// The server keeps language-neutral data (log entries are key tuples); the browser translates.
 'use strict';
 const http = require('http');
 const fs = require('fs');
@@ -21,7 +24,27 @@ const APP = __dirname;
 const CONFIG = readJSON(path.join(APP, 'config.json')) || {};
 const DEMO = flag('--demo');
 const PORT = Number(opt('--port', CONFIG.port || 4321));
-const LOG = DEMO ? path.join(APP, 'demo-events.jsonl') : opt('--log', path.join(VIZ, 'events.jsonl'));
+// ---------- 语言 / language ----------
+// --lang > CAT_LANG > config.json "lang" > LC_ALL / LC_MESSAGES / LANG > macOS AppleLanguages > en
+const LANG_FLAG = ['en', 'zh'].includes(opt('--lang', '')) ? opt('--lang', '') : null;
+function detectLang() {
+  if (LANG_FLAG) return LANG_FLAG;
+  const env = String(process.env.CAT_LANG || '').toLowerCase();
+  if (env === 'en' || env === 'zh') return env;
+  if (CONFIG.lang === 'en' || CONFIG.lang === 'zh') return CONFIG.lang;
+  const loc = process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || '';
+  if (/^zh/i.test(loc)) return 'zh';
+  if (process.platform === 'darwin') {
+    try {
+      const out = require('child_process').execFileSync('defaults', ['read', '-g', 'AppleLanguages'], { encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] });
+      if (/^zh/i.test(out.replace(/[\s"(]/g, ''))) return 'zh';
+    } catch { }
+  }
+  return 'en';
+}
+const LANG = detectLang();
+const L = (zh, en) => LANG === 'zh' ? zh : en;
+const LOG = DEMO ? path.join(APP, LANG === 'zh' ? 'demo-events.jsonl' : 'demo-events.en.jsonl') : opt('--log', path.join(VIZ, 'events.jsonl'));
 const CONTEXT_LIMIT = Number(CONFIG.contextLimit || 1000000);
 const IDLE_MIN = Number(CONFIG.collapseAfterMinutes || 30);
 const KEEP_HOURS = Number(CONFIG.keepHours || 24);
@@ -114,20 +137,23 @@ function getSession(d, ts) {
 function getAgent(s, id, type, ts) {
   let a = s.agents.get(id);
   if (!a) {
-    a = { id, type: type || '子代理', status: 'running', startedAt: ts, endedAt: null, description: null,
+    a = { id, type: type || SUB, status: 'running', startedAt: ts, endedAt: null, description: null,
       spawnModel: null, actualModel: null, effort: null, currentTool: null, lastTool: null, toolCount: 0,
       lastMessage: null, test: null, transcript: null, taskId: s.task ? s.task.id : null };
     s.agents.set(id, a);
   }
-  if (type && a.type === '子代理') a.type = type;
+  if (type && a.type === SUB) a.type = type;
   return a;
 }
 
+// 事件明细里的一条：text 是 [键, ...参数]，由网页按当前语言翻译（旧的纯文字也照常显示）
+// A log entry's text is a key tuple like ['spawned', type, desc]; the browser renders it in the viewer's language.
 function log(s, ts, who, text, kind) {
   s.timeline.push({ ts, who, text, kind: kind || 'info' });
   if (s.timeline.length > 120) s.timeline.splice(0, s.timeline.length - 120);
 }
 
+const SUB = 'subagent';   // 没有类型的子代理（网页上显示为"子代理"/"Subagent"）
 function toolLabel(name, input) {
   input = input || {};
   const base = p => p ? path.basename(String(p)) : '';
@@ -138,10 +164,10 @@ function toolLabel(name, input) {
     case 'Glob': return 'Glob · ' + short(input.pattern, 32);
     case 'WebFetch': try { return 'WebFetch · ' + new URL(input.url).host; } catch { return 'WebFetch'; }
     case 'WebSearch': return 'WebSearch · ' + short(input.query, 32);
-    case 'Agent': case 'Task': return '派出 ' + (input.subagent_type || '子代理');
+    case 'Agent': case 'Task': return 'Agent → ' + (input.subagent_type || SUB);
     default:
       if (String(name).startsWith('mcp__')) return 'MCP · ' + String(name).split('__').slice(1).join(' · ');
-      return String(name || '工具');
+      return String(name || 'tool');
   }
 }
 
@@ -164,7 +190,7 @@ function isHandback(p) {
   return t.startsWith('<agent-message') || t.startsWith('<task-notification') || t.includes('[Subagent hand-back]');
 }
 // Claude Code 内部的小助手（比如给后台子代理写进度摘要），不是派出去干活的子代理
-function isHelper(a) { return a.type === '子代理' && !a.description && a.toolCount === 0; }
+function isHelper(a) { return a.type === SUB && !a.description && a.toolCount === 0; }
 
 function isSpawn(name) { return name === 'Agent' || name === 'Task'; }
 
@@ -186,20 +212,20 @@ function handle(line) {
   switch (e) {
     case 'SessionStart':
       if (d.model) s.model = d.model;
-      log(s, ts, 'main', d.source === 'resume' ? '恢复会话' : '会话开始', 'session');
+      log(s, ts, 'main', [d.source === 'resume' ? 'sessionResumed' : 'sessionStart'], 'session');
       break;
     case 'SessionEnd':
       s.ended = true; s.status = 'ended'; s.currentTool = null; s.needMsg = null;
       closeTurn(s, ts);
       if (s.task && !s.task.endedAt) { s.task.endedAt = ts; s.tasksDone++; }
-      log(s, ts, 'main', '会话结束', 'session');
+      log(s, ts, 'main', ['sessionEnd'], 'session');
       break;
     case 'UserPromptSubmit': {
       if (isHandback(d.prompt)) {
         s.status = 'running';
         const last = s.turns[s.turns.length - 1];
-        if (!last || last.end) pushTurn(s, { start: ts, end: null, prompt: '整理子代理交回的结果', handback: true });
-        log(s, ts, 'main', '收到子代理交回的结果，整理中', 'info');
+        if (!last || last.end) pushTurn(s, { start: ts, end: null, prompt: '', handback: true });
+        log(s, ts, 'main', ['handback'], 'info');
         break;
       }
       closeTurn(s, ts);
@@ -207,7 +233,7 @@ function handle(line) {
       if (s.task && !s.task.endedAt) s.task.endedAt = ts;
       s.task = { id: d.prompt_id || String(ts), prompt: short(d.prompt, 300), startedAt: ts, endedAt: null };
       s.status = 'running'; s.test = null;
-      log(s, ts, 'you', '新任务：' + short(d.prompt, 60), 'task');
+      log(s, ts, 'you', ['newTask', short(d.prompt, 60)], 'task');
       break;
     }
     case 'PreToolUse': {
@@ -225,7 +251,7 @@ function handle(line) {
         const ti = d.tool_input || {};
         s.pendingSpawns.push({ toolUseId: d.tool_use_id, type: ti.subagent_type || null,
           description: ti.description || short(ti.prompt, 60), model: ti.model || null, ts, used: false });
-        log(s, ts, agent ? agent.type : 'main', `派出 ${ti.subagent_type || '子代理'}：${short(ti.description || ti.prompt, 50)}`, 'spawn');
+        log(s, ts, agent ? agent.type : 'main', ['spawned', ti.subagent_type || SUB, short(ti.description || ti.prompt, 50)], 'spawn');
       }
       break;
     }
@@ -240,7 +266,7 @@ function handle(line) {
         const t = detectTest(d.tool_input, d.tool_response);
         if (t) {
           if (agent) agent.test = t; else s.test = t;
-          log(s, ts, agent ? agent.type : 'main', `测试 ${t.passed}/${t.total} 通过`, t.failed ? 'warn' : 'good');
+          log(s, ts, agent ? agent.type : 'main', ['tests', t.passed, t.total], t.failed ? 'warn' : 'good');
         }
       }
       if (isSpawn(d.tool_name)) {
@@ -249,13 +275,13 @@ function handle(line) {
           if (a.toolUseId === d.tool_use_id && a.status === 'running') { a.status = failed ? 'failed' : 'done'; a.endedAt = ts; }
         }
       }
-      if (failed && !isSpawn(d.tool_name)) log(s, ts, agent ? agent.type : 'main', `工具失败：${toolLabel(d.tool_name, d.tool_input)}`, 'bad');
+      if (failed && !isSpawn(d.tool_name)) log(s, ts, agent ? agent.type : 'main', ['toolFailed', toolLabel(d.tool_name, d.tool_input)], 'bad');
       break;
     }
     case 'SubagentStart': {
       const a = agent || getAgent(s, d.agent_id || ('a' + ts), d.agent_type, ts);
       a.status = 'running'; a.startedAt = Math.min(a.startedAt, ts); a.taskId = s.task ? s.task.id : null;
-      const typed = a.type !== '子代理';
+      const typed = a.type !== SUB;
       const p = typed
         ? (s.pendingSpawns.find(x => !x.used && (!x.type || x.type === a.type)) || s.pendingSpawns.find(x => !x.used))
         : s.pendingSpawns.find(x => !x.used && !x.type);
@@ -270,27 +296,27 @@ function handle(line) {
       if (d.last_assistant_message) a.lastMessage = short(d.last_assistant_message, 1500);
       if (d.agent_transcript_path) a.transcript = d.agent_transcript_path;
       const dur = Math.max(0, Math.round(ts - a.startedAt));
-      if (!isHelper(a)) log(s, ts, a.type, `${a.status === 'failed' ? '出错结束' : a.status === 'stopped' ? '被中断' : '完成'} · 用时 ${fmtDur(dur)}`, a.status === 'done' ? 'good' : 'bad');
+      if (!isHelper(a)) log(s, ts, a.type, ['agentEnded', a.status, dur], a.status === 'done' ? 'good' : 'bad');
       break;
     }
     case 'Stop':
       s.status = 'idle'; s.currentTool = null; s.needMsg = null;
       closeTurn(s, ts);
       if (s.task && !s.task.endedAt) { s.task.endedAt = ts; s.tasksDone++; }
-      log(s, ts, 'main', '本轮回复完成，等你下一步', 'session');
+      log(s, ts, 'main', ['turnDone'], 'session');
       break;
     case 'Notification':
       if (/permission|needs_input/.test(d.notification_type || d.message || '')) {
         s.status = 'needs-you'; s.needMsg = short(d.message, 120); s.needAt = ts;
-        log(s, ts, 'main', '需要你确认：' + short(d.message, 50), 'warn');
+        log(s, ts, 'main', ['needsYou', short(d.message, 50)], 'warn');
       }
       break;
     case 'PostModelSwitch':
       if (d.to_model) { s.model = d.to_model; s.actualModel = null; }
-      log(s, ts, 'main', `切换模型 → ${prettyModel(d.to_model)}`, 'info');
+      log(s, ts, 'main', ['modelSwitch', prettyModel(d.to_model)], 'info');
       break;
     case 'PostCompact':
-      log(s, ts, 'main', '上下文已自动压缩', 'warn');
+      log(s, ts, 'main', ['compacted'], 'warn');
       break;
     // 以下为演示模式专用的模拟事件
     case 'DemoHistory': {
@@ -298,7 +324,7 @@ function handle(line) {
       if (d.cwd) s.cwd = d.cwd;
       for (const tu of d.turns || []) {
         pushTurn(s, { start: ts - tu.ago, end: tu.dur == null ? null : ts - tu.ago + tu.dur, prompt: tu.prompt, handback: false });
-        addDecision(s, { at: ts - tu.ago, model: 'claude-' + tu.fam + '-5-5', effort: tu.effort || 'medium', reason: tu.reason || '', by: tu.by || '规则' });
+        addDecision(s, { at: ts - tu.ago, model: 'claude-' + tu.fam + '-5-5', effort: tu.effort || 'medium', reason: tu.reason || '', by: tu.by || 'rule' });
         if (tu.dur != null) s.tasksDone++;
       }
       for (const [fam, u] of Object.entries(d.usage || {})) addUsage(s, 'demo-h-' + fam, 'claude-' + fam, { input_tokens: u[0], output_tokens: u[1], cache_read_input_tokens: u[2], cache_creation_input_tokens: u[3] });
@@ -320,14 +346,16 @@ function handle(line) {
       if (d.context) s.context = d.context;
       if (d.out) s.outTokens = d.out;
       break;
-    case 'DemoRoute':
-      addDecision(s, { at: ts, model: d.model || 'claude-opus-5-5', effort: d.effort || 'high', reason: d.reason, by: 'Haiku 判断' });
+    case 'DemoRoute': {
+      const by = d.by || 'haiku', model = d.model || 'claude-opus-5-5', effort = d.effort || 'high';
+      addDecision(s, { at: ts, model, effort, reason: d.reason, by });
       s.route = { mode: 'auto', last: { reason: d.reason }, advisorCalls: s.advisor.calls };
-      log(s, ts, 'router', d.text, 'route');
+      log(s, ts, 'router', ['route', prettyModel(model), effort, by, d.reason || ''], 'route');
       break;
+    }
     case 'DemoAdvisor':
       s.advisor.calls++; s.advisor.last = d.text; s.advisor.lastAt = ts; s.advisor.moment = d.moment;
-      log(s, ts, 'advisor', '顾问介入（' + (d.moment || '') + '）：' + short(d.text, 40), 'advisor');
+      log(s, ts, 'advisor', ['advisor', d.moment || '', short(d.text, 40)], 'advisor');
       break;
   }
   changed();
@@ -380,12 +408,6 @@ function usageSummary(maps) {
     if (b != null) baseline += b;
   }
   return { byModel: by, cost, baseline, saved: baseline > 0 ? Math.max(0, 1 - cost / baseline) : null, unpriced };
-}
-
-function fmtDur(sec) {
-  if (sec < 60) return sec + '秒';
-  if (sec < 3600) return Math.floor(sec / 60) + '分' + (sec % 60 ? (sec % 60) + '秒' : '');
-  return Math.floor(sec / 3600) + '小时' + Math.floor((sec % 3600) / 60) + '分';
 }
 
 // ---------- 按行读取不断增长的文件 ----------
@@ -454,7 +476,7 @@ function onTranscript(s, o) {
       if (c.id && s.advisorSeen.has(c.id)) continue;
       if (c.id) s.advisorSeen.add(c.id);
       s.advisor.calls++; s.advisor.lastAt = ts;
-      log(s, ts, 'advisor', '顾问介入', 'advisor');
+      log(s, ts, 'advisor', ['advisor'], 'advisor');
     }
     if (c.type === 'advisor_tool_result') {
       let t = '';
@@ -484,10 +506,13 @@ function pollRouter(s) {
   const seen = s.routeSeen || 0;
   for (const d of r.decisions) {
     if (d.at / 1000 <= seen) continue;
-    const by = d.phase === 'plan' ? '计划模式'
-      : String(d.prompt || '').includes('本轮中途升档') ? '本轮中途升档'
-      : { manual: '你指定', pin: '/route 固定', continue: '沿用上一轮', escalate: '自动升档', rule: '规则', haiku: 'Haiku 判断', fallback: '默认', guard: '保护', phase: '计划执行' }[d.source] || d.source;
-    log(s, d.at / 1000, 'router', `选择 ${prettyModel(d.model)} · ${d.effort}（${by}：${d.reason}）`, 'route');
+    // by 存的是键（plan / midTurn / handback / manual / pin / continue / escalate / rule / haiku / fallback / guard / phase），网页负责翻译
+    const pr = String(d.prompt || '');
+    const by = d.phase === 'plan' ? 'plan'
+      : d.midTurn || pr.includes('本轮中途升档') || pr.includes('(mid-turn escalation)') ? 'midTurn'
+      : d.handback ? 'handback'
+      : d.source || '';
+    log(s, d.at / 1000, 'router', ['route', prettyModel(d.model), d.effort, by, d.reason || ''], 'route');
     addDecision(s, { at: d.at / 1000, model: d.model, effort: d.effort, reason: d.reason, by });
   }
   if (last) s.routeSeen = last.at / 1000;
@@ -541,7 +566,7 @@ function view(s) {
   const shown = (cur.length ? cur : all.slice(-6));
   const model = sessionModel(s);
   return {
-    id: s.id, project: path.basename(s.cwd || '') || '(未知项目)', cwd: s.cwd,
+    id: s.id, project: path.basename(s.cwd || ''), cwd: s.cwd,
     active, status: active ? s.status : 'ended',
     model: prettyModel(model), family: family(model),
     effort: (s.route && s.route.mode !== 'off' && s.route.last && s.route.last.effort) || s.effort || settings.effortLevel || null,
@@ -553,7 +578,7 @@ function view(s) {
       const m = resolveAgentModel(s, a);
       const def = agentDefs[a.type] || {};
       return { id: a.id, type: a.type, model: prettyModel(m), family: family(m),
-        modelSource: a.actualModel ? '实际运行' : a.spawnModel ? '派活时指定' : def.model ? 'agents 设置' : '继承主会话',
+        modelSource: a.actualModel ? 'actual' : a.spawnModel ? 'spawn' : def.model ? 'agentDef' : 'inherit',
         effort: a.effort || def.effort || null, status: a.status, description: a.description,
         startedAt: a.startedAt, endedAt: a.endedAt, currentTool: a.currentTool, lastTool: a.lastTool, toolCount: a.toolCount,
         lastMessage: a.lastMessage, test: a.test, steps: (a.steps || []).slice(-30) };
@@ -599,7 +624,7 @@ function snapshot() {
   const recent = [...sessions.values()].filter(s => DEMO || t - s.lastTs < KEEP_HOURS * 3600);
   const all = usageSummary(recent.map(s => s.usage));
   const tasks = recent.reduce((n, s) => n + s.turns.filter(x => !x.handback && x.end).length, 0);
-  return { now: t, demo: DEMO, settings: { model: prettyModel(settings.model), advisorModel: prettyModel(settings.advisorModel),
+  return { now: t, demo: DEMO, lang: LANG_FLAG || CONFIG.lang || 'auto', settings: { model: prettyModel(settings.model), advisorModel: prettyModel(settings.advisorModel),
     advisorFamily: family(settings.advisorModel), effortLevel: settings.effortLevel },
     sessions: list, stats: { events: stats.events, badLines: stats.badLines },
     totals: { ...all, tasks, sessions: recent.length, hours: KEEP_HOURS, baselineModel: BASELINE },
@@ -629,7 +654,7 @@ function rotate() {
     fs.renameSync(LOG, path.join(VIZ, `events-${stamp}.jsonl`));
     const archives = fs.readdirSync(VIZ).filter(f => /^events-\d+\.jsonl$/.test(f)).sort();
     for (const f of archives.slice(0, Math.max(0, archives.length - KEEP_ARCHIVES))) fs.unlinkSync(path.join(VIZ, f));
-    console.log('日志已归档');
+    console.log(L('日志已归档', 'Event log archived'));
   } catch { }
 }
 
@@ -689,7 +714,7 @@ const server = http.createServer((req, res) => {
   }
   if (url === '/' || url === '/index.html') {
     fs.readFile(INDEX, (err, buf) => {
-      if (err) { res.writeHead(500); res.end('index.html 不见了'); return; }
+      if (err) { res.writeHead(500); res.end(L('index.html 不见了', 'index.html is missing')); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
       res.end(buf);
     });
@@ -698,14 +723,14 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end('not found');
 });
 server.on('error', err => {
-  if (err.code === 'EADDRINUSE') console.error(`✗ 端口 ${PORT} 已被占用。看板可能已经在运行了，直接打开 http://localhost:${PORT} 试试。`);
+  if (err.code === 'EADDRINUSE') console.error(L(`✗ 端口 ${PORT} 已被占用。看板可能已经在运行了，直接打开 http://localhost:${PORT} 试试。`, `✗ Port ${PORT} is already in use. The board may already be running — try opening http://localhost:${PORT}.`));
   else console.error(err);
   process.exit(1);
 });
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`✓ Claude Code 看板已启动${DEMO ? '（演示模式）' : ''}：http://localhost:${PORT}`);
+  console.log(L(`✓ Claude Code 看板已启动${DEMO ? '（演示模式）' : ''}：http://localhost:${PORT}`, `✓ Claude Code Agent Board is running${DEMO ? ' (demo mode)' : ''}: http://localhost:${PORT}`));
   if (!DEMO) {
-    console.log('  数据来源：' + LOG);
+    console.log(L('  数据来源：', '  Reading events from: ') + LOG);
     // 记下进程号，Windows 上安装/卸载脚本靠它停掉旧的看板
     try { fs.writeFileSync(path.join(VIZ, 'server.pid'), String(process.pid)); } catch { }
     const rm = () => { try { if (fs.readFileSync(path.join(VIZ, 'server.pid'), 'utf8') === String(process.pid)) fs.unlinkSync(path.join(VIZ, 'server.pid')); } catch { } process.exit(0); };
@@ -752,7 +777,7 @@ function syncRemote() {
     if (remote.ips.has(ip)) continue;
     const srv = http.createServer((req, res) => server.emit('request', req, res));
     srv.on('error', () => { remote.ips.delete(ip); });
-    srv.listen(PORT, ip, () => { console.log(`✓ Tailscale 远程地址：http://${ip}:${PORT}`); changed(); });
+    srv.listen(PORT, ip, () => { console.log(L('✓ Tailscale 远程地址：', '✓ Tailscale remote address: ') + `http://${ip}:${PORT}`); changed(); });
     remote.ips.set(ip, srv);
     refreshTailscaleName();
   }

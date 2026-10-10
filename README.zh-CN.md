@@ -6,11 +6,14 @@
 简单问题交给 Haiku，日常开发交给 Sonnet，大任务由 Opus 统筹派活——
 每个代理用的什么模型、花了多少钱，实时看得见。
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+**[▶ 在线看演示](https://paxon-yang.github.io/claude-agent-tools/)** · [English](README.md) · [简体中文](README.zh-CN.md)
+
+[![CI](https://github.com/paxon-yang/claude-agent-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/paxon-yang/claude-agent-tools/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/paxon-yang/claude-agent-tools?color=1d1d1f)](https://github.com/paxon-yang/claude-agent-tools/releases)
 
 <img src="docs/demo.gif" alt="实时代理看板：Opus 统筹，Haiku 和 Sonnet 子代理在跑" width="100%">
 
-<sub>演示数据。高清视频：<a href="docs/demo.mp4">docs/demo.mp4</a></sub>
+<sub>演示数据。<a href="https://paxon-yang.github.io/claude-agent-tools/">打开在线演示</a> · <a href="docs/demo.mp4">高清视频</a></sub>
 
 </div>
 
@@ -22,8 +25,20 @@ Claude Code 默认一个模型干到底，想换就得自己敲 `/model`。结�
 
 | | 做什么 |
 |---|---|
-| **auto-router** | Claude Code 插件。**每一轮**、每个子代理都自动选模型和 effort：提问查找给 Haiku，日常开发给 Sonnet，架构和多步骤大任务给 Opus（负责计划和派活）。真实会话里，比全程用 Opus 估算少花 **30–40%**。 |
+| **auto-router** | Claude Code 插件。**每一轮**、每个子代理都自动选模型和 effort：提问查找给 Haiku，日常开发给 Sonnet，架构和多步骤大任务给 Opus（负责计划和派活）。自带的报告会用你自己电脑上的真实记录，算出比全程用 Opus 少花了多少。 |
 | **agent-viz** | 本地看板 `http://localhost:4321`：所有项目、当前任务、主会话和子代理的实时分工图、每个节点用的模型、模型时间轴、估算花费和省了多少；Claude 等你批准时会提醒你。手机上也能看。 |
+
+## 和其他工具的区别
+
+| | **claude-agent-tools** | [claude-code-router](https://github.com/musistudio/claude-code-router) | [ccusage](https://github.com/ryoppippi/ccusage) | 手动 `/model` |
+|---|---|---|---|---|
+| 是什么 | 插件 + 本地看板 | 架在 Claude Code 前面的代理 | 用量分析命令行 | 自带 |
+| 怎么选模型 | **每一轮、每个子代理**自动选 | 按场景（后台、思考、长上下文……）转发，可接任意厂商 | — | 你记得时自己换 |
+| 只用 Anthropic 模型、不经代理 | ✓ | 经过它的代理 | ✓ | ✓ |
+| 实时看到子代理 | ✓ | — | — | — |
+| 看花费 | 实时 + 对比全用 Opus 的报告 | — | ✓ 详细的用量和费用报告 | — |
+
+喜欢 ccusage 的报表可以一起用；想接非 Anthropic 的模型用 claude-code-router。这个项目适合想继续用 Claude、又不想在简单问题上多花钱的人。
 
 ## 功能
 
@@ -36,6 +51,8 @@ Claude Code 默认一个模型干到底，想换就得自己敲 `/model`。结�
 - **模型时间轴和花费**：每一轮、每个子代理用的模型，按模型统计 token、估算费用和**省了多少**。
 - **等你确认提醒**：会话卡在等你批准时，顶部横幅、桌面通知或提示音。
 - **随处访问**：Tailscale（私有，零配置），或用 Cloudflare 隧道挂到自己的域名 + 邮箱验证码登录。
+- **省钱报告**：`node ~/.claude/viz/app/report.js` 读你本机的会话记录，算出每个模型花了多少、全用 Opus 要多少、自动选模型接管的会话和其他会话各省多少；加 `--md` 生成可以分享的报告。
+- **中文和英文**：选模型的提示、看板（左下角 EN | 中文 一键切换）、安装脚本都跟随系统语言。
 - **苹果风格液态玻璃界面**，浅色，适配手机，尊重"减少动态效果"设置。
 
 <table>
@@ -107,6 +124,29 @@ flowchart LR
 | `#opus 重构登录模块` | 只这一句用 Opus |
 | Shift+Tab，然后回"执行" | Opus 出方案，Sonnet 动手 |
 
+## 到底省了多少？
+
+```bash
+node ~/.claude/viz/app/report.js                   # 近 7 天
+node ~/.claude/viz/app/report.js --days 30 --md    # 生成 claude-savings-日期.md，方便分享
+```
+
+```
+Claude Code · 自动选模型省了多少
+近 7 天 · 3 个会话 · 模型回复 7 次
+
+  模型      回复次数   输入  缓存读取   输出  估算花费  占比
+  Haiku            3   19万     150万    8万     $0.10   <1%
+  Sonnet           1   20万     200万   10万     $1.80   16%
+  Opus             2   40万     300万   23万     $9.40   83%
+
+  实际约                   $11.30
+  全用 Opus 约             $16.96
+  少花          33%（省下 $5.66）
+```
+
+<sub>上面是测试数据的示例输出。按 API 公开价估算；用订阅的话这是等值金额，不是你的账单。</sub>
+
 ## 设置
 
 编辑 `~/.claude/auto-router/config.json`，然后重开 Claude Code。常用的几项：
@@ -119,8 +159,9 @@ flowchart LR
 | `subagents` | explorer→haiku，worker→sonnet … | 每种子代理用的模型 |
 | `haikuGuard.maxFiles` | `3` | Haiku 最多改几个文件就换 Sonnet |
 | `autoFable` | `false` | 最难的任务自动交给 Fable |
+| `lang` | 跟随系统 | 提示语言：`zh` 或 `en` |
 
-看板的设置在 `~/.claude/viz/app/config.json`（端口、估算用的价格、远程访问）。
+看板的设置在 `~/.claude/viz/app/config.json`（端口、估算用的价格、远程访问、`lang`）。安装前设 `CAT_LANG=zh` 或 `CAT_LANG=en` 可以指定安装提示的语言。
 
 ## 在其他设备上看
 
@@ -148,12 +189,11 @@ bash ~/.claude/viz/app/uninstall.sh
 
 ## 路线图
 
-- 中英文界面切换（目前界面和安装提示是中文）
-- 按天、按周的花费历史
+- 看板上按天、按周的花费历史
 - 选错模型时一键反馈，让规则自己学
 - Linux 开机自启（systemd）
 
-欢迎提 Issue 和 PR，见 [CONTRIBUTING](CONTRIBUTING.md)。
+欢迎提 Issue 和 PR，见 [CONTRIBUTING](CONTRIBUTING.md) 和[更新日志](CHANGELOG.md)。
 
 ## 许可
 

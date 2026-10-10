@@ -1,5 +1,6 @@
 {
   "name": "paxon-local",
-  "owner": { "name": "Paxon" },
-  "plugins": [{ "name": "auto-router", "source": "./", "description": "每一轮自动选模型（Haiku / Sonnet / Opus / Fable）" }]
+  "owner": { "name": "paxon-yang" },
+  "metadata": { "description": "Local marketplace for auto-router (claude-agent-tools)" },
+  "plugins": [{ "name": "auto-router", "source": "./", "description": "Picks the model every turn (Haiku / Sonnet / Opus / Fable) · 每一轮自动选模型" }]
 }

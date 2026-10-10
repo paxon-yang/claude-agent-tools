@@ -7,13 +7,17 @@
 // - /route 查看和手动控制
 import type { EngineInterface, Register } from 'claude-code'
 import {
-  CLASSIFIER_SYSTEM, DEFAULTS, NAMES, ORDER, classifierPrompt, guardDowngrade, guardHysteresis, guardWindow,
+  DEFAULTS, NAMES, ORDER, classifierPrompt, classifierSystem, guardDowngrade, guardHysteresis, guardWindow,
   isHandback, isRisky, mergeConfig, parseClassifier, ruleDecide, subagentTier, tierOf, up,
 } from './rules'
 import type { Config, Decision, Effort, Tier } from './rules'
+import { msgs } from './i18n'
+import type { Messages } from './i18n'
 
 type Mode = 'auto' | 'off' | Tier
-type Logged = Decision & { at: number; prompt: string; model: string }
+/** midTurn / handback: flags for the dashboard (the prompt markers are localized, so don't match on them) */
+type Flags = { midTurn?: true; handback?: true }
+type Logged = Decision & Flags & { at: number; prompt: string; model: string }
 type Loop = { files: Set<string>; errors: number; escalated: boolean }
 
 // 模块内的状态（插件重新加载时会重置；"上一轮用的档"另外存在 $.store 里）
@@ -34,6 +38,9 @@ let advisorCalls = 0
 let logFile: string | undefined
 
 const label = (d: { tier: Tier; effort: Effort }) => `${NAMES[d.tier]} · ${d.effort}`
+/** current UI messages (cfg.lang, fallback en) */
+const M = (): Messages => msgs(cfg)
+const modeStatus = (): string => (mode === 'off' ? M().statusOff : mode === 'auto' ? M().statusAuto : M().statusPinned(NAMES[mode]))
 const short = (s: string, n: number) => {
   const t = s.replace(/\s+/g, ' ').trim()
   return t.length > n ? t.slice(0, n - 1) + '…' : t
@@ -68,11 +75,11 @@ export const register: Register = on => {
     }
     await $.command.register({
       name: 'route',
-      description: '自动选模型：查看状态，或 /route auto|off|haiku|sonnet|opus|fable|rules',
+      description: M().cmdDescription,
       argumentHint: '[auto|off|haiku|sonnet|opus|fable|rules]',
       immediate: true,
     })
-    $.ui.status(mode === 'off' ? '⇄ 自动选模型：已关闭' : mode === 'auto' ? '⇄ 自动选模型：待命' : `⇄ 固定 ${NAMES[mode]}`)
+    $.ui.status(modeStatus())
     return next(e)
   })
 
@@ -100,8 +107,8 @@ export const register: Register = on => {
       const t = ht && ORDER.indexOf(ht) < ORDER.indexOf(cur) ? ht : cur
       const prev = byTurn.size ? [...byTurn.values()].pop() : undefined
       d = t === cur
-        ? { tier: t, effort: prev?.tier === t ? prev.effort : cfg.effort[t], reason: '子代理交回结果，沿用上一轮', source: 'continue' }
-        : { tier: t, effort: cfg.effort[t], reason: `子代理交回结果，用 ${NAMES[t]} 汇总`, source: 'continue' }
+        ? { tier: t, effort: prev?.tier === t ? prev.effort : cfg.effort[t], reason: M().handbackKeep, source: 'continue' }
+        : { tier: t, effort: cfg.effort[t], reason: M().handbackUse(NAMES[t]), source: 'continue' }
       let tok = 0
       try { tok = (await $.session.usage()).context.tokens ?? 0 } catch { tok = 0 }
       d = guardWindow(d, cur, tok, cfg)
@@ -109,33 +116,33 @@ export const register: Register = on => {
       loops.set('main', { files: new Set(), errors: 0, escalated: false })
       byTurn.set(e.turnId, d)
       current = d.tier
-      history.push({ ...d, at: Date.now(), prompt: '（子代理交回结果）', model: cfg.models[d.tier] })
+      history.push({ ...d, at: Date.now(), prompt: M().markHandback, model: cfg.models[d.tier], handback: true })
       if (history.length > 30) history.shift()
       void writeLog($)
       return next(e)
     }
     if (mode !== 'auto') {
-      d = { tier: mode, effort: cfg.effort[mode], reason: '/route 固定', source: 'pin' }
+      d = { tier: mode, effort: cfg.effort[mode], reason: M().pinned, source: 'pin' }
     } else {
       d = ruleDecide(e.text, current, lastTurnErrors, cfg)
       if (d?.source !== 'manual' && permissionMode === 'plan') {
-        d = { tier: cfg.planTier, effort: 'high', reason: `计划模式：${NAMES[cfg.planTier]} 想方案，批准后换 ${NAMES[cfg.executeTier]} 执行`, source: 'rule', phase: 'plan' }
+        d = { tier: cfg.planTier, effort: 'high', reason: M().planMode(NAMES[cfg.planTier], NAMES[cfg.executeTier]), source: 'rule', phase: 'plan' }
       } else if (d?.source !== 'manual' && lastWasPlan) {
         // 你退出计划模式后发的第一句（比如"执行"）：按计划执行，换执行档
         const t = cfg.executeTier
-        d = { tier: t, effort: cfg.effort[t], reason: `计划已定，执行改用 ${NAMES[t]}`, source: 'phase' }
+        d = { tier: t, effort: cfg.effort[t], reason: M().planSet(NAMES[t]), source: 'phase' }
       }
       if (!d) {
         const r = await $.model.complete({
           model: cfg.classifierModel,
-          system: CLASSIFIER_SYSTEM,
+          system: classifierSystem(cfg.lang),
           prompt: classifierPrompt(e.text, current),
           maxTokens: 120,
           effort: 'low',
           timeoutMs: cfg.classifierTimeoutMs,
         })
         d = r.isAnswered ? parseClassifier(r.text, cfg) : undefined
-        if (!d) d = { tier: cfg.defaultTier, effort: cfg.effort[cfg.defaultTier], reason: '判断失败，用默认档', source: 'fallback' }
+        if (!d) d = { tier: cfg.defaultTier, effort: cfg.effort[cfg.defaultTier], reason: M().fallback, source: 'fallback' }
       }
       let tokens = 0
       try {
@@ -178,7 +185,7 @@ export const register: Register = on => {
         s = { tier, effort: cfg.subagentEffort[tier], type }
         bySub.set(e.agentId, s)
         if (bySub.size > 200) bySub.delete(bySub.keys().next().value as string)
-        $.ui.log(`⇄ 子代理 ${type} → ${label(s)}`)
+        $.ui.log(M().subLog(type, label(s)))
         void writeLog($)
       }
       return yield* next({ ...e, model: cfg.models[s.tier], effort: s.effort })
@@ -189,7 +196,7 @@ export const register: Register = on => {
     const advice = (result.serverToolUses ?? []).filter(u => u.name === 'advisor').length
     if (advice) {
       advisorCalls += advice
-      $.ui.toast(`顾问已介入（第 ${advisorCalls} 次）`)
+      $.ui.toast(M().advisor(advisorCalls))
       void writeLog($)
     }
     return result
@@ -210,13 +217,13 @@ export const register: Register = on => {
         const file = String(input.file_path ?? input.notebook_path ?? '')
         if (file) loop.files.add(file)
         if (loop.files.size > cfg.haikuGuard.maxFiles) {
-          escalate($, key, to, `改动超过 ${cfg.haikuGuard.maxFiles} 个文件，换 ${NAMES[to]} 接手`)
-          return { deny: `auto-router：这个任务的改动范围比预想的大，已换成 ${NAMES[to]} 接手。之前的修改都保留，请从这一步（修改 ${file}）继续。` }
+          escalate($, key, to, M().tooManyFiles(cfg.haikuGuard.maxFiles, NAMES[to]))
+          return { deny: M().denyFiles(NAMES[to], file) }
         }
       }
       if (tool === 'Bash' && isRisky(String(input.command ?? ''), cfg)) {
-        escalate($, key, to, `要执行危险命令，换 ${NAMES[to]} 判断`)
-        return { deny: `auto-router：这条命令有风险（${short(String(input.command ?? ''), 60)}），已换成 ${NAMES[to]} 接手。请重新判断是否真的需要执行。` }
+        escalate($, key, to, M().risky(NAMES[to]))
+        return { deny: M().denyRisky(short(String(input.command ?? ''), 60), NAMES[to]) }
       }
     }
 
@@ -227,7 +234,7 @@ export const register: Register = on => {
       loop.errors++
       if (!loop.escalated && loop.errors >= cfg.midTurnEscalateAfterErrors && tier && tier !== 'fable') {
         const to = up(tier, cfg)
-        if (to !== tier) escalate($, key, to, `这一轮已失败 ${loop.errors} 次，当场升档`)
+        if (to !== tier) escalate($, key, to, M().midTurnFails(loop.errors))
       }
     }
 
@@ -236,7 +243,7 @@ export const register: Register = on => {
       const d = byTurn.get(mainTurn)
       if (d?.phase === 'plan' && d.tier !== cfg.executeTier) {
         const t = cfg.executeTier
-        adopt($, mainTurn, { tier: t, effort: cfg.effort[t], reason: `计划已批准，执行改用 ${NAMES[t]}`, source: 'rule' }, '（计划已批准）')
+        adopt($, mainTurn, { tier: t, effort: cfg.effort[t], reason: M().planApproved(NAMES[t]), source: 'rule' }, M().markPlanApproved)
       }
     }
     return r
@@ -257,13 +264,13 @@ export const register: Register = on => {
     if (arg === 'auto' || arg === 'off' || tierOf(arg)) {
       mode = arg as Mode
       await $.store.set('mode', mode)
-      $.ui.status(mode === 'off' ? '⇄ 自动选模型：已关闭' : mode === 'auto' ? '⇄ 自动选模型：待命' : `⇄ 固定 ${NAMES[mode]}`)
+      $.ui.status(modeStatus())
       void writeLog($)
       const said =
-        mode === 'auto' ? '已恢复自动选模型。'
-        : mode === 'off' ? '已关闭自动选模型，之后用 /model 里设的模型。'
-        : `已固定为 ${NAMES[mode]}，每一轮都用它（子代理也是）。输入 /route auto 恢复自动。`
-      return { text: said + '（这个选择会记住，下次打开 Claude Code 仍然有效）' }
+        mode === 'auto' ? M().saidAuto
+        : mode === 'off' ? M().saidOff
+        : M().saidPinned(NAMES[mode])
+      return { text: said + M().saidRemembered }
     }
     if (arg === 'rules') return { text: rulesText() }
     return { text: statusText() }
@@ -271,14 +278,14 @@ export const register: Register = on => {
 }
 
 /** 定下（或改变）主会话这一轮的档：记录、状态栏、换档提示、看板日志 */
-function adopt($: EngineInterface, turnId: string, d: Decision, prompt: string) {
+function adopt($: EngineInterface, turnId: string, d: Decision, prompt: string, flags: Flags = {}) {
   const before = current
   byTurn.set(turnId, d)
   if (byTurn.size > 50) byTurn.delete(byTurn.keys().next().value as string)
   current = d.tier
   $.ui.status(`⇄ ${label(d)} — ${d.reason}`)
-  if (before !== undefined && before !== d.tier) $.ui.toast(`模型切换：${NAMES[before]} → ${NAMES[d.tier]}（${d.reason}）`)
-  history.push({ ...d, at: Date.now(), prompt, model: cfg.models[d.tier] })
+  if (before !== undefined && before !== d.tier) $.ui.toast(M().switched(NAMES[before], NAMES[d.tier], d.reason))
+  history.push({ ...d, ...flags, at: Date.now(), prompt, model: cfg.models[d.tier] })
   if (history.length > 30) history.shift()
   void writeLog($)
 }
@@ -288,66 +295,64 @@ function escalate($: EngineInterface, key: string, to: Tier, reason: string) {
   const loop = loopOf(key)
   loop.escalated = true
   if (key === 'main') {
-    if (mainTurn) adopt($, mainTurn, { tier: to, effort: to === 'haiku' ? cfg.effort.haiku : 'high', reason, source: 'escalate' }, '（本轮中途升档）')
+    if (mainTurn) adopt($, mainTurn, { tier: to, effort: to === 'haiku' ? cfg.effort.haiku : 'high', reason, source: 'escalate' }, M().markMidTurn, { midTurn: true })
     return
   }
   const s = bySub.get(key)
   if (s) {
     bySub.set(key, { ...s, tier: to, effort: cfg.subagentEffort[to] })
-    $.ui.toast(`子代理 ${s.type}：${NAMES[s.tier]} → ${NAMES[to]}（${reason}）`)
+    $.ui.toast(M().subSwitched(s.type, NAMES[s.tier], NAMES[to], reason))
     void writeLog($)
   }
 }
 
 function statusText(): string {
-  const head =
-    mode === 'auto' ? '模式：自动' : mode === 'off' ? '模式：已关闭（/route auto 打开）' : `模式：固定 ${NAMES[mode]}（/route auto 恢复自动）`
-  const now = current ? `当前主会话：${NAMES[current]}` : '当前主会话：还没开始'
-  const wait = pendingDown ? `（等待确认：下一轮仍是简单任务就降到 ${NAMES[pendingDown]}）` : ''
+  const m = M()
+  const head = mode === 'auto' ? m.headAuto : mode === 'off' ? m.headOff : m.headPinned(NAMES[mode])
+  const now = current ? m.nowMain(NAMES[current]) : m.nowNone
+  const wait = pendingDown ? m.waitDown(NAMES[pendingDown]) : ''
   const rows = history.slice(-10).reverse().map(h => {
     const t = new Date(h.at).toTimeString().slice(0, 5)
-    return `  ${t}  ${NAMES[h.tier].padEnd(10)} ${h.effort.padEnd(6)} ${h.reason}  「${h.prompt}」`
+    return `  ${t}  ${NAMES[h.tier].padEnd(10)} ${h.effort.padEnd(6)} ${h.reason}  ${m.quote(h.prompt)}`
   })
   const subs = [...bySub.values()].slice(-6).map(s => `  ${s.type} → ${NAMES[s.tier]} · ${s.effort}`)
   return [
-    head, now + wait, `顾问介入：${advisorCalls} 次`, '',
-    '最近的选择（新的在上）：', ...(rows.length ? rows : ['  （还没有）']),
-    ...(subs.length ? ['', '最近的子代理：', ...subs] : []),
-    '', '命令：/route auto | off | haiku | sonnet | opus | fable | rules',
+    head, now + wait, m.advisorCount(advisorCalls), '',
+    m.recent, ...(rows.length ? rows : [m.none]),
+    ...(subs.length ? ['', m.recentSubs, ...subs] : []),
+    '', m.commands,
   ].join('\n')
 }
 
 function rulesText(): string {
-  const subs = Object.entries(cfg.subagents).map(([k, v]) => `${k}→${v === 'main' ? '跟主会话' : NAMES[v]}`).join('，')
+  const m = M()
+  const subs = Object.entries(cfg.subagents).map(([k, v]) => `${k}→${v === 'main' ? m.followMain : NAMES[v]}`).join(m.listSep)
   const k = (n: number) => `${Math.round(n / 1000)}k`
-  return [
-    '自动选模型的规则（按顺序判断）：',
-    '1. 提示里写了 #haiku / #sonnet / #opus / #fable → 用你指定的',
-    '2. 只回了"继续/好的/ok"之类 → 沿用上一轮',
-    `3. 上一轮工具失败 ≥ ${cfg.escalateAfterToolErrors} 次，或你说"还是不对/又错了" → 升一档`,
-    `4. 计划模式（Shift+Tab）→ ${NAMES[cfg.planTier]} 想方案，批准计划后这一轮换 ${NAMES[cfg.executeTier]} 执行`,
-    `5. 多步骤大任务（按文档/方案修改、@文档、很长、列了 4 条以上要求）→ 主会话 ${NAMES[cfg.bigTaskTier]} 统筹`,
-    `6. 提到架构、重构、迁移、安全、性能、审查等 → ${NAMES.opus}`,
-    `7. 提问、解释、查找、总结、翻译、改名等，且不要求改代码 → ${NAMES.haiku}`,
-    `8. 其他情况 → 让 ${NAMES.haiku} 判断难度（失败时用 ${NAMES[cfg.defaultTier]}）`,
-    '',
-    '保护：',
-    `· ${cfg.noDowngradeAboveTokens == null ? '对话再长也允许降档' : `对话超过 ${k(cfg.noDowngradeAboveTokens)} 时不降档`}；降档要连续 ${cfg.downgradeConfirmations} 轮都判成更便宜的档`,
-    `· 后台子代理交回结果时，主会话用 ${cfg.handbackTier ? NAMES[cfg.handbackTier] : '上一轮的模型'} 汇总`,
-    `· 对话超过目标模型窗口的八成时不切过去（Haiku 窗口按 ${k(cfg.windows.haiku ?? 0)} 算）`,
-    `· 一轮里工具失败 ${cfg.midTurnEscalateAfterErrors} 次 → 当场把这一轮剩下的请求升一档`,
-    `· Haiku 一轮里改到第 ${cfg.haikuGuard.maxFiles + 1} 个文件，或要执行危险命令 → 换 ${NAMES[cfg.haikuGuard.escalateTo]} 接手`,
-    '',
-    `Fable 主力：${cfg.autoFable ? '最难任务、反复失败时自动启用' : '只在你写 #fable 时启用'}；顾问由 /advisor 设置，与这里无关`,
-    `子代理：${subs}；其他类型 → ${cfg.subagentDefault === 'main' ? '跟主会话' : NAMES[cfg.subagentDefault]}`,
-    '改规则：编辑 ~/.claude/auto-router/config.json，然后重开 Claude Code',
-  ].join('\n')
+  return m.rules({
+    escalateAfter: cfg.escalateAfterToolErrors,
+    plan: NAMES[cfg.planTier],
+    execute: NAMES[cfg.executeTier],
+    bigTask: NAMES[cfg.bigTaskTier],
+    opus: NAMES.opus,
+    haiku: NAMES.haiku,
+    defaultTier: NAMES[cfg.defaultTier],
+    noDowngradeAbove: cfg.noDowngradeAboveTokens == null ? null : k(cfg.noDowngradeAboveTokens),
+    confirmations: cfg.downgradeConfirmations,
+    handback: cfg.handbackTier ? NAMES[cfg.handbackTier] : null,
+    haikuWindow: k(cfg.windows.haiku ?? 0),
+    midTurnAfter: cfg.midTurnEscalateAfterErrors,
+    maxFiles: cfg.haikuGuard.maxFiles,
+    guardTo: NAMES[cfg.haikuGuard.escalateTo],
+    autoFable: cfg.autoFable,
+    subs,
+    subDefault: cfg.subagentDefault === 'main' ? m.followMain : NAMES[cfg.subagentDefault],
+  }).join('\n')
 }
 
 async function writeLog($: EngineInterface) {
   if (!logFile) return
   try {
-    await $.fs.write(logFile, JSON.stringify({ mode, current, pendingDown, advisorCalls, decisions: history, subagents: [...bySub.values()].slice(-20) }, null, 1))
+    await $.fs.write(logFile, JSON.stringify({ mode, lang: cfg.lang, current, pendingDown, advisorCalls, decisions: history, subagents: [...bySub.values()].slice(-20) }, null, 1))
   } catch {
     /* 看板没装也没关系 */
   }

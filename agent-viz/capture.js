@@ -13,7 +13,7 @@ const LOG = path.join(os.homedir(), '.claude', 'viz', 'events.jsonl');
 // 超长文字只保留开头和结尾，防止文件暴涨（测试结果通常在结尾，所以结尾多留一些）
 function trim(v, depth) {
   if (typeof v === 'string') {
-    return v.length > 2400 ? v.slice(0, 800) + ' …[已截断]… ' + v.slice(-1400) : v;
+    return v.length > 2400 ? v.slice(0, 800) + ' …[truncated]… ' + v.slice(-1400) : v;
   }
   if (depth > 6) return null;
   if (Array.isArray(v)) return v.slice(0, 50).map(x => trim(x, depth + 1));

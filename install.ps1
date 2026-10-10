@@ -29,4 +29,14 @@ $candidates += (Join-Path (Split-Path (Split-Path $gitExe)) 'bin\bash.exe')
 $bash = $candidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $bash) { Write-Host 'x  Git Bash (bash.exe) not found. Reinstall Git for Windows.' -ForegroundColor Red; exit 1 }
 
+# Language for the installers and the router UI (en|zh). An existing CAT_LANG wins;
+# otherwise Chinese Windows UI/culture -> zh, anything else -> en. Bash inherits the variable.
+if (-not $env:CAT_LANG) {
+  $ui = ''
+  try { $ui = [string](Get-UICulture).Name } catch { }
+  $cu = ''
+  try { $cu = [string](Get-Culture).Name } catch { }
+  if ($ui.StartsWith('zh') -or $cu.StartsWith('zh')) { $env:CAT_LANG = 'zh' } else { $env:CAT_LANG = 'en' }
+}
+
 & $bash -lc 'bash ~/claude-agent-tools/install.sh'
