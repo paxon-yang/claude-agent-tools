@@ -81,11 +81,11 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 .proj.need .name { color: var(--red-i); }
 .st { width: 18px; height: 20px; display: grid; place-items: center; }
 .st i { width: 8px; height: 8px; border-radius: 50%; }
-.st.running i { background: var(--green); }
+.st.running i, .st.bg i { background: var(--green); }
 .st.idle i { box-shadow: inset 0 0 0 1.5px var(--faint); }
 .st.ended i { background: var(--hair); }
 .st.need i { width: 16px; height: 16px; background: var(--red); color: #fff; font-style: normal; font-size: 10.5px; font-weight: 600; display: grid; place-items: center; }
-@media (prefers-reduced-motion: no-preference) { .st.running i { animation: blink 1.6s ease-in-out infinite; } }
+@media (prefers-reduced-motion: no-preference) { .st.running i, .st.bg i { animation: blink 1.6s ease-in-out infinite; } }
 @keyframes blink { 50% { opacity: .3; } }
 
 .remote { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--ink80); }
@@ -107,7 +107,7 @@ main { min-width: 0; padding-bottom: 64px; }
 .subnav .since { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
 .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.pill.running { background: rgba(52, 199, 89, .14); color: var(--green-i); }
+.pill.running, .pill.bg { background: rgba(52, 199, 89, .14); color: var(--green-i); }
 .pill.need { background: rgba(255, 59, 48, .12); color: var(--red-i); }
 .pill.idle { background: rgba(0, 0, 0, .05); color: var(--ink80); }
 .pill.ended { background: rgba(0, 0, 0, .04); color: var(--muted); }
@@ -179,11 +179,11 @@ main { min-width: 0; padding-bottom: 64px; }
 .mn .ttl b { display: block; font-family: var(--display); font-size: 21px; font-weight: 600; letter-spacing: .231px; color: #fff; line-height: 1.19; }
 .mn .ttl span { font-size: 12px; color: rgba(235, 235, 245, .6); }
 .state { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
-.state.running { background: rgba(52, 199, 89, .18); color: #63E28A; }
+.state.running, .state.bg { background: rgba(52, 199, 89, .18); color: #63E28A; }
 .state.need { background: rgba(255, 69, 58, .2); color: #FF8A80; }
 .state.idle, .state.ended { background: rgba(255, 255, 255, .1); color: rgba(235, 235, 245, .8); }
 .state i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-@media (prefers-reduced-motion: no-preference) { .state.running i { animation: blink 1.4s ease-in-out infinite; } }
+@media (prefers-reduced-motion: no-preference) { .state.running i, .state.bg i { animation: blink 1.4s ease-in-out infinite; } }
 .gauges { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; margin: 18px 0 14px; padding: 12px 14px; border-radius: var(--r-md); background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .06); }
 .gauges .g-l { display: flex; flex-direction: column; gap: 9px; font-size: 12px; color: rgba(235, 235, 245, .6); }
 .gauges .g-l > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
@@ -235,7 +235,17 @@ main { min-width: 0; padding-bottom: 64px; }
 
 /* ---------- 分工图的交互与动效 ---------- */
 .fsvg .eg path { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke: rgba(255, 255, 255, .2); transition: stroke-width .25s, stroke .25s; }
-.fsvg .eg.running path { stroke: color-mix(in srgb, var(--c) 50%, transparent); }
+.fsvg .eg.running path { stroke: color-mix(in srgb, var(--c) 80%, transparent); stroke-dasharray: 5 7; }
+@media (prefers-reduced-motion: no-preference) { .fsvg .eg.running path { animation: dashflow .8s linear infinite; } }
+@keyframes dashflow { to { stroke-dashoffset: -12; } }
+/* 已完成的卡片收成一行 / finished cards collapse to one line */
+.ag.compact { padding: 8px 12px 8px 10px; }
+.ag.compact .ds, .ag.compact .r3 { display: none; }
+.ag.compact .ty { font-size: 13px; }
+.ag.compact .mdl > :not(b) { display: none; }
+.ag.bgtask .glyph { background: linear-gradient(180deg, #8E8E93, #636366); font-size: 14px; }
+.fold { border: 0; background: none; color: rgba(235, 235, 245, .66); font-size: 12px; padding: 3px 4px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(235, 235, 245, .3); }
+.fold:hover { color: #fff; }
 .fsvg .eg.failed path, .fsvg .eg.stopped path { stroke: rgba(255, 105, 97, .6); stroke-dasharray: 2 4; }
 .fsvg .eg { transition: opacity .25s; }
 .fsvg .eg.hl path { stroke-width: 2.5; stroke: var(--c); filter: drop-shadow(0 0 6px var(--c)); }
@@ -448,7 +458,7 @@ const I18N = {
     flowTitle: '分工', tlTitle: '模型时间轴', tlSub: '每一轮主会话和每个子代理各用了什么模型、跑了多久',
     useTitle: '这个会话的花费', useSub: '按 API 公开价估算', histTitle: '任务记录', logTitle: '事件明细', logSub: '最近 40 条',
     docNeeds: n => `(${n}) 等你确认 · `,
-    st_running: '运行中', st_idle: '等你下一步', st_need: '等你确认', 'st_needs-you': '等你确认', st_ended: '已结束', st_done: '已完成', st_failed: '出错', st_stopped: '已中断',
+    st_running: '运行中', st_bg: '后台任务在跑', st_idle: '等你下一步', st_need: '等你确认', 'st_needs-you': '等你确认', st_ended: '已结束', st_done: '已完成', st_failed: '出错', st_stopped: '已中断',
     spendHead: (h, s, k) => `近 ${h} 小时 · ${s} 个会话 · 完成 ${k} 个任务`,
     spendVs: (m, money, pct) => `全用 ${m} 约 ${money}，<b>少花 ${pct}%</b>`,
     noUsage: '还没有用量数据', tokens: 'token',
@@ -463,7 +473,10 @@ const I18N = {
     sessionSince: hm => `会话开始于 ${hm}`, noTask: '还没有收到任务', noTaskEnded: '这个会话没有记录到任务', fullShow: '看全文', fullHide: '收起', unknownModel: '模型未知',
     turnTime: (done, tm) => `这一轮${done ? '用了' : '已用'} ${tm}`,
     whyThis: '为什么选它：', routeMode: m => `（模式：${m}）`, pendingDown: m => `；下一轮还简单就换 ${m}`, ctxUsed: p => `上下文占用 ${p}%`,
-    nowDoing: '正在', waitingKids: n => `等 ${n} 个子代理交回结果`, thinking: '思考中…', approveInTerminal: '等你在终端里确认', lastStep: '上一步', idleNow: '空闲',
+    nowDoing: '正在', waitingKids: n => `等 ${n} 个子代理交回结果`, waitingBg: n => `${n} 个后台任务在跑，结束后会自动接着做`,
+    bg_Monitor: '后台监视', bg_Bash: '后台命令', bgGeneric: ty => `后台任务 · ${ty}`, bgSub: '后台运行，不占模型', bgRunning: '在后台运行', bgLeft: m => `最多再等 ${m} 分钟`,
+    bgSummary: x => x === 'timeout' ? '到时间自动结束' : x, foldDone: n => `收起已完成`, unfoldDone: n => `展开已完成的 ${n} 个`,
+    agHead2: (n, b, live) => `派出 <b>${n}</b> 个子代理` + (b ? `、<b>${b}</b> 个后台任务` : '') + (live ? `，<b>${live}</b> 个在跑` : '，都已结束'), thinking: '思考中…', approveInTerminal: '等你在终端里确认', lastStep: '上一步', idleNow: '空闲',
     mainSession: '主会话', mainRole: '主会话 · 计划、派活、汇总、检查', context: '上下文', testsFailing: '测试有失败', testsPassing: '测试通过',
     statTools: n => `工具 <b class="num">${n}</b> 次`, statAgents: n => `子代理 <b class="num">${n}</b> 个`, statTurns: n => `完成 <b class="num">${n}</b> 轮`, detailsChev: '详情 ›',
     noDesc: '（没有取到任务描述）', returned: m => `交回：${m}`, usedTools: n => `用了 ${n} 次工具`,
@@ -508,7 +521,7 @@ const I18N = {
     flowTitle: 'Delegation', tlTitle: 'Model timeline', tlSub: 'Which model the main session and each subagent used each turn, and for how long',
     useTitle: 'Session cost', useSub: 'Estimated at public API prices', histTitle: 'Task history', logTitle: 'Event log', logSub: 'Last 40',
     docNeeds: n => `(${n}) Needs you · `,
-    st_running: 'Running', st_idle: 'Your turn', st_need: 'Needs you', 'st_needs-you': 'Needs you', st_ended: 'Ended', st_done: 'Done', st_failed: 'Failed', st_stopped: 'Stopped',
+    st_running: 'Running', st_bg: 'Background task running', st_idle: 'Your turn', st_need: 'Needs you', 'st_needs-you': 'Needs you', st_ended: 'Ended', st_done: 'Done', st_failed: 'Failed', st_stopped: 'Stopped',
     spendHead: (h, s, k) => `Last ${h}h · ${s} ${pl(s, 'session', 'sessions')} · ${k} ${pl(k, 'task', 'tasks')} done`,
     spendVs: (m, money, pct) => `~${money} if all on ${m} · <b>${pct}% saved</b>`,
     noUsage: 'No usage yet', tokens: 'tokens',
@@ -523,7 +536,10 @@ const I18N = {
     sessionSince: hm => `Started ${hm}`, noTask: 'No task yet', noTaskEnded: 'No task recorded in this session', fullShow: 'Full prompt', fullHide: 'Hide', unknownModel: 'Unknown model',
     turnTime: (done, tm) => `${done ? 'This turn took' : 'This turn so far:'} ${tm}`,
     whyThis: 'Why this model: ', routeMode: m => ` (mode: ${m})`, pendingDown: m => `; switches to ${m} next turn if it stays simple`, ctxUsed: p => `Context ${p}% used`,
-    nowDoing: 'Now', waitingKids: n => `Waiting on ${n} ${pl(n, 'subagent', 'subagents')}`, thinking: 'Thinking…', approveInTerminal: 'Approve in your terminal', lastStep: 'Last step', idleNow: 'Idle',
+    nowDoing: 'Now', waitingKids: n => `Waiting on ${n} ${pl(n, 'subagent', 'subagents')}`, waitingBg: n => `${n} background ${pl(n, 'task', 'tasks')} running — Claude picks up when ${n > 1 ? 'they finish' : 'it finishes'}`,
+    bg_Monitor: 'Background monitor', bg_Bash: 'Background command', bgGeneric: ty => `Background · ${ty}`, bgSub: 'Runs in the background, no model', bgRunning: 'Running in the background', bgLeft: m => `stops within ${m} min`,
+    bgSummary: x => x === 'timeout' ? 'Ended at its time limit' : x, foldDone: n => `Collapse finished`, unfoldDone: n => `Expand ${n} finished`,
+    agHead2: (n, b, live) => `<b>${n}</b> ${pl(n, 'subagent', 'subagents')}` + (b ? ` · <b>${b}</b> background ${pl(b, 'task', 'tasks')}` : '') + (live ? ` · <b>${live}</b> running` : ' · all finished'), thinking: 'Thinking…', approveInTerminal: 'Approve in your terminal', lastStep: 'Last step', idleNow: 'Idle',
     mainSession: 'Main session', mainRole: 'Main session · plans, delegates, reviews', context: 'Context', testsFailing: 'Tests failing', testsPassing: 'Tests passing',
     statTools: n => `<b class="num">${n}</b> ${pl(n, 'tool', 'tools')}`, statAgents: n => `<b class="num">${n}</b> ${pl(n, 'subagent', 'subagents')}`, statTurns: n => `<b class="num">${n}</b> ${pl(n, 'turn', 'turns')}`, detailsChev: 'Details ›',
     noDesc: '(No task description)', returned: m => `Returned: ${m}`, usedTools: n => `Used ${n} ${pl(n, 'tool', 'tools')}`,
@@ -613,7 +629,13 @@ function meter(level, fam) {
   for (let i = 0; i < 4; i++) s += `<i class="${i < n ? 'on' : ''}"></i>`;
   return `<span class="meter ${f(fam)}" aria-label="effort ${esc(level)}">${s}<span>${esc(level)}</span></span>`;
 }
-const stKey = x => !x.active ? 'ended' : x.status === 'needs-you' ? 'need' : x.status === 'running' ? 'running' : 'idle';
+const stKey = x => !x.active ? 'ended' : x.status === 'needs-you' ? 'need' : x.status === 'running' ? 'running' : x.status === 'background' ? 'bg' : 'idle';
+const bgName = ty => has('bg_' + ty) ? t('bg_' + ty) : t('bgGeneric', ty);
+// 子代理 + 后台任务，在跑的排前面 / sub-agents plus background tasks, running ones first
+function flowItems(s) {
+  const bg = (s.background || []).map(b => ({ ...b, kind: 'bg', type: b.tool, family: null, model: null, toolCount: 0, lastMessage: b.summary ? t('bgSummary', b.summary) : null }));
+  return (s.agents || []).concat(bg).sort((a, b) => ((a.status === 'running' ? 0 : 1) - (b.status === 'running' ? 0 : 1)) || (a.startedAt - b.startedAt));
+}
 
 const cache = {};
 function put(id, html) { if (cache[id] === html) return; cache[id] = html; const el = document.getElementById(id); if (el) el.innerHTML = html; }
@@ -734,7 +756,7 @@ function renderProjects(sel) {
     const when = dup[x.project] > 1 ? `<span class="when">${t('startedAt', hm(x.startedAt))}</span>` : '';
     return `<button class="proj ${f(x.family)} ${x.id === (sel && sel.id) ? 'sel' : ''} ${k === 'need' ? 'need' : ''}" onclick="select('${esc(x.id)}')" title="${esc(x.cwd)}">
       <span class="st ${k}"><i>${k === 'need' ? '!' : ''}</i></span><span class="name">${esc(projName(x))}${when}</span>
-      <span class="sub">${chip(x.family, x.model)}<span>${k === 'need' ? t('st_need') : k === 'running' ? t('st_running') : esc(ago(x.lastTs))}</span></span></button>`;
+      <span class="sub">${chip(x.family, x.model)}<span>${k === 'need' ? t('st_need') : k === 'running' ? t('st_running') : k === 'bg' ? t('st_bg') : esc(ago(x.lastTs))}</span></span></button>`;
   }).join('');
   put('projects', state.sessions.length ? html : `<h3>${t('projects')}</h3><div style="color:var(--muted);font-size:13px">${t('noSessions')}</div>`);
 }
@@ -852,7 +874,8 @@ function ring(pct, fam) {
 // ---------- 分工图：按 id 增量更新，卡片和连线的动画不会被刷新打断 ----------
 const NS = 'http://www.w3.org/2000/svg';
 const RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const flowState = { sid: null, prev: new Map(), filter: 'all', showAll: false, hover: null, open: null, pulse: new Set(), first: true };
+const flowState = { sid: null, prev: new Map(), filter: 'all', showAll: false, hover: null, open: null, pulse: new Set(), first: true, expandDone: false };
+try { flowState.expandDone = localStorage.getItem('viz.expandDone') === '1'; } catch (e) { }
 function setHTML(el, html) { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } }
 const famKey = fm => (fm === 'mythos' ? 'fable' : fm || 'none');
 
@@ -864,6 +887,7 @@ function mainInner(s) {
   const stLabel = statusLabel(k);
   const nowLine = s.currentTool ? `<span class="pulse"></span><span>${t('nowDoing')}</span><span class="mono">${esc(toolText(s.currentTool))}</span>`
     : k === 'running' ? (live ? `<span class="pulse"></span><span>${t('waitingKids', live)}</span>` : `<span class="pulse"></span><span>${t('thinking')}</span>`)
+    : k === 'bg' ? `<span class="pulse"></span><span>${t('waitingBg', s.bgRunning || 1)}</span>`
     : k === 'need' ? `<span class="pulse need"></span><span style="color:#FF8A80;font-weight:600">${t('approveInTerminal')}</span>`
     : s.lastTool ? `<span class="pulse off"></span><span>${t('lastStep')}</span><span class="mono">${esc(toolText(s.lastTool))}</span>` : `<span class="pulse off"></span><span>${t('idleNow')}</span>`;
   const name = s.model || t('mainSession');
@@ -874,6 +898,15 @@ function mainInner(s) {
     <div class="stats"><span>${t('statTools', s.toolCount)}</span><span>${t('statAgents', s.totalAgents)}</span><span>${t('statTurns', s.tasksDone)}</span><span class="chev">${t('detailsChev')}</span></div>`;
 }
 function agentInner(x) {
+  if (x.kind === 'bg') {
+    const left = x.status === 'running' && x.timeoutAt ? Math.max(1, Math.ceil((x.timeoutAt - nowS()) / 60)) : null;
+    return `<div class="r1"><span class="glyph sm">◷</span>
+      <div class="who"><span class="ty">${esc(bgName(x.type))}</span><span class="mdl">${esc(left ? t('bgLeft', left) : t('bgSub'))}</span></div>
+      <span class="side"><span class="num">${timer(x.startedAt, x.endedAt)}</span><span class="si ${esc(x.status)}" title="${esc(statusLabel(x.status))}">${SI[x.status] || ''}</span></span></div>
+    <div class="ds">${esc(x.description || x.label || t('noDesc'))}</div>
+    ${x.status === 'running' ? `<div class="r3"><span>${t('bgRunning')}</span></div>` : x.lastMessage ? `<div class="r3 ret">${esc(x.lastMessage)}</div>` : ''}
+    <span class="chev" aria-hidden="true">›</span>`;
+  }
   return `<div class="r1"><span class="glyph sm ${f(x.family)}">${esc((NAMES[x.family] || x.model || '?')[0])}</span>
       <div class="who"><span class="ty">${esc(agentType(x.type))}</span><span class="mdl"><b>${esc(x.model || t('unknownModel'))}</b>${meter(x.effort, x.family)}</span></div>
       <span class="side"><span class="num">${timer(x.startedAt, x.endedAt)}</span><span class="si ${esc(x.status)}" title="${esc(statusLabel(x.status))}">${SI[x.status] || ''}</span></span></div>
@@ -897,7 +930,7 @@ function renderFlow(s) {
       <div class="aglist" id="aglist"></div><button class="more" id="agmore" hidden></button></div></div></div>`;
   }
   const a = s.advisor || {};
-  const kids = s.agents || [];
+  const kids = flowItems(s);
   const live = kids.filter(x => x.status === 'running').length;
   const fmain = document.getElementById('fmain');
   fmain.className = `mn glass ${f(s.family)}${flowState.open && flowState.open.kind === 'main' ? ' sel' : ''}`;
@@ -910,11 +943,14 @@ function renderFlow(s) {
   if (flowState.filter !== 'all' && !cnt[flowState.filter]) flowState.filter = 'all';
   const tabs = ['all', 'running', 'done', 'failed'].filter(k2 => k2 === 'all' || cnt[k2]);
   setHTML(document.getElementById('filters'), kids.length > 1 && tabs.length > 2 ? tabs.map(k2 => `<button role="tab" data-filter="${k2}" class="${flowState.filter === k2 ? 'on' : ''}" aria-selected="${flowState.filter === k2}">${t('f_' + k2)} <span class="num">${cnt[k2]}</span></button>`).join('') : '');
-  setHTML(document.getElementById('agh'), kids.length ? t('agHead', kids.length, live) : '');
+  const nBg = kids.filter(x => x.kind === 'bg').length, nDone = kids.filter(x => x.status !== 'running').length;
+  setHTML(document.getElementById('agh'), kids.length ? (nBg ? t('agHead2', kids.length - nBg, nBg, live) : t('agHead', kids.length, live))
+    + (nDone ? ` <button class="fold" id="foldbtn">${flowState.expandDone ? t('foldDone', nDone) : t('unfoldDone', nDone)}</button>` : '') : '');
   const list = kids.filter(x => flowState.filter === 'all' || (flowState.filter === 'failed' ? (x.status === 'failed' || x.status === 'stopped') : x.status === flowState.filter));
-  const visible = flowState.showAll ? list : list.slice(-6);
+  const LIM = 8;
+  const visible = flowState.showAll ? list : list.slice(0, Math.max(LIM, list.filter(x => x.status === 'running').length));
   const more = document.getElementById('agmore');
-  more.hidden = list.length <= 6;
+  more.hidden = list.length <= visible.length && !flowState.showAll;
   more.textContent = flowState.showAll ? t('showLess') : t('showAll', list.length);
   document.getElementById('fgrid').classList.toggle('solo', !kids.length);
 
@@ -934,9 +970,10 @@ function renderFlow(s) {
       }
       if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
       const keep = ['enter', 'just-done', 'hl', 'dim'].filter(c => el.classList.contains(c));
-      el.className = `ag glass ${f(x.family)} ${x.status}${flowState.open && flowState.open.id === x.id ? ' sel' : ''} ${keep.join(' ')}`;
+      const compact = x.status !== 'running' && !flowState.expandDone && !(flowState.open && flowState.open.id === x.id);
+      el.className = `ag glass ${f(x.family)} ${x.status}${x.kind === 'bg' ? ' bgtask' : ''}${compact ? ' compact' : ''}${flowState.open && flowState.open.id === x.id ? ' sel' : ''} ${keep.join(' ')}`;
       el.dataset.st = x.status;
-      el.setAttribute('aria-label', t('agentAria', agentType(x.type)));
+      el.setAttribute('aria-label', t('agentAria', x.kind === 'bg' ? bgName(x.type) : agentType(x.type)));
       setHTML(el, agentInner(x));
       const prev = flowState.prev.get(x.id);
       if (prev === 'running' && x.status !== 'running' && !RM) {
@@ -1047,6 +1084,7 @@ document.addEventListener('click', e => {
   if (lb) { setLang(lb.dataset.lang); return; }
   const fb = tg.closest && tg.closest('#filters button');
   if (fb) { flowState.filter = fb.dataset.filter; flowState.showAll = false; const s = pick(); if (s) renderFlow(s); return; }
+  if (tg.closest && tg.closest('#foldbtn')) { flowState.expandDone = !flowState.expandDone; try { localStorage.setItem('viz.expandDone', flowState.expandDone ? '1' : '0'); } catch (e) { } const s = pick(); if (s) renderFlow(s); return; }
   if (tg.closest && tg.closest('#agmore')) { flowState.showAll = !flowState.showAll; const s = pick(); if (s) renderFlow(s); return; }
   const card = tg.closest && tg.closest('#aglist .ag');
   if (card) { openSheet({ kind: 'agent', id: card.dataset.aid }); return; }
@@ -1092,8 +1130,16 @@ function renderSheet(s) {
       <h4>${t('recentSteps')}</h4>${stepsHTML(s.steps)}`);
     return;
   }
-  const x = (s.agents || []).find(y => y.id === o.id);
+  const x = flowItems(s).find(y => y.id === o.id);
   if (!x) { setHTML(body, `<div class="sh-empty" style="padding-top:40px">${t('agentGone')}</div>`); return; }
+  if (x.kind === 'bg') {
+    setHTML(body, `<div class="sh-h"><span class="glyph" style="background:linear-gradient(180deg,#8E8E93,#636366)">◷</span><div><b>${esc(bgName(x.type))}</b><span>${esc(t('bgSub'))}</span></div><span class="pill ${x.status === 'running' ? 'running' : x.status === 'done' ? 'idle' : 'need'}">${esc(statusLabel(x.status))}</span></div>
+      <div class="sh-facts"><div><span>${t('duration')}</span><b class="num">${timer(x.startedAt, x.endedAt)}</b></div><div><span>${t('started')}</span><b class="num">${hm(x.startedAt)}</b></div></div>
+      <h4>${t('assigned')}</h4><div class="sh-text">${esc(x.description || x.label || t('noDesc'))}</div>
+      ${x.label ? `<h4>${t('steps')}</h4><div class="sh-text mono">${esc(x.label)}</div>` : ''}
+      ${x.lastMessage ? `<h4>${t('returnedTitle')}</h4><div class="sh-text">${esc(x.lastMessage)}</div>` : ''}`);
+    return;
+  }
   const src = x.modelSource ? (has('src_' + x.modelSource) ? t('src_' + x.modelSource) : x.modelSource) : '';
   setHTML(body, `<div class="sh-h"><span class="glyph ${f(x.family)}">${esc((NAMES[x.family] || x.model || '?')[0])}</span><div><b>${esc(agentType(x.type))}</b><span>${esc(x.model || t('unknownModel'))} · ${esc(src)}</span></div><span class="pill ${x.status === 'running' ? 'running' : x.status === 'done' ? 'idle' : 'need'}">${esc(statusLabel(x.status))}</span></div>
     <div class="sh-facts"><div><span>${t('duration')}</span><b class="num">${timer(x.startedAt, x.endedAt)}</b></div><div><span>effort</span><b>${esc(x.effort || '—')}</b></div><div><span>${t('toolCalls')}</span><b class="num">${t('times', x.toolCount)}</b></div><div><span>${t('started')}</span><b class="num">${hm(x.startedAt)}</b></div></div>
@@ -1128,8 +1174,9 @@ function renderTimeline(s) {
   }).join('')).join('');
   const rows = lanes.map(l => {
     const b = l.end || t1, w = x(b) - x(l.start);
-    const tip = `<b>${esc(agentType(l.type))}</b> · ${esc(l.model || '')}<br>${esc(l.description || '')}<br><span class='d'>${esc(t('tipStart', hm(l.start), l.end ? dur(b - l.start) : t('inProgress')))}</span>`;
-    return `<div class="tl-row"><div class="tl-label" title="${esc(agentType(l.type))}">${esc(agentType(l.type))}</div><div class="tl-track">${grid}<span class="seg ${f(l.family)} ${l.end ? '' : 'open'}" style="left:${x(l.start)}%;width:${w}%" data-tip="${esc(tip)}">${w > 9 ? esc(l.model || '') : ''}</span></div></div>`;
+    const nm = l.kind === 'bg' ? bgName(l.type) : agentType(l.type);
+    const tip = `<b>${esc(nm)}</b>${l.model ? ' · ' + esc(l.model) : ''}<br>${esc(l.description || '')}<br><span class='d'>${esc(t('tipStart', hm(l.start), l.end ? dur(b - l.start) : t('inProgress')))}</span>`;
+    return `<div class="tl-row"><div class="tl-label" title="${esc(nm)}">${esc(nm)}</div><div class="tl-track">${grid}<span class="seg ${f(l.family)} ${l.end ? '' : 'open'}" style="left:${x(l.start)}%;width:${w}%" data-tip="${esc(tip)}">${w > 9 ? esc(l.model || '') : ''}</span></div></div>`;
   }).join('');
   const used = [...new Set([...turns.flatMap(tu => tu.segs.map(g => g.family)), ...lanes.map(l => l.family)].filter(Boolean))];
   put('tl', `<div class="tl"><div class="tl-axis">${ticks.map(v => `<span style="left:${x(v)}%">${step < 60 ? hm(v) + ':' + String(Math.round(v) % 60).padStart(2, '0') : hm(v)}</span>`).join('')}</div>

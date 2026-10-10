@@ -124,7 +124,7 @@ function getSession(d, ts) {
       task: null, tasksDone: 0, toolCount: 0, currentTool: null, test: null,
       context: 0, outTokens: 0, seenMsg: new Set(),
       advisor: { calls: 0, last: null, lastAt: null },
-      agents: new Map(), pendingSpawns: [], tools: new Map(), timeline: [],
+      agents: new Map(), pendingSpawns: [], tools: new Map(), timeline: [], bg: new Map(),
       usage: new Map(), turns: [], decisions: [], msgModels: [], needMsg: null };
     sessions.set(id, s);
   }
@@ -194,6 +194,75 @@ function isHelper(a) { return a.type === SUB && !a.description && a.toolCount ==
 
 function isSpawn(name) { return name === 'Agent' || name === 'Task'; }
 
+// ---------- 后台任务：Monitor、后台运行的命令（run_in_background）----------
+// Background tasks: Monitor and commands started with run_in_background. They keep running after the
+// tool call returns; Claude Code reports the end with a <task-notification> message.
+const BG_TOOLS = new Set(['Monitor']);
+const KILL_TOOLS = /^(KillShell|KillBash|BashKill|TaskStop|StopTask)$/;
+function isBgCall(name, input) { return !isSpawn(name) && (BG_TOOLS.has(name) || !!(input && input.run_in_background)); }
+function bgIdFrom(resp) {
+  if (resp && typeof resp === 'object' && !Array.isArray(resp)) {
+    for (const k of ['task_id', 'taskId', 'backgroundTaskId', 'background_task_id', 'shell_id', 'shellId', 'bash_id', 'monitor_id', 'id'])
+      if (typeof resp[k] === 'string' && resp[k].length >= 3) return resp[k];
+  }
+  const text = typeof resp === 'string' ? resp : JSON.stringify(resp || '');
+  const m = text.match(/\b(?:task|shell|bash|monitor)?[ _-]?(?:ID|id|Id)\b\s*[:=]?\s*\\?["'`]?([A-Za-z0-9][\w-]{3,})/);
+  return m ? m[1] : null;
+}
+function bgTimeout(input) {
+  const v = input && (input.timeout_ms ?? input.timeoutMs ?? input.timeout);
+  if (typeof v !== 'number' || !(v > 0)) return null;
+  return v > 10000 ? v / 1000 : v;   // 毫秒或秒 / ms or s
+}
+function startBg(s, d, ts, agent) {
+  const ti = d.tool_input || {};
+  const key = d.tool_use_id || ('bg-' + ts);
+  if (s.bg.has(key)) return;
+  const rec = d.tool_use_id && s.tools.get(d.tool_use_id);
+  const start = (rec && rec.startedAt) || ts;
+  const tmo = bgTimeout(ti);
+  const b = { id: key, taskId: bgIdFrom(d.tool_response), tool: String(d.tool_name || 'tool'), label: toolLabel(d.tool_name, ti),
+    description: short(ti.description || ti.command || ti.prompt || ti.condition || '', 120), owner: agent ? agent.type : 'main',
+    startedAt: start, endedAt: null, status: 'running', summary: null, timeoutAt: tmo ? start + tmo : null, taskRef: s.task ? s.task.id : null };
+  s.bg.set(key, b);
+  if (s.bg.size > 60) s.bg.delete(s.bg.keys().next().value);
+  log(s, ts, b.owner, ['bgStarted', b.tool, b.description], 'spawn');
+}
+function endBg(s, b, ts, status, summary) {
+  if (b.status !== 'running') return;
+  b.status = status; b.endedAt = ts; if (summary) b.summary = short(summary, 300);
+  log(s, ts, b.owner, ['bgEnded', b.tool, status, Math.max(0, Math.round(ts - b.startedAt))], status === 'done' ? 'good' : 'bad');
+}
+// 解析 <task-notification>：后台命令、Monitor 和后台子代理结束时都会发一条
+// Parse <task-notification> blocks (sent when a background command, monitor or background sub-agent finishes)
+function onNotifications(s, text, ts) {
+  const str = String(text || '');
+  if (!str.includes('<task-notification')) return;
+  const re = /<task-notification>([\s\S]*?)<\/task-notification>/g;
+  let m;
+  while ((m = re.exec(str))) {
+    const body = m[1];
+    const tag = n => { const x = body.match(new RegExp('<' + n + '>([\\s\\S]*?)</' + n + '>')); return x ? x[1].trim() : null; };
+    const id = tag('task-id'), tu = tag('tool-use-id'), st = (tag('status') || 'completed').toLowerCase(), summary = tag('summary');
+    const status = /fail|error/.test(st) ? 'failed' : /kill|stop|cancel/.test(st) ? 'stopped' : 'done';
+    let hit = false;
+    for (const b of s.bg.values()) {
+      if ((tu && b.id === tu) || (id && b.taskId && (b.taskId === id || b.taskId.endsWith(id) || id.endsWith(b.taskId)))) { endBg(s, b, ts, status, summary); hit = true; }
+    }
+    if (!hit && id) {
+      const a = s.agents.get(id) || s.agents.get(id.replace(/^agent-/, ''));
+      if (a && a.status === 'running') { a.status = status; a.endedAt = ts; a.currentTool = null; }
+    }
+  }
+}
+function expireBg(s, t) {
+  for (const b of s.bg.values()) {
+    if (b.status !== 'running') continue;
+    if (b.timeoutAt && t > b.timeoutAt + 30) endBg(s, b, b.timeoutAt, 'done', 'timeout');
+    else if (t - b.startedAt > 12 * 3600) endBg(s, b, t, 'stopped', null);
+  }
+}
+
 // ---------- 处理一条事件 ----------
 function handle(line) {
   const d = line && line.data;
@@ -216,11 +285,13 @@ function handle(line) {
       break;
     case 'SessionEnd':
       s.ended = true; s.status = 'ended'; s.currentTool = null; s.needMsg = null;
+      for (const b of s.bg.values()) endBg(s, b, ts, 'stopped', null);
       closeTurn(s, ts);
       if (s.task && !s.task.endedAt) { s.task.endedAt = ts; s.tasksDone++; }
       log(s, ts, 'main', ['sessionEnd'], 'session');
       break;
     case 'UserPromptSubmit': {
+      onNotifications(s, d.prompt, ts);
       if (isHandback(d.prompt)) {
         s.status = 'running';
         const last = s.turns[s.turns.length - 1];
@@ -245,6 +316,10 @@ function handle(line) {
       if (owner.steps.length > 40) owner.steps.splice(0, owner.steps.length - 40);
       const rec = { label, agentId: d.agent_id || null, startedAt: ts, step };
       if (d.tool_use_id) s.tools.set(d.tool_use_id, rec);
+      if (KILL_TOOLS.test(String(d.tool_name || ''))) {
+        const ti0 = d.tool_input || {}, kid = ti0.shell_id || ti0.task_id || ti0.taskId || ti0.bash_id || ti0.id;
+        if (kid) for (const b of s.bg.values()) if (b.taskId === kid || b.id === kid) endBg(s, b, ts, 'stopped', null);
+      }
       if (agent) { agent.currentTool = label; agent.lastTool = label; agent.toolCount++; agent.status = 'running'; }
       else { s.currentTool = label; s.lastTool = label; s.toolCount++; if (s.status !== 'running') s.status = 'running'; s.needMsg = null; }
       if (isSpawn(d.tool_name)) {
@@ -275,6 +350,7 @@ function handle(line) {
           if (a.toolUseId === d.tool_use_id && a.status === 'running') { a.status = failed ? 'failed' : 'done'; a.endedAt = ts; }
         }
       }
+      if (!failed && isBgCall(d.tool_name, d.tool_input)) startBg(s, d, ts, agent);
       if (failed && !isSpawn(d.tool_name)) log(s, ts, agent ? agent.type : 'main', ['toolFailed', toolLabel(d.tool_name, d.tool_input)], 'bad');
       break;
     }
@@ -450,6 +526,11 @@ function onTranscript(s, o) {
   const m = o.message;
   if (!m || typeof m !== 'object') return;
   const ts = o.timestamp ? Date.parse(o.timestamp) / 1000 : now();
+  if (o.type === 'user' && s.bg.size) {
+    const c = m.content;
+    const text = typeof c === 'string' ? c : Array.isArray(c) ? c.map(x => x && (typeof x.text === 'string' ? x.text : typeof x.content === 'string' ? x.content : '')).join('\n') : '';
+    if (text.includes('<task-notification')) { const before = [...s.bg.values()].filter(b => b.status === 'running').length; onNotifications(s, text, ts); if ([...s.bg.values()].filter(b => b.status === 'running').length !== before) changed(); }
+  }
   if (o.type === 'assistant') {
     if (m.model && !String(m.model).startsWith('<')) {
       s.actualModel = m.model;
@@ -563,11 +644,19 @@ function view(s) {
   const active = !s.ended && t - s.lastTs < IDLE_MIN * 60;
   const all = [...s.agents.values()].filter(a => !isHelper(a)).sort((x, y) => x.startedAt - y.startedAt);
   const cur = s.task ? all.filter(a => a.taskId === s.task.id) : all;
-  const shown = (cur.length ? cur : all.slice(-6));
+  // 更早派出、现在还在跑的子代理也要显示 / keep earlier sub-agents that are still running
+  const shown = cur.length ? all.filter(a => cur.includes(a) || a.status === 'running') : all.filter((a, i) => a.status === 'running' || i >= all.length - 6);
+  expireBg(s, t);
+  const bgAll = [...s.bg.values()];
+  const bgShown = bgAll.filter(b => b.status === 'running' || (s.task && b.taskRef === s.task.id) || (b.endedAt && t - b.endedAt < 600)).slice(-8);
+  const bgRunning = bgAll.filter(b => b.status === 'running').length;
   const model = sessionModel(s);
   return {
     id: s.id, project: path.basename(s.cwd || ''), cwd: s.cwd,
-    active, status: active ? s.status : 'ended',
+    active, status: active ? (s.status === 'idle' && bgRunning ? 'background' : s.status) : 'ended',
+    background: bgShown.map(b => ({ id: b.id, tool: b.tool, label: b.label, description: b.description, owner: b.owner, status: b.status,
+      startedAt: b.startedAt, endedAt: b.endedAt, timeoutAt: b.timeoutAt, summary: b.summary })),
+    bgRunning,
     model: prettyModel(model), family: family(model),
     effort: (s.route && s.route.mode !== 'off' && s.route.last && s.route.last.effort) || s.effort || settings.effortLevel || null,
     startedAt: s.startedAt, lastTs: s.lastTs, task: s.task, tasksDone: s.tasksDone,
@@ -592,7 +681,7 @@ function view(s) {
     lanes: all.slice(-24).map(a => {
       const m = resolveAgentModel(s, a);
       return { id: a.id, type: a.type, family: family(m), model: prettyModel(m), start: a.startedAt, end: a.endedAt, status: a.status, description: a.description };
-    }),
+    }).concat(bgAll.slice(-6).map(b => ({ id: b.id, kind: 'bg', type: b.tool, family: null, model: null, start: b.startedAt, end: b.endedAt, status: b.status, description: b.description }))),
     usage: usageSummary([s.usage]),
   };
 }
