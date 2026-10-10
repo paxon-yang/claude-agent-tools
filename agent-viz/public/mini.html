@@ -32,6 +32,8 @@ button { font: inherit; color: inherit; }
 /* 手机全屏打开时让开刘海和底部横条 / clear the notch and home bar when opened from the home screen */
 body:not(.widget) .card { padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
 body.widget .card { min-height: 0; border-radius: 18px; border: 1px solid rgba(255, 255, 255, .12); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); }
+/* 皮肤：图案 + 蒙版，铺在最底下 / skin: pattern under a scrim, at the very back */
+.skin { position: absolute; inset: 0; pointer-events: none; background-repeat: no-repeat; }
 .glow { position: absolute; inset: -40% -20% auto; height: 260px; pointer-events: none; opacity: .55; filter: blur(30px); }
 .in { position: relative; }
 .f-haiku { --c: var(--haiku); --cl: var(--haiku-l); } .f-sonnet { --c: var(--sonnet); --cl: var(--sonnet-l); }
@@ -107,7 +109,8 @@ body:not(.widget) .ctl .w { display: none; }
 </style>
 </head>
 <body>
-<div class="card" id="card"><div class="glow" id="glow"></div><div class="in" id="root"></div></div>
+<div class="card" id="card"><div class="skin" id="skin" hidden></div><div class="glow" id="glow"></div><div class="in" id="root"></div></div>
+<script src="/skins.js"></script>
 <script>
 const W = window.widget || null;   // 桌面小窗口（Electron）注入 / injected by the desktop widget
 if (W) { document.body.classList.add('widget'); if (W.platform === 'darwin') document.body.classList.add('mac'); }
@@ -238,7 +241,15 @@ function render() {
   document.title = (state.needsYou.length ? `(${state.needsYou.length}) ` : '') + (s.project || 'Agent');
   fit();
 }
-function fit() { if (W && W.resize) requestAnimationFrame(() => W.resize(Math.ceil($('#card').getBoundingClientRect().height))); }
+function fit() {
+  requestAnimationFrame(() => {
+    const r = $('#card').getBoundingClientRect();
+    if (W && W.resize) W.resize(Math.ceil(r.height));
+    if (W && W.skin && state) W.skin(state.skin || 'none');
+    if (window.Skins && state) Skins.apply($('#skin'), state.skin, { dark: true, width: r.width, height: r.height, surface: '28,28,30' });
+  });
+}
+addEventListener('resize', () => fit());
 const STANDALONE = matchMedia('(display-mode: standalone)').matches || !!navigator.standalone;
 function openFull() { if (W && W.openFull) W.openFull(); else if (STANDALONE) location.href = '/'; else window.open('/', '_blank'); }
 function togglePin() { pinned = !pinned; if (W && W.setPinned) W.setPinned(pinned); render(); }

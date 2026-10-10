@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld('widget', {
   setPinned: v => ipcRenderer.send('card:pin', v),
   getPinned: () => ipcRenderer.invoke('card:pinned'),
   openFull: () => ipcRenderer.send('card:full'),
+  skin: id => ipcRenderer.send('card:skin', id),
 });

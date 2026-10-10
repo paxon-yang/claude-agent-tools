@@ -39,6 +39,10 @@ class Prefs(context: Context) {
     var lastError: String
         get() = p.getString("lastError", "") ?: ""
         set(v) = p.edit().putString("lastError", v).apply()
+    /** 皮肤：follow = 跟随电脑上看板选的 / the skin; follow = whatever the board on the computer uses */
+    var skin: String
+        get() = p.getString("skin", Skins.FOLLOW) ?: Skins.FOLLOW
+        set(v) = p.edit().putString("skin", v).apply()
     var liveUntil: Long
         get() = p.getLong("liveUntil", 0)
         set(v) = p.edit().putLong("liveUntil", v).apply()

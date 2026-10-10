@@ -27,7 +27,7 @@ class CardWidget : AppWidgetProvider() {
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, newOptions: Bundle) {
-        manager.updateAppWidget(id, build(context))
+        manager.updateAppWidget(id, build(context, sizeOf(newOptions)))
     }
 
     override fun onEnabled(context: Context) {
@@ -63,7 +63,15 @@ class CardWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, CardWidget::class.java))
             if (ids.isEmpty()) return
-            manager.updateAppWidget(ids, build(context))
+            // 每张卡片按自己的大小画皮肤 / each card gets a skin drawn at its own size
+            for (id in ids) manager.updateAppWidget(id, build(context, sizeOf(manager.getAppWidgetOptions(id))))
+        }
+
+        /** 卡片的大小（dp，竖屏）；拿不到就用默认的 4×3 / the card's size in dp (portrait), or the default 4×3 */
+        fun sizeOf(o: Bundle?): Pair<Float, Float> {
+            val w = o?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+            val h = o?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0
+            return (if (w > 0) w.toFloat() else 340f) to (if (h > 0) h.toFloat() else 250f)
         }
 
         private fun pi(context: Context, code: Int, intent: Intent, activity: Boolean): PendingIntent {
@@ -86,10 +94,19 @@ class CardWidget : AppWidgetProvider() {
             rv.setViewVisibility(R.id.dot_still, if (which == null) View.VISIBLE else View.GONE)
         }
 
-        fun build(context: Context): RemoteViews {
+        fun build(context: Context, sizeDp: Pair<Float, Float> = 340f to 250f): RemoteViews {
             val prefs = Prefs(context)
             val rv = RemoteViews(context.packageName, R.layout.widget_card)
             val color = { id: Int -> context.getColor(id) }
+
+            // 皮肤 / skin
+            val skin = runCatching { Skins.draw(context, Skins.current(prefs, prefs.data()), sizeDp.first, sizeDp.second) }.getOrNull()
+            if (skin != null) {
+                rv.setImageViewBitmap(R.id.skin, skin)
+                rv.setViewVisibility(R.id.skin, View.VISIBLE)
+            } else {
+                rv.setViewVisibility(R.id.skin, View.GONE)
+            }
 
             val settings = pi(context, 2, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true)
             if (prefs.url.isBlank()) {

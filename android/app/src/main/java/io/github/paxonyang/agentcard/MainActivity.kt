@@ -20,6 +20,8 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import kotlin.concurrent.thread
 
@@ -74,6 +76,8 @@ class MainActivity : Activity() {
                 saveAndTest()
             }
             if (intent?.getBooleanExtra("pin", false) == true) addWidget()
+            // 截图时换皮肤 / switch skins for screenshots
+            intent?.getStringExtra("skin")?.let { prefs.skin = it }
             // 截图用的样例数据（base64 JSON）/ sample data for screenshots, base64 JSON
             intent?.getStringExtra("sample")?.let {
                 sampleMode = true
@@ -176,8 +180,49 @@ class MainActivity : Activity() {
     /** 设置页上的预览：就是桌面卡片本身 / the preview here is the home-screen card itself */
     private fun showPreview() {
         preview.removeAllViews()
-        val v: View = CardWidget.build(this).apply(this, preview)
+        val dm = resources.displayMetrics
+        val wDp = if (preview.width > 0) preview.width / dm.density else dm.widthPixels / dm.density - 40f
+        val v: View = CardWidget.build(this, wDp to 250f).apply(this, preview)
         preview.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        showSkins()
+    }
+
+    /** 皮肤选择：跟随电脑 + 每种皮肤一个小缩略图 / skin picker: "same as computer" plus a thumbnail per skin */
+    private fun showSkins() {
+        val box = findViewById<LinearLayout>(R.id.skins) ?: return
+        box.removeAllViews()
+        val d = resources.displayMetrics.density
+        val board = prefs.data()?.skin
+        val opts = listOf(Skins.FOLLOW to getString(R.string.skin_follow)) + Skins.LIST.map { it.id to Skins.name(this, it.id) }
+        for ((id, label) in opts) {
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setPadding((4 * d).toInt(), 0, (4 * d).toInt(), 0)
+            }
+            val img = ImageView(this).apply {
+                setBackgroundResource(if (prefs.skin == id) R.drawable.skin_opt_on else R.drawable.skin_opt)
+                val pad = (3 * d).toInt()
+                setPadding(pad, pad, pad, pad)
+                scaleType = ImageView.ScaleType.FIT_XY
+                val shown = if (id == Skins.FOLLOW) board ?: "none" else id
+                Skins.draw(this@MainActivity, shown, 60f, 42f, radiusDp = 9f, scaleCap = 3f)?.let { setImageBitmap(it) }
+                contentDescription = label
+            }
+            col.addView(img, LinearLayout.LayoutParams((66 * d).toInt(), (48 * d).toInt()))
+            col.addView(TextView(this).apply {
+                text = label
+                textSize = 11f
+                setTextColor(getColor(if (prefs.skin == id) R.color.c_blue else R.color.page_muted))
+                setPadding(0, (4 * d).toInt(), 0, 0)
+            })
+            col.setOnClickListener {
+                prefs.skin = id
+                CardWidget.renderAll(this)
+                showPreview()
+            }
+            box.addView(col)
+        }
     }
 
     private fun addWidget() {

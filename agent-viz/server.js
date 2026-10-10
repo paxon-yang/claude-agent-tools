@@ -733,6 +733,31 @@ function turnsView(s, t) {
   });
 }
 
+// ---------- 皮肤 / skins ----------
+// 存在 config.json 的 "skin" 里；桌面卡片、看板、手机卡片（选了"跟随电脑"时）都用它
+// kept in config.json "skin"; the desktop card, the board and the phone card (when set to follow) all use it
+const SKIN_IDS = (() => { try { return require(path.join(APP, 'public', 'skins.js')).IDS; } catch { return ['none']; } })();
+let skinCache = { at: 0, v: 'none' };
+let demoSkin = null;   // 演示模式不写 config.json / the demo doesn't touch config.json
+function currentSkin() {
+  if (DEMO && demoSkin) return demoSkin;
+  const t = Date.now();
+  if (t - skinCache.at > 5000) {
+    const v = (readJSON(path.join(APP, 'config.json')) || {}).skin;
+    skinCache = { at: t, v: SKIN_IDS.includes(v) ? v : 'none' };
+  }
+  return skinCache.v;
+}
+function saveSkin(id) {
+  if (DEMO) { demoSkin = id; changed(); return; }
+  const f = path.join(APP, 'config.json');
+  const c = readJSON(f) || {};
+  c.skin = id;
+  fs.writeFileSync(f, JSON.stringify(c, null, 2) + '\n');
+  skinCache = { at: Date.now(), v: id };
+  changed();
+}
+
 function snapshot() {
   const t = now();
   const list = [...sessions.values()]
@@ -747,6 +772,7 @@ function snapshot() {
     totals: { ...all, tasks, sessions: recent.length, hours: KEEP_HOURS, baselineModel: BASELINE },
     needsYou: list.filter(x => x.active && x.status === 'needs-you').map(x => ({ id: x.id, project: x.project, msg: x.needMsg })),
     limits: limitsView(),
+    skin: currentSkin(),
     remote: remoteInfo() };
 }
 
@@ -806,6 +832,7 @@ function widgetView() {
     others: act.filter(x => x !== s).slice(0, 5).map(x => ({ project: x.project, status: x.status })),
     needsYou: snap.needsYou.length,
     limits: snap.limits,
+    skin: snap.skin,
     totals: { cost: snap.totals.cost, baseline: snap.totals.baseline, saved: snap.totals.saved, hours: snap.totals.hours, baselineModel: snap.totals.baselineModel },
   };
 }
@@ -956,6 +983,31 @@ const server = http.createServer((req, res) => {
   if (url === '/api/widget') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(widgetView()));
+    return;
+  }
+  if (url === '/api/skin' && req.method === 'POST') {
+    // 只接受本页面发来的 JSON（别的网站的表单发不了这种请求）/ JSON from the board's own pages only
+    const origin = req.headers.origin;
+    const same = !origin || origin.replace(/^https?:\/\//, '') === String(req.headers.host || '');
+    if (!same || !/^application\/json/.test(req.headers['content-type'] || '')) { res.writeHead(403); res.end('forbidden'); return; }
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1000) req.destroy(); });
+    req.on('end', () => {
+      let id = null;
+      try { id = JSON.parse(body).skin; } catch { }
+      if (!SKIN_IDS.includes(id)) { res.writeHead(400); res.end('unknown skin'); return; }
+      try { saveSkin(id); } catch (e) { res.writeHead(500); res.end(String(e.message || e)); return; }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, skin: id }));
+    });
+    return;
+  }
+  if (url === '/skins.js') {
+    fs.readFile(path.join(APP, 'public', 'skins.js'), (err, buf) => {
+      if (err) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(buf);
+    });
     return;
   }
   if (url === '/api/health') {

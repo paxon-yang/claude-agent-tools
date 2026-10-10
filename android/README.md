@@ -26,6 +26,8 @@ A home-screen widget that shows your Claude Code agent board at a glance: the cu
 - 手机装了 **Tailscale**：App 里直接填电脑的 Tailscale 地址，比如 `http://100.x.y.z:4321`，配对码留空。
 - 想让卡片也走 Cloudflare 的登录：用服务令牌（见下面），填看板网址和令牌。
 
+**皮肤：** App 里"皮肤"一栏可以单独给手机卡片选一款（陶土、等高线、终端、沙丘、极光、星野），默认"跟随电脑"，用的是电脑上看板选的那款。
+
 **怎么刷新：** 每 15 分钟自动刷新一次（安卓对桌面小组件的最短间隔）。**点一下卡片**进入实时模式：有会话在跑时每 15 秒刷新，通知栏有一条"实时更新"（可以点"停止"），闲下来 10 分钟后自动停。卡片右下角的 ↗ 打开完整看板。
 
 APK 也可以单独下载：https://github.com/paxon-yang/claude-agent-tools/releases/download/card-android/agent-card.apk
@@ -55,6 +57,8 @@ Show the QR code again: `phone.sh --qr`; new key (phones must rescan): `phone.sh
 **Other ways to connect:**
 - **Tailscale** on the phone: enter the computer's Tailscale address, e.g. `http://100.x.y.z:4321`, and leave the key empty.
 - Keep the card behind Cloudflare's login: use a service token (below) with the board's address.
+
+**Skins:** pick one for the phone card under "Skin" in the app (Clay, Contour, Terminal, Dunes, Aurora, Night sky). The default, "Same as computer", uses whatever the board on the computer uses.
 
 **Refresh:** every 15 minutes (the shortest Android allows for widgets). **Tap the card** for live mode: every 15 seconds while a session is busy, with an ongoing "Live updates" notification you can stop; it ends by itself after 10 quiet minutes. The ↗ opens the full board.
 

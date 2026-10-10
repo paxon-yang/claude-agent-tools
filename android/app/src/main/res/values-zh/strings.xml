@@ -91,6 +91,9 @@
     <string name="test_ok">连上了：%1$s · %2$s</string>
     <string name="test_ok_empty">连上了。最近 24 小时还没有会话。</string>
     <string name="preview_label">预览</string>
+    <string name="skin_label">皮肤</string>
+    <string name="skin_follow">跟随电脑</string>
+    <string name="skin_help">"跟随电脑"会用电脑上选的皮肤（看板侧栏 → 皮肤，或桌面卡片的菜单栏图标 → 皮肤）。</string>
     <string name="btn_add_widget">把卡片添加到桌面</string>
     <string name="add_widget_manual">长按桌面 → 插件（小组件）→ Agent 卡片。</string>
     <string name="section_keep">让卡片保持更新</string>

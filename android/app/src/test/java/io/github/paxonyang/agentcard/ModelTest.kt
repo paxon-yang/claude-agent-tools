@@ -89,4 +89,17 @@ class ModelTest {
         assertEquals("<$0.01", Model.money(0.001))
         assertEquals("$123", Model.money(123.4))
     }
+
+    @Test fun skins() {
+        // 和 public/skins.js 的随机数一样，星星位置两边一致 / same generator as public/skins.js
+        val g = Skins.Rng(7)
+        g.next()
+        assertEquals(6.195825757458806, g.next() * 100, 1e-9)
+        assertEquals(97.690763277933, g.next() * 100, 1e-9)
+        assertEquals(listOf("none", "clay", "contour", "terminal", "dunes", "aurora", "night"), Skins.LIST.map { it.id })
+        assertFalse(Skins.valid("follow"))
+        val d = Model.parse("""{"v":2,"now":5,"session":null,"others":[],"needsYou":0,"skin":"dunes","totals":{"hours":24}}""")
+        assertEquals("dunes", d.skin)
+        assertNull(Model.parse("""{"v":2,"now":5,"session":null,"others":[],"needsYou":0,"totals":{"hours":24}}""").skin)
+    }
 }

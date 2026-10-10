@@ -70,7 +70,7 @@ function record(lang) {
 `;
   // GitHub Pages serves the demo under /claude-agent-tools/: no home-screen manifest, icons by relative path
   const page2 = page.replace(/<link rel="manifest"[^>]*>\n/, '').replace(/href="\/(icon-192|apple-touch-icon)\.png"/g, 'href="$1.png"');
-  for (const f of ['icon-192.png', 'apple-touch-icon.png']) fs.copyFileSync(path.join(ROOT, 'agent-viz', 'public', f), path.join(OUT, f));
+  for (const f of ['icon-192.png', 'apple-touch-icon.png', 'skins.js']) fs.copyFileSync(path.join(ROOT, 'agent-viz', 'public', f), path.join(OUT, f));
   const out = page2.replace('</head>', head + '</head>');
   if (out === page2) throw new Error('could not inject static flag');
   fs.writeFileSync(path.join(OUT, 'index.html'), out);

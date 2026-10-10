@@ -141,6 +141,8 @@ bash ~/claude-agent-tools/agent-viz/widget/install.sh
 
 It downloads Electron once (~100 MB) and opens at login. The same card works in any browser at `http://localhost:4321/mini`, which is handy on a phone.
 
+**Skins.** Six optional backgrounds in warm terracotta tones: Clay, Contour, Terminal, Dunes, Aurora and Night sky. Each is a faint pattern under a scrim, so the text stays readable. Pick one from the dashboard sidebar (Skin) or the card's menu-bar / tray icon. The desktop card, the dashboard and the Android card (set to "Same as computer") all follow it.
+
 <br clear="right">
 
 ## How much did it save me?

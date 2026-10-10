@@ -54,7 +54,14 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 .btn.primary { background: var(--blue); color: #fff; }
 .btn:active { transform: scale(.95); }
 
-.app { display: grid; grid-template-columns: 288px minmax(0, 1fr); min-height: 100vh; }
+.app { position: relative; z-index: 1; display: grid; grid-template-columns: 288px minmax(0, 1fr); min-height: 100vh; }
+/* 皮肤：整页最底下一层淡图案 + 蒙版 / skin: a faint pattern under a scrim behind the whole page */
+.skinbg { position: fixed; inset: 0; z-index: 0; pointer-events: none; background-repeat: no-repeat; }
+.skinrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--muted); }
+.skinsw { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.skinsw button { width: 26px; height: 18px; border-radius: 6px; border: 1px solid var(--hair); background: var(--canvas) no-repeat center / 100% 100%; cursor: pointer; padding: 0; transition: transform .12s, box-shadow .2s; }
+.skinsw button:hover { transform: scale(1.08); }
+.skinsw button.on { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 3.5px var(--blue); }
 
 /* ---------- 侧栏：磨砂羊皮纸 ---------- */
 .rail { position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--hair); background: rgba(245, 245, 247, .8); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); z-index: 5; }
@@ -449,6 +456,7 @@ details.log summary small { font-family: var(--text); font-weight: 400; color: v
 <script>window.VIZ_STATIC = 'demo/';</script>
 </head>
 <body>
+<div class="skinbg" id="skinbg" hidden></div>
 <div class="app">
   <aside class="rail"><div class="rail-in">
     <div class="brand"><a class="backcard" href="/mini" data-i18n="backCard" hidden></a><b data-i18n="brand">Agent Board</b><span class="conn" id="conn"><i></i><span></span></span></div>
@@ -456,13 +464,15 @@ details.log summary small { font-family: var(--text); font-weight: 400; color: v
     <section class="spend" id="spend"></section>
     <nav class="projects" id="projects" data-i18n-aria="projectsAria"></nav>
     <section class="remote"><div id="notify"></div><div id="remote" style="margin-top:16px"></div>
-      <div class="langrow"><span data-i18n="langLabel"></span><div class="langseg" id="langseg" role="group" data-i18n-aria="langAria"><button type="button" data-lang="en" lang="en">EN</button><button type="button" data-lang="zh" lang="zh-CN">中文</button></div></div></section>
+      <div class="langrow"><span data-i18n="langLabel"></span><div class="langseg" id="langseg" role="group" data-i18n-aria="langAria"><button type="button" data-lang="en" lang="en">EN</button><button type="button" data-lang="zh" lang="zh-CN">中文</button></div></div>
+      <div class="skinrow"><span data-i18n="skinLabel"></span><div class="skinsw" id="skinsw" role="group" data-i18n-aria="skinLabel"></div></div></section>
   </div></aside>
   <main id="main"></main>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
 <div class="scrim" id="scrim"></div>
 <aside class="sheet" id="sheet" aria-hidden="true" data-i18n-aria="details"><button class="sheet-x" id="sheetx" data-i18n-aria="close">✕</button><div id="sheetbody"></div></aside>
+<script src="skins.js"></script>
 <script>
 // 从手机主屏幕打开（没有浏览器的返回键）时显示“‹ 卡片” / opened from the home screen: show a way back to the card
 if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) { document.addEventListener('DOMContentLoaded', () => { document.body.classList.add('standalone'); const a = document.querySelector('.backcard'); if (a) a.hidden = false; }); }
@@ -481,7 +491,7 @@ const pl = (n, one, many) => n === 1 ? one : many;
 const I18N = {
   zh: {
     title: 'Agent 看板', brand: 'Agent 看板', connecting: '连接中', live: '实时', reconnecting: '重连中', replay: '回放',
-    projectsAria: '项目', backCard: '‹ 卡片', details: '详情', close: '关闭', langLabel: '语言', langAria: '界面语言',
+    projectsAria: '项目', backCard: '‹ 卡片', details: '详情', close: '关闭', langLabel: '语言', langAria: '界面语言', skinLabel: '皮肤',
     demo: '演示模式：以下是模拟数据',
     staticNote: '这是录好的演示回放。装到自己电脑上，就能实时看到你的 Claude Code。', staticCta: '去 GitHub 安装 →',
     emptyTitle: '现在没有 Claude Code 在运行', emptyBody: '在任意项目文件夹里打开终端，输入 <code>claude</code>，这里会自动出现。',
@@ -548,7 +558,7 @@ const I18N = {
   },
   en: {
     title: 'Agent Board', brand: 'Agent Board', connecting: 'Connecting', live: 'Live', reconnecting: 'Reconnecting', replay: 'Replay',
-    projectsAria: 'Projects', backCard: '‹ Card', details: 'Details', close: 'Close', langLabel: 'Language', langAria: 'Interface language',
+    projectsAria: 'Projects', backCard: '‹ Card', details: 'Details', close: 'Close', langLabel: 'Language', langAria: 'Interface language', skinLabel: 'Skin',
     demo: 'Demo mode — simulated data',
     staticNote: 'This is a recorded demo. Install it to watch your own Claude Code live.', staticCta: 'Get it on GitHub →',
     emptyTitle: 'No Claude Code sessions running', emptyBody: 'Open a terminal in any project folder and run <code>claude</code>. It’ll show up here automatically.',
@@ -685,8 +695,31 @@ function applyStatic() {
   document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', t(el.dataset.i18nAria)));
 }
 function renderConn() { $('#conn').className = conn === 'live' ? 'conn ok' : 'conn'; $('#conn span').textContent = t(conn); }
+// ---------- 皮肤 / skins ----------
+// 选好的皮肤存在电脑上的看板里（桌面卡片、手机卡片跟着变）；静态演示只在这个浏览器里记住
+// the choice is saved on the board (the desktop and phone cards follow); the static demo keeps it in this browser
+let localSkin = (() => { try { return localStorage.getItem('viz.skin'); } catch (e) { return null; } })();
+const skinNow = () => (STATIC ? localSkin : state && state.skin) || 'none';
+function renderSkin() {
+  if (!window.Skins) return;
+  Skins.apply($('#skinbg'), skinNow(), { dark: false, width: innerWidth, height: innerHeight, surface: '245,245,247' });
+  const box = $('#skinsw');
+  if (!box) return;
+  if (!box.children.length) box.innerHTML = Skins.LIST.map(k => `<button type="button" data-skin="${k.id}" style="background-image:${k.id === 'none' ? 'none' : Skins.url(k.id, 52, 36, false).replace(/"/g, "'")}"></button>`).join('');
+  const cur = skinNow();
+  box.querySelectorAll('button').forEach(b => { const on = b.dataset.skin === cur; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.title = Skins.name(b.dataset.skin, LANG); b.setAttribute('aria-label', b.title); });
+}
+function setSkin(id) {
+  if (STATIC) { localSkin = id; try { localStorage.setItem('viz.skin', id); } catch (e) { } renderSkin(); return; }
+  if (state) state.skin = id;
+  renderSkin();
+  fetch('/api/skin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skin: id }) }).catch(() => { });
+}
+addEventListener('resize', () => renderSkin());
+
 function renderLangSeg() {
   document.querySelectorAll('#langseg button').forEach(b => { const on = b.dataset.lang === LANG; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  renderSkin();
 }
 function applyLang(l) {
   LANG = l;
@@ -756,7 +789,7 @@ function render() {
   if (!state) return;
   const s = pick();
   put('demo', STATIC ? `<span class="demo">${t('staticNote')}</span> <a class="demo" style="font-weight:600;text-decoration:none" href="${REPO}" target="_blank" rel="noopener">${t('staticCta')}</a>` : state.demo ? `<span class="demo">${t('demo')}</span>` : '');
-  renderSpend(); renderProjects(s); renderRemote(); notifyNeeds();
+  renderSpend(); renderProjects(s); renderRemote(); notifyNeeds(); renderSkin();
   document.title = (state.needsYou.length ? t('docNeeds', state.needsYou.length) : '') + t('title');
   if (!s) {
     put('main', `<div class="empty"><h2>${t('emptyTitle')}</h2><p>${t('emptyBody')}</p></div>`);
@@ -1143,6 +1176,8 @@ document.addEventListener('click', e => {
   const tg = e.target;
   const lb = tg.closest && tg.closest('#langseg button');
   if (lb) { setLang(lb.dataset.lang); return; }
+  const sb = tg.closest && tg.closest('#skinsw button');
+  if (sb) { setSkin(sb.dataset.skin); return; }
   const fb = tg.closest && tg.closest('#filters button');
   if (fb) { flowState.filter = fb.dataset.filter; flowState.showAll = false; const s = pick(); if (s) renderFlow(s); return; }
   if (tg.closest && tg.closest('#foldbtn')) { flowState.expandDone = !flowState.expandDone; try { localStorage.setItem('viz.expandDone', flowState.expandDone ? '1' : '0'); } catch (e) { } const s = pick(); if (s) renderFlow(s); return; }

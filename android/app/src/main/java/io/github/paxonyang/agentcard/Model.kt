@@ -46,6 +46,8 @@ data class WidgetData(
     val needsYou: Int,
     val totals: Totals,
     val limits: Limits? = null,
+    /** 电脑上看板选的皮肤 / the skin chosen on the board */
+    val skin: String? = null,
 )
 
 /** 卡片上的状态 / the status the card shows */
@@ -113,6 +115,7 @@ object Model {
             needsYou = o.optInt("needsYou", 0),
             totals = Totals(t.num("cost"), t.num("baseline"), t.num("saved"), t.optInt("hours", 24), t.str("baselineModel") ?: "opus"),
             limits = lim,
+            skin = o.str("skin"),
         )
     }
 

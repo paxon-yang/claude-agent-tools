@@ -86,6 +86,16 @@ sleep 4
 shot home-sample
 sleep 5
 shot home-sample-2
+# 每种皮肤一张 / one shot per skin
+for SK in clay contour terminal dunes aurora night; do
+  adb shell am force-stop $PKG
+  adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE" --es skin $SK
+  sleep 4
+  [ $SK = clay ] && shot app-skin-picker
+  adb shell input keyevent KEYCODE_BACK
+  sleep 3
+  shot home-skin-$SK
+done
 # 深色模式 / dark mode
 adb shell cmd uimode night yes
 sleep 3
@@ -94,11 +104,19 @@ sleep 5
 adb shell input keyevent KEYCODE_BACK
 sleep 4
 shot home-sample-dark
+for SK in contour aurora; do
+  adb shell am force-stop $PKG
+  adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE" --es skin $SK
+  sleep 4
+  adb shell input keyevent KEYCODE_BACK
+  sleep 3
+  shot home-skin-$SK-dark
+done
 adb shell cmd uimode night no
 # 等你确认，同时还有子代理在跑：红条在上，下面列出在跑的 / needs you while sub-agents run
 SAMPLE_NEED=$(echo "$SAMPLE" | base64 -d | sed 's/"status":"running","active":true/"status":"needs-you","active":true/; s/"needMsg":null/"needMsg":"Claude 需要你批准：运行 npm publish"/' | base64 -w0)
 adb shell am force-stop $PKG
-adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE_NEED"
+adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE_NEED" --es skin follow
 sleep 5
 adb shell input keyevent KEYCODE_BACK
 sleep 4

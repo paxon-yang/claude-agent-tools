@@ -17,6 +17,9 @@ const ZH = (() => {
 })();
 const L = (zh, en) => (ZH ? zh : en);
 
+// 皮肤列表跟看板用同一个文件 / the skin list comes from the board's own file
+const SKINS = (() => { try { return require(path.join(os.homedir(), '.claude', 'viz', 'app', 'public', 'skins.js')).LIST; } catch { return []; } })();
+let skin = 'none';
 let win = null, tray = null, prefs = { pinned: true, x: null, y: null, visible: true };
 const PREFS = () => path.join(app.getPath('userData'), 'card.json');
 function loadPrefs() { try { prefs = { ...prefs, ...JSON.parse(fs.readFileSync(PREFS(), 'utf8')) }; } catch { } }
@@ -64,6 +67,11 @@ ipcMain.on('card:hide', () => hideCard());
 ipcMain.on('card:pin', (_e, v) => setPinned(v));
 ipcMain.handle('card:pinned', () => prefs.pinned);
 ipcMain.on('card:full', () => shell.openExternal(BASE + '/'));
+ipcMain.on('card:skin', (_e, id) => { if (id && id !== skin) { skin = id; buildMenu(); } });
+function setSkin(id) {
+  skin = id; buildMenu();
+  fetch(BASE + '/api/skin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skin: id }) }).catch(() => { });
+}
 
 function buildMenu() {
   if (!tray) return;
@@ -71,6 +79,7 @@ function buildMenu() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: visible ? L('隐藏卡片', 'Hide card') : L('显示卡片', 'Show card'), click: () => (visible ? hideCard() : showCard()) },
     { label: L('总在最前', 'Always on top'), type: 'checkbox', checked: prefs.pinned, click: m => setPinned(m.checked) },
+    ...(SKINS.length ? [{ label: L('皮肤', 'Skin'), submenu: SKINS.map(k => ({ label: ZH ? k.zh : k.en, type: 'radio', checked: k.id === skin, click: () => setSkin(k.id) })) }] : []),
     { label: L('打开完整看板', 'Open full board'), click: () => shell.openExternal(BASE + '/') },
     { type: 'separator' },
     { label: L('退出', 'Quit'), click: () => app.quit() },

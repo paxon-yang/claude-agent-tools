@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 选中的皮肤 / the chosen skin -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/c_surface" />
+    <stroke android:width="2dp" android:color="@color/c_blue" />
+    <corners android:radius="12dp" />
+</shape>
