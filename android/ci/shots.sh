@@ -95,6 +95,14 @@ adb shell input keyevent KEYCODE_BACK
 sleep 4
 shot home-sample-dark
 adb shell cmd uimode night no
+# 等你确认，同时还有子代理在跑：红条在上，下面列出在跑的 / needs you while sub-agents run
+SAMPLE_NEED=$(echo "$SAMPLE" | base64 -d | sed 's/"status":"running","active":true/"status":"needs-you","active":true/; s/"needMsg":null/"needMsg":"Claude 需要你批准：运行 npm publish"/' | base64 -w0)
+adb shell am force-stop $PKG
+adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE_NEED"
+sleep 5
+adb shell input keyevent KEYCODE_BACK
+sleep 4
+shot home-sample-need
 adb shell cmd locale set-app-locales $PKG --locales en-US
 adb shell am force-stop $PKG
 adb shell am start -n $PKG/.MainActivity

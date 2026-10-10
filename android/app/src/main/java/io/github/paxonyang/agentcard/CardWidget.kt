@@ -193,26 +193,30 @@ class CardWidget : AppWidgetProvider() {
             if (running.isEmpty() && s != null && (s.agentsRunning + s.bgRunning) > 0 && d.version < 2) {
                 running = listOf(Run("agent", context.getString(R.string.sub_agents, s.agentsRunning + s.bgRunning), null, null, context.getString(R.string.update_board)))
             }
+            fun addRows(max: Int) {
+                rv.setViewVisibility(R.id.rows, if (running.isEmpty()) View.GONE else View.VISIBLE)
+                for (r in running.take(max)) {
+                    val row = RemoteViews(context.packageName, R.layout.widget_run_row)
+                    val bg = r.kind == "bg"
+                    row.setInt(R.id.r_glyph, "setBackgroundResource", if (bg || r.family == null) R.drawable.g_grey else glyphRes(r.family))
+                    row.setTextViewText(R.id.r_glyph, if (bg) "›_" else if (r.family == null && r.model == null) "·" else Model.glyph(r.family, r.model ?: r.name))
+                    row.setTextViewText(R.id.r_name, r.name)
+                    row.setTextViewText(R.id.r_text, listOfNotNull(r.model, r.text).joinToString(" · "))
+                    rv.addView(R.id.rows, row)
+                }
+            }
             when {
+                // 等你确认：红条在上，下面照样列出在跑的 / needs you: the red bar on top, running work still listed below
                 st == Status.NEEDS_YOU -> {
-                    rv.setViewVisibility(R.id.rows, View.GONE)
                     rv.setViewVisibility(R.id.line, View.VISIBLE)
                     rv.setInt(R.id.line, "setBackgroundResource", R.drawable.need_fill)
                     rv.setTextColor(R.id.line, color(R.color.c_red))
                     rv.setTextViewText(R.id.line, s?.needMsg ?: context.getString(R.string.st_need))
+                    addRows(3)
                 }
                 running.isNotEmpty() -> {
                     rv.setViewVisibility(R.id.line, View.GONE)
-                    rv.setViewVisibility(R.id.rows, View.VISIBLE)
-                    for (r in running.take(4)) {
-                        val row = RemoteViews(context.packageName, R.layout.widget_run_row)
-                        val bg = r.kind == "bg"
-                        row.setInt(R.id.r_glyph, "setBackgroundResource", if (bg || r.family == null) R.drawable.g_grey else glyphRes(r.family))
-                        row.setTextViewText(R.id.r_glyph, if (bg) "›_" else if (r.family == null && r.model == null) "·" else Model.glyph(r.family, r.model ?: r.name))
-                        row.setTextViewText(R.id.r_name, r.name)
-                        row.setTextViewText(R.id.r_text, listOfNotNull(r.model, r.text).joinToString(" · "))
-                        rv.addView(R.id.rows, row)
-                    }
+                    addRows(4)
                 }
                 else -> {
                     rv.setViewVisibility(R.id.rows, View.GONE)

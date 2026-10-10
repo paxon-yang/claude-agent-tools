@@ -157,26 +157,20 @@
     </LinearLayout>
 
     <!-- 中间：在跑的子代理 / 等你确认 / 一句话 / middle: running sub-agents, needs-you, or one line -->
-    <FrameLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_marginTop="12dp"
         android:layout_weight="1"
-        android:minHeight="36dp">
+        android:minHeight="36dp"
+        android:orientation="vertical">
 
-        <!-- 在跑的子代理和后台任务，一个一行，每行下面一条流动的进度线 / running sub-agents and tasks, one per row, each with a moving activity line -->
-        <LinearLayout
-            android:id="@+id/rows"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:orientation="vertical" />
-
+        <!-- 等你确认时的红条，或者一句"现在在做什么" / the red "needs you" bar, or one line of what is happening -->
         <TextView
             android:id="@+id/line"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="top"
+            android:layout_marginBottom="6dp"
             android:background="@drawable/row_fill"
             android:ellipsize="end"
             android:maxLines="2"
@@ -187,7 +181,15 @@
             android:textColor="@color/c_label2"
             android:textSize="13sp"
             android:visibility="gone" />
-    </FrameLayout>
+
+        <!-- 在跑的子代理和后台任务，一个一行，每行下面一条流动的进度线 / running sub-agents and tasks, one per row, each with a moving activity line -->
+        <LinearLayout
+            android:id="@+id/rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </LinearLayout>
 
     <!-- 页脚 / footer -->
     <LinearLayout
