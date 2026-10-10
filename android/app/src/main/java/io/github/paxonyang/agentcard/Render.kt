@@ -250,7 +250,8 @@ object Render {
             // 中间：等你确认 / 在跑的 / 正在做 / 空闲 / middle: needs you, running, now, idle
             val midBottom = H - bottomH - dp(6)
             if (st == Status.NEEDS_YOU) {
-                val msg = ctx.getString(R.string.need_prefix, s?.needMsg ?: "")
+                // 状态标签已经写了"等你确认"，这里只放具体要确认什么 / the pill already says "needs you"; show what it needs
+                val msg = s?.needMsg ?: ctx.getString(R.string.st_need)
                 tp.typeface = BOLD
                 tp.textSize = dp(12)
                 tp.color = RED_L

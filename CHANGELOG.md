@@ -7,6 +7,8 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 ### Added
 - **Android home-screen card** (`android/`): a widget with the current task, model and effort, running sub-agents, cache time left, test gate and 24-hour cost; refreshes every 15 minutes, and every 15 seconds in live mode (tap the card) while a session is busy. Works over Tailscale or behind Cloudflare Access with a service token. Built and signed by GitHub Actions; the latest APK is always at the `card-android` release.
 - Dashboard: `/api/widget`, a small summary for the card.
+- **Weekly plan usage** everywhere: the router records Claude Code's 5-hour and 7-day usage windows; the dashboard sidebar, the desktop card and the Android card show how much of the week is used and when it resets.
+- The Android card is redrawn in the desktop card's style: model-tinted glow, model glyph and effort meter, running sub-agents and background tasks, cache and test tags, weekly usage bar; it adapts to the widget's size and to foldables.
 - `agent-viz/phone.sh`: connects a phone without the Cloudflare Zero Trust dashboard — adds a card-only address to the existing tunnel, protected by a random pairing key, and shows a QR code; the phone opens a page to install the app and pair in one tap. The full board stays behind its login.
 
 ## [0.4.0] — 2026-10-10
