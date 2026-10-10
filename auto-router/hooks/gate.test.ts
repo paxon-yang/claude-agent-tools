@@ -5,16 +5,19 @@ import type { On } from 'claude-code'
 
 type World = { files: Record<string, string>; exit: number; runs: { argv: readonly string[]; cwd?: string }[]; log?: string }
 
+// Windows 上引擎会把路径改写成 D:\proj\… 的样子；比较前统一一下 / on Windows the engine hands paths over as D:\proj\…; compare them normalised
+const norm = (p: string | undefined) => String(p ?? '').replace(/\\/g, '/').replace(/^[A-Za-z]:/, '')
+
 function world(on: On, w: World) {
   mock.store(on)
   mock.env(on, { HOME: '/home/u' })
   w.files['/home/u/.claude/viz'] = ''
   mock.clock(on, { now: 1_000_000 })
   const v = <T>(value: T) => ({ value })
-  on('fs.read', ($, e) => (e.path in w.files ? v(w.files[e.path]) : { deny: 'ENOENT ' + e.path }))
-  on('fs.exists', ($, e) => v(e.path in w.files))
+  on('fs.read', ($, e) => (norm(e.path) in w.files ? v(w.files[norm(e.path)]) : { deny: 'ENOENT ' + e.path }))
+  on('fs.exists', ($, e) => v(norm(e.path) in w.files))
   on('fs.write', ($, e) => {
-    if (e.path.includes('/router/')) w.log = e.text
+    if (norm(e.path).includes('/router/')) w.log = e.text
     return v(undefined)
   })
   on('session.id', () => v('sess-1'))
@@ -27,7 +30,7 @@ function world(on: On, w: World) {
   on('ui.log', () => v(undefined))
   on('model.complete', () => v({ isAnswered: true as const, text: '{"tier":"haiku","effort":"low","reason":"x"}', usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 } }))
   on('process.run', ($, e) => {
-    w.runs.push({ argv: e.argv, cwd: e.init?.cwd })
+    w.runs.push({ argv: e.argv, cwd: norm(e.init?.cwd) })
     return v({ exitCode: w.exit, stdout: w.exit ? 'FAIL src/auth.test.ts\n  expected 2, got 3' : 'all good', stderr: '', isStdoutTruncated: false, isStderrTruncated: false })
   })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
