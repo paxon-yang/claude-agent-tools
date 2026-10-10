@@ -704,7 +704,13 @@ server.on('error', err => {
 });
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`✓ Claude Code 看板已启动${DEMO ? '（演示模式）' : ''}：http://localhost:${PORT}`);
-  if (!DEMO) console.log('  数据来源：' + LOG);
+  if (!DEMO) {
+    console.log('  数据来源：' + LOG);
+    // 记下进程号，Windows 上安装/卸载脚本靠它停掉旧的看板
+    try { fs.writeFileSync(path.join(VIZ, 'server.pid'), String(process.pid)); } catch { }
+    const rm = () => { try { if (fs.readFileSync(path.join(VIZ, 'server.pid'), 'utf8') === String(process.pid)) fs.unlinkSync(path.join(VIZ, 'server.pid')); } catch { } process.exit(0); };
+    process.on('SIGINT', rm); process.on('SIGTERM', rm);
+  }
 });
 
 // ---------- 远程访问：只在 Tailscale 的私有地址上额外开放（100.64.0.0/10，只有你登录同一账号的设备能连） ----------
@@ -721,8 +727,9 @@ function tailscaleIPs() {
   return out;
 }
 function findTailscaleCli() {
-  const c = ['/Applications/Tailscale.app/Contents/MacOS/Tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale', '/usr/bin/tailscale'];
-  return c.find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } }) || null;
+  const c = ['/Applications/Tailscale.app/Contents/MacOS/Tailscale', '/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale', '/usr/bin/tailscale',
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Tailscale', 'tailscale.exe')];
+  return c.find(p => { try { fs.accessSync(p, process.platform === 'win32' ? fs.constants.F_OK : fs.constants.X_OK); return true; } catch { return false; } }) || null;
 }
 function refreshTailscaleName() {
   if (!remote.cli) remote.cli = findTailscaleCli();

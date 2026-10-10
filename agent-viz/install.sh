@@ -57,13 +57,21 @@ fi
 
 echo ""
 echo "[3/4] 加入采集设置（~/.claude/settings.json）"
-"$NODE" "$APP/setup-hooks.js" --install --node "$NODE" || fail "修改设置失败，上面有原因。你的设置没有被改动。"
+NODE_HOOK="$NODE"
+command -v cygpath >/dev/null 2>&1 && NODE_HOOK="$(cygpath -m "$NODE")"
+"$NODE" "$APP/setup-hooks.js" --install --node "$NODE_HOOK" || fail "修改设置失败，上面有原因。你的设置没有被改动。"
 
 echo ""
 echo "[4/4] 注册为开机自动运行的后台服务"
-if [ "$(uname)" != "Darwin" ]; then
-  warn "这不是 Mac，跳过开机自启。手动启动看板：  node \"$APP/server.js\""
-else
+wait_up() {
+  OKUP=""
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    sleep 0.6
+    if curl -s "http://localhost:$PORT/api/health" | grep -q '"ok":true'; then OKUP=1; break; fi
+  done
+}
+case "$(uname -s)" in
+Darwin)
   mkdir -p "$HOME/Library/LaunchAgents"
   launchctl bootout "gui/$(id -u)/$LABEL" >/dev/null 2>&1
   cat > "$PLIST" <<EOF
@@ -85,14 +93,34 @@ EOF
   if ! launchctl bootstrap "gui/$(id -u)" "$PLIST" >/dev/null 2>&1; then
     launchctl load -w "$PLIST" >/dev/null 2>&1
   fi
-  OKUP=""
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    sleep 0.6
-    if curl -s "http://localhost:$PORT/api/health" | grep -q '"ok":true'; then OKUP=1; break; fi
-  done
+  wait_up
   if [ -n "$OKUP" ]; then ok "看板服务已在后台运行，以后开机会自动启动"
   else warn "看板服务没能启动。请把这个文件的最后几行发给 Claude：$VIZ/server.log"; fi
-fi
+  ;;
+MINGW*|MSYS*|CYGWIN*)
+  # Windows：放一个隐藏运行的启动脚本到"启动"文件夹，开机登录后自动运行
+  STARTUP="$APPDATA/Microsoft/Windows/Start Menu/Programs/Startup"
+  [ -d "$STARTUP" ] || STARTUP="$(cygpath -u "$APPDATA")/Microsoft/Windows/Start Menu/Programs/Startup"
+  VBS="$STARTUP/claude-agent-viz.vbs"
+  NODEX="$NODE"; [ -f "$NODE.exe" ] && NODEX="$NODE.exe"
+  WNODE="$(cygpath -w "$NODEX")"; WAPP="$(cygpath -w "$APP")"; WLOG="$(cygpath -w "$VIZ/server.log")"
+  if [ -f "$VIZ/server.pid" ]; then taskkill //F //PID "$(cat "$VIZ/server.pid")" >/dev/null 2>&1; rm -f "$VIZ/server.pid"; sleep 1; fi
+  mkdir -p "$STARTUP"
+  cat > "$VBS" <<EOF
+' Claude Code 代理看板：登录 Windows 后在后台启动（没有窗口）
+Set sh = CreateObject("WScript.Shell")
+sh.CurrentDirectory = "$WAPP"
+sh.Run "cmd /c """"$WNODE"" ""$WAPP\server.js"" >> ""$WLOG"" 2>&1""", 0, False
+EOF
+  wscript.exe "$(cygpath -w "$VBS")" >/dev/null 2>&1 &
+  wait_up
+  if [ -n "$OKUP" ]; then ok "看板服务已在后台运行，以后登录 Windows 会自动启动"
+  else warn "看板服务没能启动。请把这个文件的最后几行发给 Claude：$VIZ/server.log"; fi
+  ;;
+*)
+  warn "这个系统不支持开机自启，请手动启动看板：  node \"$APP/server.js\""
+  ;;
+esac
 
 echo ""
 echo "=== 安装完成 ==="
@@ -102,5 +130,10 @@ echo "  下一步：    关掉所有正在运行的 Claude Code，重新打开�
 echo "  想先看效果：node \"$APP/server.js\" --demo --port 4322   然后打开 http://localhost:4322"
 echo "  卸载：      bash \"$APP/uninstall.sh\""
 echo ""
-[ "$(uname)" = "Darwin" ] && [ -n "$OKUP" ] && open "http://localhost:$PORT"
+if [ -n "$OKUP" ]; then
+  case "$(uname -s)" in
+    Darwin) open "http://localhost:$PORT" ;;
+    MINGW*|MSYS*|CYGWIN*) cmd //c start "" "http://localhost:$PORT" >/dev/null 2>&1 ;;
+  esac
+fi
 exit 0

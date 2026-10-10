@@ -11,6 +11,6 @@ if [ -f "$CMD" ] && grep -q "auto-router:start" "$CMD"; then
   echo "  ✓ 已从 ~/.claude/CLAUDE.md 移除派活规则（移除前备份为 CLAUDE.md.bak-auto-router-uninstall）"
 fi
 echo "  ~/.claude/agents 里的子代理文件保留不动，不需要可以手动删除。"
-echo "  文件还在 $HOME/.claude/auto-router，不需要可以在访达里删掉。"
+echo "  文件还在 $HOME/.claude/auto-router，不需要可以手动删掉。"
 echo "  重开 Claude Code 后，就回到 /model 里设置的固定模型。"
 echo ""

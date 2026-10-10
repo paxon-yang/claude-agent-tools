@@ -51,7 +51,10 @@ ok "插件文件已就位"
 
 echo ""
 echo "[3/4] 安装到 Claude Code（对你所有项目生效）"
-claude plugin marketplace add "$DEST" >/dev/null 2>&1 || claude plugin marketplace update paxon-local >/dev/null 2>&1
+# Windows（Git Bash）上 claude.exe 要用 C:\... 这种路径
+DEST_NATIVE="$DEST"
+command -v cygpath >/dev/null 2>&1 && DEST_NATIVE="$(cygpath -w "$DEST")"
+claude plugin marketplace add "$DEST_NATIVE" >/dev/null 2>&1 || claude plugin marketplace update paxon-local >/dev/null 2>&1
 if claude plugin install auto-router@paxon-local --scope user >/tmp/auto-router-install.log 2>&1; then
   ok "已安装并启用"
 else

@@ -1,54 +1,164 @@
-# Claude Code 自动选模型 + 代理看板
+<div align="center">
 
-两个配套的小工具，装一次，对所有项目生效。
+# Claude Agent Tools
 
-- **auto-router**：Claude Code 每一轮自动选模型和 effort。简单提问交给 Haiku，日常开发交给 Sonnet，架构、重构和大任务交给 Opus 统筹并派子代理分工，Fable 当顾问。
-- **agent-viz**：看板（http://localhost:4321），实时显示所有项目的状态、当前任务、主会话和子代理的分工、模型时间轴、估算花费（以及比全用 Opus 少花多少）、任务记录；Claude 等你确认时会提醒你。装了 [Tailscale](https://tailscale.com/download) 的话，你的其他电脑和手机也能打开。
+**Automatic model routing and a live agent dashboard for Claude Code.**<br>
+Haiku answers the lookups, Sonnet does the daily work, Opus plans the big jobs —
+and you watch every agent, model and dollar in real time.
 
-## 安装（Mac）
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-打开"终端"，粘贴这一行，按回车：
+![macOS](https://img.shields.io/badge/macOS-supported-1d1d1f?logo=apple)
+![Windows](https://img.shields.io/badge/Windows-beta-0078D4?logo=windows)
+![Linux](https://img.shields.io/badge/Linux-manual%20start-555)
+![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1.288%2B-D97757)
+![License](https://img.shields.io/badge/license-MIT-0066cc)
+
+<img src="docs/demo.gif" alt="Live agent dashboard: Opus orchestrates while Haiku and Sonnet sub-agents run" width="100%">
+
+<sub>Demo data. Full-quality video: <a href="docs/demo.mp4">docs/demo.mp4</a></sub>
+
+</div>
+
+## Why
+
+Claude Code uses one model for everything unless you keep typing `/model`. That means paying Opus prices to ask *"where is the login code?"*, or asking Sonnet to architect a migration. And when a session fans out into sub-agents, you can't see who is doing what.
+
+This repo ships two small tools that fix both:
+
+| | What it does |
+|---|---|
+| **auto-router** | A Claude Code plugin that picks the model and effort **every turn**, and for every sub-agent. Simple questions go to Haiku, everyday coding to Sonnet, architecture and multi-step jobs to Opus (which plans and delegates). In real sessions it cut estimated cost by **30–40%** versus running everything on Opus. |
+| **agent-viz** | A local dashboard at `http://localhost:4321`: every project, the current task, a live tree of the main session and its sub-agents, which model each one runs, a model timeline, estimated cost and savings, and an alert when Claude is waiting for your approval. Works on your phone too. |
+
+## Features
+
+- **Per-turn routing** — keyword rules first, then a Haiku classifier for the rest. Tag a prompt with `#opus`, `#sonnet`, `#haiku` or `#fable` to override once; `/route opus` to pin.
+- **Multi-model teamwork** — big tasks ("implement docs/spec.md") get Opus as the orchestrator, `explorer` sub-agents on Haiku to read code, `worker` sub-agents on Sonnet to write it.
+- **Plan → execute** — in plan mode (Shift+Tab) Opus writes the plan; once you approve, Sonnet carries it out.
+- **Guard rails** — Haiku hands over to Sonnet before editing a 4th file or running risky commands (`rm -rf`, `git push`, migrations, deploys); 3 tool failures in a turn escalate one tier on the spot; downgrades need two confirmations.
+- **Cost-aware** — sub-agent results are summarized on Sonnet, not re-read by Opus; no model lock-in on long chats.
+- **Live agent tree** — curved links with flowing particles while a sub-agent runs, a green pulse back when it reports, hover to trace a branch, click any card for its full brief, result and every tool step.
+- **Model timeline & cost** — which model ran each turn and each sub-agent, token use per model, estimated cost and *how much you saved*.
+- **"Needs you" alerts** — banner, desktop notification or sound when a session is blocked on your approval.
+- **Anywhere access** — Tailscale (private, zero config) or your own domain via Cloudflare Tunnel + Access email login.
+- **Apple-style liquid-glass UI**, light theme, mobile layout, reduced-motion support.
+
+<table>
+<tr>
+<td width="62%"><img src="docs/flow.png" alt="Agent tree"></td>
+<td><img src="docs/mobile.png" alt="Mobile layout"></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/details.png" alt="Detail sheet with every tool step"></td>
+</tr>
+</table>
+
+## Install
+
+**Requirements:** Claude Code 2.1.288 or newer, Node.js 18+, Git.
+
+### macOS / Linux
 
 ```bash
 git clone https://github.com/paxon-yang/claude-agent-tools.git ~/claude-agent-tools && bash ~/claude-agent-tools/install.sh
 ```
 
-装完关掉所有 Claude Code，重新打开。
+### Windows (beta)
 
-## 更新
+In **PowerShell**:
+
+```powershell
+irm https://raw.githubusercontent.com/paxon-yang/claude-agent-tools/main/install.ps1 | iex
+```
+
+It clones the repo to `%USERPROFILE%\claude-agent-tools` and runs the same installer through Git Bash (which Claude Code on Windows already needs). The dashboard starts hidden at login from your Startup folder.
+
+Then **restart Claude Code** and open <http://localhost:4321>.
+
+### Update
 
 ```bash
 bash ~/claude-agent-tools/update.sh
 ```
 
-也可以直接在 Claude Code 里说一句："运行 bash ~/claude-agent-tools/update.sh"，让它替你更新。更新完重开 Claude Code 生效。
+Or just tell Claude Code: *"run bash ~/claude-agent-tools/update.sh"*. Your `config.json` changes are kept.
 
-## 在其他电脑和手机上看看板
+## How routing works
 
-在 Mac 和其他设备上都装 Tailscale 并登录同一个账号，看板左下角会显示远程地址（比如 `http://你的Mac名.xxx.ts.net:4321`），在其他设备的浏览器里打开即可。只有你自己的设备能访问。不想开放：把 `~/.claude/viz/app/config.json` 里的 `remote` 改成 `off`。
-
-## 用 Cloudflare 挂到自己的域名（任何设备都能打开）
-
-先在 Cloudflare Zero Trust 里给这个网址加一个 Access 应用（只允许你的邮箱用验证码登录），再运行：
-
-```bash
-bash ~/claude-agent-tools/agent-viz/cloudflare.sh board.你的域名
+```mermaid
+flowchart LR
+  P[Your prompt] --> M{#tag or /route pin?}
+  M -- yes --> T[That model]
+  M -- no --> R{Rules}
+  R -- "plan mode / big multi-step task / architecture" --> O[Opus · orchestrates]
+  R -- "question, lookup, tiny edit" --> H[Haiku]
+  R -- unsure --> C[Haiku classifier] --> S[Sonnet / Haiku / Opus + effort]
+  O -. delegates .-> E[explorer · Haiku]
+  O -. delegates .-> W[worker · Sonnet]
+  E & W -. report back .-> SUM[Sonnet summarizes]
 ```
 
-脚本只新建一条名为 agent-board 的隧道和它自己的配置文件，不会动你其他的 cloudflared 设置。停止对外开放：`bash ~/claude-agent-tools/agent-viz/cloudflare.sh --remove`。
+Each turn's choice, and why, shows up in the Claude Code status line, in `/route`, and on the dashboard.
 
-## 日常用法
+## Everyday use
 
-- `/route` 查看当前模型和最近的选择；`/route rules` 查看规则
-- `/route opus` 固定某个模型；`/route auto` 恢复自动；`/route off` 关闭
-- 提示里写 `#haiku` / `#sonnet` / `#opus` / `#fable`，只对这一句生效
-- 大任务：Shift+Tab 进计划模式，Opus 出方案，回"执行"后换 Sonnet 动手
+| You type | What happens |
+|---|---|
+| `/route` | Current model and the last decisions |
+| `/route rules` | The active rules |
+| `/route sonnet` · `/route auto` · `/route off` | Pin a model · back to automatic · disable |
+| `#opus refactor the auth module` | Use Opus for this prompt only |
+| Shift+Tab, then *"go ahead"* | Opus plans, Sonnet executes |
 
-## 卸载
+## Configuration
+
+Edit `~/.claude/auto-router/config.json` and restart Claude Code. The most useful keys:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `defaultTier` | `sonnet` | Used when nothing else decides |
+| `bigTaskTier` | `opus` | Orchestrator for multi-step tasks — set to `sonnet` to save more |
+| `handbackTier` | `sonnet` | Who summarizes sub-agent results |
+| `subagents` | explorer→haiku, worker→sonnet … | Model per sub-agent type |
+| `haikuGuard.maxFiles` | `3` | Files Haiku may edit before Sonnet takes over |
+| `autoFable` | `false` | Let the hardest tasks go to Fable automatically |
+
+Dashboard settings live in `~/.claude/viz/app/config.json` (port, prices used for estimates, remote access).
+
+## Open the dashboard from other devices
+
+- **Tailscale (private):** install Tailscale on the computer and your other devices with the same account. The dashboard listens on the Tailscale address automatically and shows the link in its sidebar.
+- **Your own domain (Cloudflare):** create a Cloudflare Access application for the hostname (email one-time PIN), then run
+  `bash ~/claude-agent-tools/agent-viz/cloudflare.sh board.example.com`.
+  It creates a dedicated `agent-board` tunnel and never touches your other cloudflared config.
+
+## Uninstall
 
 ```bash
 bash ~/.claude/auto-router/uninstall.sh
 bash ~/.claude/viz/app/uninstall.sh
 ```
 
-设置在 `~/.claude/auto-router/config.json`，各项含义见 auto-router/说明.txt。
+Both make a backup before editing `~/.claude/settings.json` or `~/.claude/CLAUDE.md`.
+
+## FAQ
+
+**Does switching models lose context?** No. The conversation is kept; the only cost is that the new model reads it once without cache. That pays for itself within a dozen calls, which is why the router no longer refuses to downgrade on long chats.
+
+**Does it send my data anywhere?** No. Routing runs inside Claude Code; the dashboard reads local files and listens on localhost (plus your Tailscale address, or a tunnel you set up).
+
+**Is the cost exact?** It's an estimate from public API prices. On a subscription, treat it as relative.
+
+## Roadmap
+
+- English / Chinese UI switch (the UI and installer messages are Chinese today)
+- Daily and weekly cost history
+- Router feedback: tell it "wrong model" and it learns
+- Native Linux autostart (systemd)
+
+Issues and PRs are welcome — see [CONTRIBUTING](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)

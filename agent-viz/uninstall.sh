@@ -10,13 +10,20 @@ APP="$HOME/.claude/viz/app"
 
 echo ""
 echo "=== Claude Code 代理看板 · 卸载 ==="
-launchctl bootout "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || launchctl unload "$PLIST" >/dev/null 2>&1
-[ -f "$PLIST" ] && rm "$PLIST"
+case "$(uname -s)" in
+  Darwin)
+    launchctl bootout "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || launchctl unload "$PLIST" >/dev/null 2>&1
+    [ -f "$PLIST" ] && rm "$PLIST" ;;
+  MINGW*|MSYS*|CYGWIN*)
+    rm -f "$APPDATA/Microsoft/Windows/Start Menu/Programs/Startup/claude-agent-viz.vbs"
+    [ -f "$HOME/.claude/viz/server.pid" ] && taskkill //F //PID "$(cat "$HOME/.claude/viz/server.pid")" >/dev/null 2>&1
+    rm -f "$HOME/.claude/viz/server.pid" ;;
+esac
 echo "  ✓ 后台服务已停止，开机不再自动运行"
 if command -v node >/dev/null 2>&1 && [ -f "$APP/setup-hooks.js" ]; then
   node "$APP/setup-hooks.js" --remove
 fi
 echo ""
-echo "  程序和记录还留在 $HOME/.claude/viz ，不需要了可以在访达里删掉这个文件夹。"
+echo "  程序和记录还留在 $HOME/.claude/viz ，不需要了可以手动删掉这个文件夹。"
 echo "  重新打开 Claude Code 后，采集就彻底停止了。"
 echo ""

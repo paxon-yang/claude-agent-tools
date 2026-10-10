@@ -11,7 +11,9 @@ const os = require('os');
 const args = process.argv.slice(2);
 const SETTINGS = path.join(os.homedir(), '.claude', 'settings.json');
 const CAPTURE = path.join(os.homedir(), '.claude', 'viz', 'app', 'capture.js');
-const MARK = path.join('.claude', 'viz', 'app', 'capture.js');
+const MARK = '.claude/viz/app/capture.js';
+const WIN = process.platform === 'win32';
+const fwd = p => String(p).replace(/\\/g, '/');
 
 // 有 matcher 的事件用 "*"（全部匹配），没有 matcher 的事件不写 matcher
 const EVENTS = {
@@ -46,13 +48,14 @@ function backup() {
   return dest;
 }
 
-function isOurs(h) { return h && typeof h.command === 'string' && h.command.includes(MARK); }
+function isOurs(h) { return h && typeof h.command === 'string' && fwd(h.command).includes(MARK); }
 
 function install(nodePath) {
   const s = load();
   const bak = backup();
   s.hooks = s.hooks && typeof s.hooks === 'object' ? s.hooks : {};
-  const command = `"${nodePath}" "${CAPTURE}"`;
+  // Windows 上用正斜杠，命令在 Git Bash 和 cmd 里都能跑
+  const command = WIN ? `"${fwd(process.execPath)}" "${fwd(CAPTURE)}"` : `"${nodePath}" "${CAPTURE}"`;
   let added = 0;
   for (const [ev, hasMatcher] of Object.entries(EVENTS)) {
     const groups = Array.isArray(s.hooks[ev]) ? s.hooks[ev] : [];

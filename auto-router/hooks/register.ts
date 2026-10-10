@@ -59,7 +59,7 @@ export const register: Register = on => {
     const saved = await $.store.get('mode')
     mode = saved === 'off' || tierOf(String(saved)) ? (saved as Mode) : 'auto'
     try {
-      const home = await $.env.get('HOME')
+      const home = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE'))
       if (home && (await $.fs.exists(`${home}/.claude/viz`))) {
         logFile = `${home}/.claude/viz/router/${await $.session.id()}.json`
       }
