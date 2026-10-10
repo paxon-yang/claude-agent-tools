@@ -95,7 +95,7 @@
     <string name="preview_label">Preview</string>
     <string name="skin_label">Skin</string>
     <string name="skin_follow">Same as computer</string>
-    <string name="skin_help">"Same as computer" uses the skin picked on the board (sidebar → Skin) or the desktop card's menu.</string>
+    <string name="skin_help">\"Same as computer\" uses the skin picked on the board (sidebar, Skin) or in the desktop card\'s menu.</string>
     <string name="btn_add_widget">Add the card to the home screen</string>
     <string name="add_widget_manual">Long-press the home screen → Widgets → Agent Card.</string>
     <string name="section_keep">Keep it up to date</string>
