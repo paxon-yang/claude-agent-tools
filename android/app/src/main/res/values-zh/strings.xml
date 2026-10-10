@@ -62,6 +62,8 @@
     <string name="cost_short">近 %1$d 小时 %2$s · 少花 %3$d%%</string>
     <string name="cost_short_plain">近 %1$d 小时 %2$s</string>
     <string name="agent_more">%1$d/%2$d</string>
+    <string name="update_board">电脑上的看板更新后显示明细</string>
+    <string name="quota_update">看板需更新</string>
     <string name="notif_channel">实时更新</string>
     <string name="notif_stop">停止</string>
     <string name="notif_connecting">正在连接…</string>

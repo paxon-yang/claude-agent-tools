@@ -104,7 +104,7 @@ class CardWidget : AppWidgetProvider() {
                 rv.setChronometer(R.id.timer, SystemClock.elapsedRealtime(), null, false)
                 rv.setViewVisibility(R.id.timer, View.GONE)
                 rv.setViewVisibility(R.id.quota, View.GONE)
-                rv.setViewVisibility(R.id.activity, View.GONE)
+                rv.setViewVisibility(R.id.rows, View.GONE)
                 rv.setViewVisibility(R.id.line, View.GONE)
                 rv.setTextViewText(R.id.cost, "")
                 rv.setTextViewText(R.id.updated, "")
@@ -166,16 +166,25 @@ class CardWidget : AppWidgetProvider() {
                 rv.setContentDescription(R.id.ring, context.getString(R.string.q_week) + " " + wk.pct.roundToInt() + "%")
                 val five = d.limits?.fiveHour
                 rv.setTextViewText(R.id.quota_sub, if (five != null) context.getString(R.string.q_5h, five.pct.roundToInt()) else "")
+            } else if (d.version < 2) {
+                // 旧版看板没有额度数据：提示更新 / an older board sends no usage: say so
+                rv.setViewVisibility(R.id.quota, View.VISIBLE)
+                rv.setImageViewBitmap(R.id.ring, Ring.draw(context, null))
+                rv.setTextViewText(R.id.quota_sub, context.getString(R.string.quota_update))
             } else {
                 rv.setViewVisibility(R.id.quota, View.GONE)
             }
 
             // 中间 / middle
-            rv.removeAllViews(R.id.flipper)
-            val running = s?.running.orEmpty()
+            rv.removeAllViews(R.id.rows)
+            var running = s?.running.orEmpty()
+            // 电脑上的看板还是旧版本：只知道有几个在跑，不知道是谁 / an older board only sends counts
+            if (running.isEmpty() && s != null && (s.agentsRunning + s.bgRunning) > 0 && d.version < 2) {
+                running = listOf(Run("agent", context.getString(R.string.sub_agents, s.agentsRunning + s.bgRunning), null, null, context.getString(R.string.update_board)))
+            }
             when {
                 st == Status.NEEDS_YOU -> {
-                    rv.setViewVisibility(R.id.activity, View.GONE)
+                    rv.setViewVisibility(R.id.rows, View.GONE)
                     rv.setViewVisibility(R.id.line, View.VISIBLE)
                     rv.setInt(R.id.line, "setBackgroundResource", R.drawable.need_fill)
                     rv.setTextColor(R.id.line, color(R.color.c_red))
@@ -183,20 +192,19 @@ class CardWidget : AppWidgetProvider() {
                 }
                 running.isNotEmpty() -> {
                     rv.setViewVisibility(R.id.line, View.GONE)
-                    rv.setViewVisibility(R.id.activity, View.VISIBLE)
-                    running.forEachIndexed { i, r ->
+                    rv.setViewVisibility(R.id.rows, View.VISIBLE)
+                    for (r in running.take(4)) {
                         val row = RemoteViews(context.packageName, R.layout.widget_run_row)
                         val bg = r.kind == "bg"
-                        row.setInt(R.id.r_glyph, "setBackgroundResource", if (bg) R.drawable.g_grey else glyphRes(r.family))
-                        row.setTextViewText(R.id.r_glyph, if (bg) "›_" else Model.glyph(r.family, r.model ?: r.name))
+                        row.setInt(R.id.r_glyph, "setBackgroundResource", if (bg || r.family == null) R.drawable.g_grey else glyphRes(r.family))
+                        row.setTextViewText(R.id.r_glyph, if (bg) "›_" else if (r.family == null && r.model == null) "·" else Model.glyph(r.family, r.model ?: r.name))
                         row.setTextViewText(R.id.r_name, r.name)
                         row.setTextViewText(R.id.r_text, listOfNotNull(r.model, r.text).joinToString(" · "))
-                        row.setTextViewText(R.id.r_count, if (running.size > 1) context.getString(R.string.agent_more, i + 1, running.size) else "")
-                        rv.addView(R.id.flipper, row)
+                        rv.addView(R.id.rows, row)
                     }
                 }
                 else -> {
-                    rv.setViewVisibility(R.id.activity, View.GONE)
+                    rv.setViewVisibility(R.id.rows, View.GONE)
                     val text = when {
                         st == Status.RUNNING && s?.now != null -> s.now
                         st == Status.IDLE && s?.task != null -> context.getString(R.string.waiting_you)

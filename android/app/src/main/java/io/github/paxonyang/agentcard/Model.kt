@@ -38,6 +38,8 @@ data class Other(val project: String, val status: String)
 data class Totals(val cost: Double?, val baseline: Double?, val saved: Double?, val hours: Int, val baselineModel: String)
 
 data class WidgetData(
+    /** 看板接口的版本：2 起才有子代理明细和订阅额度 / payload version: 2+ carries the running list and plan limits */
+    val version: Int = 1,
     val now: Double,
     val session: Session?,
     val others: List<Other>,
@@ -104,6 +106,7 @@ object Model {
             Limits(one("sevenDay"), one("fiveHour")).takeIf { it.sevenDay != null || it.fiveHour != null }
         }
         return WidgetData(
+            version = o.optInt("v", 1),
             now = o.optDouble("now", 0.0),
             session = s,
             others = others,

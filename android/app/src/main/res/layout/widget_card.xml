@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 桌面卡片，苹果风格：没有大标题，一眼看状态、模型、本周额度；会动的地方：状态点、计时器、在跑的进度线、子代理轮播
-     Home-screen card, Apple style: no big title; status, model and weekly usage at a glance.
-     What moves: the status dot, the turn timer, the activity line, the rotating sub-agents. -->
+<!-- 桌面卡片，苹果风格：没有大标题，一眼看状态、模型、本周额度、在跑的子代理；会动的地方：状态点、计时器、每个子代理下面的进度线
+     Home-screen card, Apple style: no big title; status, model, weekly usage and running sub-agents at a glance.
+     What moves: the status dot, the turn timer, the activity line under each running sub-agent. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/card"
     android:layout_width="match_parent"
@@ -156,48 +156,27 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 中间：在跑的子代理（轮流显示）/ 等你确认 / 一句话 / middle: running sub-agents (rotating), needs-you, or one line -->
+    <!-- 中间：在跑的子代理 / 等你确认 / 一句话 / middle: running sub-agents, needs-you, or one line -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="12dp"
         android:layout_weight="1"
-        android:minHeight="34dp">
+        android:minHeight="36dp">
 
+        <!-- 在跑的子代理和后台任务，一个一行，每行下面一条流动的进度线 / running sub-agents and tasks, one per row, each with a moving activity line -->
         <LinearLayout
-            android:id="@+id/activity"
+            android:id="@+id/rows"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:background="@drawable/row_fill"
-            android:orientation="vertical">
-
-            <ViewFlipper
-                android:id="@+id/flipper"
-                android:layout_width="match_parent"
-                android:layout_height="34dp"
-                android:autoStart="true"
-                android:flipInterval="3200"
-                android:inAnimation="@anim/card_in"
-                android:outAnimation="@anim/card_out" />
-
-            <ProgressBar
-                android:id="@+id/sweep"
-                style="@android:style/Widget.Material.ProgressBar.Horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="2dp"
-                android:layout_marginStart="12dp"
-                android:layout_marginEnd="12dp"
-                android:layout_marginBottom="1dp"
-                android:indeterminate="true"
-                android:indeterminateTint="@color/c_blue" />
-        </LinearLayout>
+            android:layout_gravity="top"
+            android:orientation="vertical" />
 
         <TextView
             android:id="@+id/line"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
+            android:layout_gravity="top"
             android:background="@drawable/row_fill"
             android:ellipsize="end"
             android:maxLines="2"

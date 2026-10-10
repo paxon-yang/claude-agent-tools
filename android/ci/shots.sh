@@ -68,7 +68,7 @@ shot home-zh-live-2
 # 样例数据：一个正在跑、带子代理和后台任务的会话 / sample: a busy session with sub-agents and a background task
 NOW=$(date +%s)
 SAMPLE=$(cat <<JSON | base64 -w0
-{"v":1,"now":$NOW,"lang":"zh","demo":true,
+{"v":2,"now":$NOW,"lang":"zh","demo":true,
  "session":{"id":"s","project":"monthly-report-app","status":"running","active":true,"task":"给月报页面加 PDF 导出，并补上测试","taskStartedAt":$((NOW-434)),"taskEndedAt":null,
   "model":"Opus 5.5","family":"opus","effort":"high","agentsRunning":2,"bgRunning":1,"now":"Agent → worker","needMsg":null,"reason":"多步骤大任务","cacheUntil":$((NOW+2460)),"gate":"pass","lastEventAt":$NOW,
   "running":[{"kind":"agent","name":"explorer","model":"Haiku 5.5","family":"haiku","text":"Grep · ExportButton"},{"kind":"agent","name":"worker","model":"Sonnet 5.5","family":"sonnet","text":"Edit · pdf-export.ts"},{"kind":"bg","name":"Bash","model":null,"family":null,"text":"npm run dev"}]},

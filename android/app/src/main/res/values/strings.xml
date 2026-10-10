@@ -64,6 +64,8 @@
     <string name="cost_short">%1$dh %2$s · %3$d%% saved</string>
     <string name="cost_short_plain">%1$dh %2$s</string>
     <string name="agent_more">%1$d/%2$d</string>
+    <string name="update_board">update the board on your computer for details</string>
+    <string name="quota_update">update board</string>
     <string name="notif_channel">Live updates</string>
     <string name="notif_stop">Stop</string>
     <string name="notif_connecting">Connecting…</string>

@@ -801,7 +801,7 @@ function widgetView() {
       .slice(0, 3),
   };
   return {
-    v: 1, now: snap.now, lang: LANG, demo: DEMO,
+    v: 2, now: snap.now, lang: LANG, demo: DEMO,   // v2: running list and plan limits
     session: one,
     others: act.filter(x => x !== s).slice(0, 5).map(x => ({ project: x.project, status: x.status })),
     needsYou: snap.needsYou.length,

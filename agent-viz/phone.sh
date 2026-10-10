@@ -94,7 +94,7 @@ echo ""
 echo "$(t '=== 手机桌面卡片 ===' '=== Phone home-screen card ===')"
 
 # 1. 看板要是新版、正在运行 / the board must be running and new enough
-curl -s "http://127.0.0.1:$PORT/api/widget" | grep -q '"v":1' \
+curl -s "http://127.0.0.1:$PORT/api/widget" | grep -qE '"v":[0-9]' \
   || fail "$(t '看板没在运行，或者还是旧版本。先运行 bash ~/claude-agent-tools/update.sh' "The board isn't running or is too old. Run bash ~/claude-agent-tools/update.sh first")"
 ok "$(t '看板在运行' 'The board is running')"
 
