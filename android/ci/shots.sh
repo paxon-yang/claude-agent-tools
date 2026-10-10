@@ -34,6 +34,8 @@ shot app-zh
 adb shell am start -S -n $PKG/.MainActivity --ez pin true
 sleep 5
 shot pin-dialog
+sleep 4
+shot pin-dialog-2
 tap_text '^(Add to home screen|Add automatically|Add|添加)\s*$'
 sleep 4
 adb shell input keyevent KEYCODE_HOME
@@ -42,8 +44,6 @@ shot home-zh
 # 点卡片进入实时模式 / tap the card for live mode
 tap_text 'Agent|monthly|compliance|camic'
 sleep 25
-adb shell input keyevent KEYCODE_HOME
-sleep 2
 shot home-zh-live
 adb shell cmd statusbar expand-notifications
 sleep 3
@@ -54,8 +54,5 @@ adb shell am force-stop $PKG
 adb shell am start -n $PKG/.MainActivity
 sleep 8
 shot app-en
-adb shell input keyevent KEYCODE_HOME
-sleep 5
-shot home-en
 adb logcat -d | grep -iE 'agentcard|AndroidRuntime|FATAL EXCEPTION' | tail -200 > out/logcat.txt || true
 ls -la out
