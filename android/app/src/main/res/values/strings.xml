@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Agent Card</string>
+    <string name="widget_description">Claude Code at a glance: task, model, sub-agents, cost</string>
+
+    <!-- 小组件选择器里的预览 / picker preview -->
+    <string name="preview_project">monthly-report-app</string>
+    <string name="preview_task">Add PDF export to the report page</string>
+    <string name="preview_model">Opus 5.5 · high</string>
+    <string name="preview_meta">2 sub-agents · cache 41 min · tests ✓</string>
+    <string name="preview_now">Now: Bash · npm test</string>
+    <string name="preview_cost" formatted="false">24h $2.10 · 65% less than all-Opus</string>
+    <string name="preview_updated">Live</string>
+    <string name="open_board">Open the board</string>
+
+    <string name="st_running">Running</string>
+    <string name="st_need">Needs you</string>
+    <string name="st_bg">Background</string>
+    <string name="st_idle">Idle</string>
+    <string name="st_ended">Ended</string>
+    <string name="st_none">No session</string>
+
+    <plurals name="meta_agents">
+        <item quantity="one">%d sub-agent</item>
+        <item quantity="other">%d sub-agents</item>
+    </plurals>
+    <string name="meta_bg">%d background</string>
+    <string name="meta_cache">cache %d min</string>
+    <string name="gate_pass">tests ✓</string>
+    <string name="gate_fail">tests ✕ fixing</string>
+    <string name="gate_giveup">tests ✕</string>
+    <string name="gate_timeout">tests timed out</string>
+    <string name="gate_skip">tests skipped</string>
+
+    <string name="now_doing">Now: %s</string>
+    <string name="waiting_you">Done, waiting for your next message</string>
+    <string name="no_task">No task yet</string>
+    <string name="need_prefix">Approve in your terminal or the Claude app · %s</string>
+    <string name="others_running">+%d more sessions</string>
+    <string name="cost_line">%1$dh %2$s · %3$d%% less than all-%4$s</string>
+    <string name="cost_line_plain">%1$dh %2$s</string>
+    <string name="live">Live</string>
+    <string name="updated_at">%s</string>
+    <string name="stale">Offline · %s</string>
+
+    <string name="err_no_url">Tap to set the board address</string>
+    <string name="err_network">Can\'t reach the board</string>
+    <string name="err_auth_needed">Cloudflare login needed: add a service token</string>
+    <string name="err_auth_failed">Service token was rejected</string>
+    <string name="err_not_board">That address isn\'t the agent board</string>
+    <string name="err_http">The board answered %s</string>
+
+    <string name="notif_channel">Live updates</string>
+    <string name="notif_stop">Stop</string>
+    <string name="notif_connecting">Connecting…</string>
+    <string name="notif_idle">Nothing running</string>
+
+    <string name="intro">A home-screen card for your Claude Code agent board. Enter the address you use to open the board on this phone.</string>
+    <string name="label_url">Board address</string>
+    <string name="hint_url">https://board.example.com or http://100.x.y.z:4321</string>
+    <string name="label_cf">Cloudflare Access service token (only if the board is behind Cloudflare Access)</string>
+    <string name="hint_cf_id">Client ID</string>
+    <string name="hint_cf_secret">Client Secret</string>
+    <string name="cf_help">Cloudflare Zero Trust → Access → Service Auth → Create Service Token. Then add a policy to the board\'s Access application: Action Service Auth, Include Service Token = this token.</string>
+    <string name="btn_save_test">Save and test</string>
+    <string name="testing">Testing…</string>
+    <string name="test_ok">Connected: %1$s · %2$s</string>
+    <string name="test_ok_empty">Connected. No session in the last 24 hours yet.</string>
+    <string name="preview_label">Preview</string>
+    <string name="btn_add_widget">Add the card to the home screen</string>
+    <string name="add_widget_manual">Long-press the home screen → Widgets → Agent Card.</string>
+    <string name="section_keep">Keep it up to date</string>
+    <string name="keep_help">The card refreshes every 15 minutes. Tap it for live mode: every 15 seconds while a session is busy, stopping by itself after 10 quiet minutes. On ColorOS, allow Auto-launch and Background activity for this app, or the system pauses it.</string>
+    <string name="btn_app_settings">Open app settings</string>
+    <string name="btn_battery">Battery optimisation settings</string>
+</resources>

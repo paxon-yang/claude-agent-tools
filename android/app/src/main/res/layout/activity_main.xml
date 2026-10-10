@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="@color/page_ink"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/intro"
+            android:textColor="@color/page_muted"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/Label"
+            android:text="@string/preview_label" />
+
+        <FrameLayout
+            android:id="@+id/preview"
+            android:layout_width="match_parent"
+            android:layout_height="170dp" />
+
+        <TextView
+            style="@style/Label"
+            android:labelFor="@+id/url"
+            android:text="@string/label_url" />
+
+        <EditText
+            android:id="@+id/url"
+            style="@style/Field"
+            android:autofillHints=""
+            android:hint="@string/hint_url"
+            android:inputType="textUri" />
+
+        <TextView
+            style="@style/Label"
+            android:labelFor="@+id/cf_id"
+            android:text="@string/label_cf" />
+
+        <EditText
+            android:id="@+id/cf_id"
+            style="@style/Field"
+            android:autofillHints=""
+            android:hint="@string/hint_cf_id"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/cf_secret"
+            style="@style/Field"
+            android:layout_marginTop="8dp"
+            android:autofillHints=""
+            android:hint="@string/hint_cf_secret"
+            android:inputType="textPassword" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/cf_help"
+            android:textColor="@color/page_muted"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/save"
+            style="@style/Btn"
+            android:text="@string/btn_save_test" />
+
+        <TextView
+            android:id="@+id/result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/page_ink"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/add"
+            style="@style/Btn"
+            android:text="@string/btn_add_widget" />
+
+        <TextView
+            android:id="@+id/add_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/add_widget_manual"
+            android:textColor="@color/page_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            style="@style/Label"
+            android:text="@string/section_keep" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/keep_help"
+            android:textColor="@color/page_muted"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/app_settings"
+            style="@style/Btn"
+            android:text="@string/btn_app_settings" />
+
+        <Button
+            android:id="@+id/battery"
+            style="@style/Btn"
+            android:text="@string/btn_battery" />
+    </LinearLayout>
+</ScrollView>

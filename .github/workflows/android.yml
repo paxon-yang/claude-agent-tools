@@ -1,0 +1,134 @@
+name: Android card
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', 'agent-viz/server.js', '.github/workflows/android.yml']
+  pull_request:
+    paths: ['android/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      - name: Signing key (repository secret when set, otherwise the public key in android/app)
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then
+            echo "$KS" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Unit tests, lint, build
+        working-directory: android
+        run: |
+          # errors also go out as annotations, so they are readable without the raw log
+          if ! gradle --no-daemon --stacktrace testReleaseUnitTest lintRelease assembleRelease > build.log 2>&1; then
+            tail -80 build.log
+            { grep -E '^e: |error:|Error:|What went wrong|FAILED|Expected|AssertionError|Exception' build.log || tail -30 build.log; } \
+              | head -40 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}' | sed 's/^/::error title=android build::/'
+            echo
+            if [ -f app/build/reports/lint-results-release.txt ]; then
+              grep -E 'Error' -A3 app/build/reports/lint-results-release.txt | head -40 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}' | sed 's/^/::error title=lint::/'
+              echo
+            fi
+            exit 1
+          fi
+          tail -5 build.log
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/agent-card.apk"
+          ls -la "$RUNNER_TEMP/agent-card.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-card-apk
+          path: ${{ runner.temp }}/agent-card.apk
+
+      - name: Publish to the fixed download link
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'EOF'
+          **Agent Card for Android** — a home-screen card for the Claude Code agent board. / 把 Agent 看板放到安卓手机桌面上的小组件。
+
+          Download / 下载: `agent-card.apk` below (always the latest build of `main`). Setup / 设置: see [android/README.md](https://github.com/paxon-yang/claude-agent-tools/blob/main/android/README.md).
+          EOF
+          if gh release view card-android >/dev/null 2>&1; then
+            gh release upload card-android "$RUNNER_TEMP/agent-card.apk" --clobber
+            gh release edit card-android --notes-file notes.md
+          else
+            gh release create card-android "$RUNNER_TEMP/agent-card.apk" --title "Agent Card for Android" --notes-file notes.md --latest=false --target main
+          fi
+
+  preview:
+    name: Screenshot on an emulator
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: agent-card-apk
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Start the demo board
+        run: |
+          nohup node agent-viz/server.js --demo --port 4330 --lang zh > board.log 2>&1 &
+          for i in $(seq 1 20); do sleep 0.5; curl -s http://127.0.0.1:4330/api/widget | grep -q '"v":1' && break; done
+          sleep 8
+          curl -s http://127.0.0.1:4330/api/widget | head -c 400
+      - name: Install, open, screenshot
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install -r apk/agent-card.apk
+            adb shell cmd locale set-app-locales io.github.paxonyang.agentcard --locales zh-CN
+            adb shell am start -n io.github.paxonyang.agentcard/.MainActivity --es url http://10.0.2.2:4330
+            sleep 12
+            adb exec-out screencap -p > shot-zh-1.png
+            sleep 20
+            adb exec-out screencap -p > shot-zh-2.png
+            adb shell cmd locale set-app-locales io.github.paxonyang.agentcard --locales en-US
+            adb shell am force-stop io.github.paxonyang.agentcard
+            adb shell am start -n io.github.paxonyang.agentcard/.MainActivity
+            sleep 10
+            adb exec-out screencap -p > shot-en.png
+            adb logcat -d -t 400 | grep -iE 'agentcard|AndroidRuntime|FATAL' > logcat.txt || true
+      - name: Push screenshots to the android-preview branch
+        run: |
+          mkdir -p out && cp shot-*.png logcat.txt board.log out/ 2>/dev/null || true
+          cd out
+          git init -q -b android-preview
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A && git commit -q -m "Emulator screenshots for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" android-preview

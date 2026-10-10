@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Agent 卡片</string>
+    <string name="widget_description">Claude Code 一眼看清：任务、模型、子代理、花费</string>
+
+    <string name="preview_project">monthly-report-app</string>
+    <string name="preview_task">给月报页面加 PDF 导出</string>
+    <string name="preview_model">Opus 5.5 · high</string>
+    <string name="preview_meta">2 个子代理 · 缓存 41 分 · 测试 ✓</string>
+    <string name="preview_now">正在：Bash · npm test</string>
+    <string name="preview_cost" formatted="false">近 24 小时 $2.10 · 少花 65%</string>
+    <string name="preview_updated">实时</string>
+    <string name="open_board">打开看板</string>
+
+    <string name="st_running">运行中</string>
+    <string name="st_need">等你确认</string>
+    <string name="st_bg">后台在跑</string>
+    <string name="st_idle">空闲</string>
+    <string name="st_ended">已结束</string>
+    <string name="st_none">没有会话</string>
+
+    <plurals name="meta_agents">
+        <item quantity="other">%d 个子代理</item>
+    </plurals>
+    <string name="meta_bg">%d 个后台</string>
+    <string name="meta_cache">缓存 %d 分</string>
+    <string name="gate_pass">测试 ✓</string>
+    <string name="gate_fail">测试 ✕ 修复中</string>
+    <string name="gate_giveup">测试 ✕</string>
+    <string name="gate_timeout">测试超时</string>
+    <string name="gate_skip">测试跳过</string>
+
+    <string name="now_doing">正在：%s</string>
+    <string name="waiting_you">做完了，等你下一步</string>
+    <string name="no_task">还没有任务</string>
+    <string name="need_prefix">去终端或 Claude App 里确认 · %s</string>
+    <string name="others_running">另有 %d 个会话</string>
+    <string name="cost_line">近 %1$d 小时 %2$s · 少花 %3$d%%</string>
+    <string name="cost_line_plain">近 %1$d 小时 %2$s</string>
+    <string name="live">实时</string>
+    <string name="updated_at">%s</string>
+    <string name="stale">未连接 · %s</string>
+
+    <string name="err_no_url">点这里设置看板地址</string>
+    <string name="err_network">连不上看板</string>
+    <string name="err_auth_needed">需要 Cloudflare 服务令牌</string>
+    <string name="err_auth_failed">服务令牌不对</string>
+    <string name="err_not_board">这个地址不是 Agent 看板</string>
+    <string name="err_http">看板返回 %s</string>
+
+    <string name="notif_channel">实时更新</string>
+    <string name="notif_stop">停止</string>
+    <string name="notif_connecting">正在连接…</string>
+    <string name="notif_idle">没有在跑的任务</string>
+
+    <string name="intro">把 Claude Code 的 Agent 看板放到手机桌面上。填上你在这台手机上打开看板用的地址。</string>
+    <string name="label_url">看板地址</string>
+    <string name="hint_url">https://board.example.com 或 http://100.x.y.z:4321</string>
+    <string name="label_cf">Cloudflare Access 服务令牌（看板挂在 Cloudflare Access 后面时才需要）</string>
+    <string name="hint_cf_id">Client ID</string>
+    <string name="hint_cf_secret">Client Secret</string>
+    <string name="cf_help">Cloudflare Zero Trust → Access → Service Auth → Create Service Token。然后在看板的 Access 应用里加一条策略：Action 选 Service Auth，Include 选 Service Token = 这个令牌。</string>
+    <string name="btn_save_test">保存并测试</string>
+    <string name="testing">正在测试…</string>
+    <string name="test_ok">连上了：%1$s · %2$s</string>
+    <string name="test_ok_empty">连上了。最近 24 小时还没有会话。</string>
+    <string name="preview_label">预览</string>
+    <string name="btn_add_widget">把卡片添加到桌面</string>
+    <string name="add_widget_manual">长按桌面 → 插件（小组件）→ Agent 卡片。</string>
+    <string name="section_keep">让卡片保持更新</string>
+    <string name="keep_help">卡片每 15 分钟自动刷新。点一下卡片进入实时模式：有会话在跑时每 15 秒刷新，闲下来 10 分钟后自动停。ColorOS 上请给这个 App 打开"自启动"和"允许后台运行"，否则系统会把它停掉。</string>
+    <string name="btn_app_settings">打开应用设置</string>
+    <string name="btn_battery">电池优化设置</string>
+</resources>

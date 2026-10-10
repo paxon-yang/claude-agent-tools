@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AgentCard" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorAccent">@color/blue_l</item>
+        <item name="android:statusBarColor">#FF000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/page</item>
+    </style>
+    <color name="page">#FF000000</color>
+    <color name="page_ink">#FFF5F5F7</color>
+    <color name="page_muted">#FF98989D</color>
+    <color name="field">#FF1C1C1E</color>
+</resources>

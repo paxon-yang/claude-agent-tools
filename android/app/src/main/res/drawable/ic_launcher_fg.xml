@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 和看板图标同一个图案：主会话派出三个子代理 / same mark as the board icon: the main session and three sub-agents -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#00000000" android:strokeColor="#73FFFFFF" android:strokeWidth="2.4" android:pathData="M54,42L36,70M54,42V73M54,42L72,70" />
+    <path android:fillColor="#FFF08C00" android:pathData="M54,33.5a8.5,8.5 0,1 1,0 17a8.5,8.5 0,1 1,0 -17z" />
+    <path android:fillColor="#FF1FA2B8" android:pathData="M36,64.4a5.6,5.6 0,1 1,0 11.2a5.6,5.6 0,1 1,0 -11.2z" />
+    <path android:fillColor="#FF0A7AFF" android:pathData="M54,67.4a5.6,5.6 0,1 1,0 11.2a5.6,5.6 0,1 1,0 -11.2z" />
+    <path android:fillColor="#FF34C759" android:pathData="M72,64.4a5.6,5.6 0,1 1,0 11.2a5.6,5.6 0,1 1,0 -11.2z" />
+</vector>

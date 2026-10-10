@@ -737,6 +737,61 @@ function snapshot() {
     remote: remoteInfo() };
 }
 
+// ---------- 手机桌面小组件 / phone home-screen widget ----------
+// 小组件只要最要紧的一个会话和合计，数据越小越省电 / the widget needs one session and the totals; small payload, less battery
+function brief(p) {
+  // 和网页上的标题缩写一样 / same as the page's title summariser
+  const full = String(p == null ? '' : p).replace(/```[\s\S]*?```/g, ' ').replace(/`([^`]*)`/g, '$1')
+    .replace(/https?:\/\/\S+/g, ' ').replace(/[#>*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let s = full.replace(/^(?:(?:请你|请帮我|你帮我|帮我|帮忙|麻烦你?|你能不能|能不能|可以帮我|我想让你|我需要你|我想|请|好的|那)[，,\s]*)+/, '')
+    .replace(/^(?:(?:please|can you|could you|would you|help me|i want you to|i need you to|i'd like you to|ok(?:ay)?|so)[,\s]+)+/i, '');
+  if (!s) s = full;
+  const cjk = /[㐀-鿿]/.test(s);
+  const W = str => { let w = 0; for (const ch of str) w += /[⺀-￯]/.test(ch) ? 1 : 0.55; return w; };
+  const max = cjk ? 20 : 31, min = cjk ? 6 : 10, slack = cjk ? 6 : 8;
+  const trimEnd = x => x.replace(/[。！？!?；;：:，,、\s]+$/, '');
+  let out = '';
+  for (const c of s.split(/(?<=[。！？!?；;：:，,\n])\s*/)) { out += c; if (W(trimEnd(out)) >= min) break; }
+  out = trimEnd(out);
+  let cut = out.length < trimEnd(s).length;
+  if (W(out) > max + slack) {
+    let head = '', w = 0;
+    for (const ch of out) { const cw = /[⺀-￯]/.test(ch) ? 1 : 0.55; if (w + cw > max) break; head += ch; w += cw; }
+    const rest = out.slice(head.length);
+    if (/[A-Za-z0-9]$/.test(head) && /^[A-Za-z0-9]/.test(rest)) head = head.replace(/[A-Za-z0-9._-]+$/, '');
+    if (!cjk && /\s/.test(head)) head = head.replace(/\s+\S*$/, '');
+    out = trimEnd(head) || out.slice(0, 12);
+    cut = true;
+  }
+  if (!cjk) out = out.charAt(0).toUpperCase() + out.slice(1);
+  return out + (cut ? '…' : '');
+}
+function widgetView() {
+  const snap = snapshot();
+  const act = snap.sessions.filter(x => x.active);
+  // 先看等你确认的，再看在跑的，再看最近的 / needs-you first, then running, then the latest
+  const s = act.find(x => x.status === 'needs-you') || act.find(x => x.status === 'running' || x.status === 'background') || act[0] || snap.sessions[0] || null;
+  const one = s && {
+    id: s.id, project: s.project, status: s.status, active: s.active,
+    task: s.task ? brief(s.task.prompt) : null, taskStartedAt: s.task ? s.task.startedAt : null, taskEndedAt: s.task ? s.task.endedAt || null : null,
+    model: s.model || null, family: s.family || null, effort: s.effort || null,
+    agentsRunning: s.agents.filter(a => a.status === 'running').length, agentsDone: s.agents.filter(a => a.status !== 'running').length,
+    bgRunning: (s.background || []).filter(b => b.status === 'running').length,
+    now: s.currentTool || null, needMsg: s.needMsg || null,
+    reason: s.route && s.route.last ? s.route.last.reason || null : null,
+    cacheUntil: s.route && s.route.cacheUntil ? s.route.cacheUntil : null,
+    gate: s.route && s.route.gate ? s.route.gate.result : null,
+    lastEventAt: s.lastEventAt || null,
+  };
+  return {
+    v: 1, now: snap.now, lang: LANG, demo: DEMO,
+    session: one,
+    others: act.filter(x => x !== s).slice(0, 5).map(x => ({ project: x.project, status: x.status })),
+    needsYou: snap.needsYou.length,
+    totals: { cost: snap.totals.cost, baseline: snap.totals.baseline, saved: snap.totals.saved, hours: snap.totals.hours, baselineModel: snap.totals.baselineModel },
+  };
+}
+
 // ---------- 推送 ----------
 const clients = new Set();
 let dirty = true;
@@ -810,6 +865,11 @@ const server = http.createServer((req, res) => {
   if (url === '/api/state') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify(snapshot(), null, 2));
+    return;
+  }
+  if (url === '/api/widget') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(widgetView()));
     return;
   }
   if (url === '/api/health') {

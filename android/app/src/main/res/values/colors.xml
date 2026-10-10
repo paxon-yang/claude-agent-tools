@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ink">#FFF5F5F7</color>
+    <color name="muted">#99EBEBF5</color>
+    <color name="faint">#61EBEBF5</color>
+    <color name="green_l">#FF63E28A</color>
+    <color name="red_l">#FFFF8A80</color>
+    <color name="blue_l">#FF409CFF</color>
+    <color name="icon_bg">#FF16161A</color>
+    <color name="accent">#FF0A7AFF</color>
+</resources>
