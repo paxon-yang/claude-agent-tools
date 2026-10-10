@@ -24,13 +24,23 @@ PY
 )
   [ -n "$xy" ] && adb shell input tap $xy
 }
+# 等某个文字出现在屏幕上（最多 $2 秒）/ wait until some text is on screen (up to $2 seconds)
+wait_text() {
+  for _ in $(seq 1 "${2:-20}"); do
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+    adb pull /sdcard/ui.xml out/ui.xml >/dev/null 2>&1
+    grep -qE "$1" out/ui.xml && return 0
+    sleep 1
+  done
+  return 1
+}
 mkdir -p out
 adb install -r "$APK"
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS
 adb shell cmd locale set-app-locales $PKG --locales zh-CN
 # 和手机扫码一样：配对页上的链接打开 App，确认后连接 / same as scanning the QR code: the pairing link opens the app
 adb shell am start -a android.intent.action.VIEW -d "agentcard://pair?url=http%3A%2F%2F10.0.2.2%3A4330\&key=$CARD_KEY\&board=http%3A%2F%2F10.0.2.2%3A4330"
-sleep 6
+wait_text 'text="(连接|Connect)"' 30
 shot pair-confirm
 tap_text '^(连接|Connect)$'
 sleep 10

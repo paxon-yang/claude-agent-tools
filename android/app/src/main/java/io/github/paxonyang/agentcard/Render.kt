@@ -230,7 +230,16 @@ object Render {
                 if (started != null && s.taskEndedAt == null && s.active) {
                     val sec = max(0.0, nowSec() - started).toLong()
                     val t = if (sec >= 3600) "${sec / 3600}:${"%02d".format((sec % 3600) / 60)}:${"%02d".format(sec % 60)}" else "${sec / 60}:${"%02d".format(sec % 60)}"
-                    text("· $t", x, mid, 12f, MUTED)
+                    x += text("· $t", x, mid, 12f, MUTED) + dp(8)
+                }
+                // 右边：缓存、测试的小标签，放得下才放 / on the right: cache and test tags, when they fit
+                var rx = right
+                for ((label, color) in tags(s).reversed()) {
+                    val wv = measure(label, 11f, MEDIUM) + dp(14)
+                    if (rx - wv < x) break
+                    round(rx - wv, y + gs / 2 - dp(10), rx, y + gs / 2 + dp(10), dp(10), Color.TRANSPARENT, 0x24FFFFFF)
+                    text(label, rx - wv + dp(7), y + gs / 2 + dp(4), 11f, color, MEDIUM)
+                    rx -= wv + dp(6)
                 }
                 y += gs + dp(10)
             }
@@ -253,11 +262,16 @@ object Render {
                     y += boxH + dp(8)
                 }
             } else if (s != null && s.running.isNotEmpty()) {
-                val rowH = dp(42)
+                // 都放得下就用两行的样子，放不下就每个一行 / two-line rows when they all fit, otherwise one line each
                 val gap = dp(6)
-                for (r in s.running) {
-                    if (y + rowH > midBottom) break
-                    runRow(r, y, rowH)
+                val n = s.running.size
+                val full = y + n * dp(42) + (n - 1) * gap <= midBottom
+                val rowH = if (full) dp(42) else dp(30)
+                s.running.forEachIndexed { i, r ->
+                    if (y + rowH > midBottom) return@forEachIndexed
+                    val left = n - i - 1
+                    val more = if (left > 0 && y + rowH + gap + rowH > midBottom) left else 0
+                    runRow(r, y, rowH, compact = !full, more = more)
                     y += rowH + gap
                 }
             } else if (s != null) {
@@ -276,36 +290,23 @@ object Render {
                 }
             }
 
-            // 小标签：缓存、测试 / small tags: cache, tests
-            if (s != null) {
-                val tags = Model.meta(s, nowSec()).mapNotNull {
-                    when (it) {
-                        is Meta.CacheLeft -> Pair(ctx.getString(R.string.meta_cache, it.minutes), MUTED)
-                        is Meta.Gate -> Pair(
-                            ctx.getString(
-                                when (it.result) {
-                                    "pass" -> R.string.gate_pass; "fail" -> R.string.gate_fail; "giveup" -> R.string.gate_giveup
-                                    "timeout" -> R.string.gate_timeout; else -> R.string.gate_skip
-                                },
-                            ),
-                            if (it.result == "pass") GREEN_L else if (it.result == "fail" || it.result == "giveup") RED_L else MUTED,
-                        )
-                        else -> null
-                    }
-                }
-                if (tags.isNotEmpty() && y + dp(20) <= midBottom) {
-                    var x = padX
-                    for ((label, color) in tags) {
-                        val wv = measure(label, 11f, MEDIUM) + dp(14)
-                        if (x + wv > right) break
-                        round(x, y, x + wv, y + dp(20), dp(10), Color.TRANSPARENT, HAIR)
-                        text(label, x + dp(7), y + dp(14), 11f, color, MEDIUM)
-                        x += wv + dp(6)
-                    }
-                }
-            }
-
             bottom()
+        }
+
+        fun tags(s: Session): List<Pair<String, Int>> = Model.meta(s, nowSec()).mapNotNull {
+            when (it) {
+                is Meta.CacheLeft -> Pair(ctx.getString(R.string.meta_cache, it.minutes), MUTED)
+                is Meta.Gate -> Pair(
+                    ctx.getString(
+                        when (it.result) {
+                            "pass" -> R.string.gate_pass; "fail" -> R.string.gate_fail; "giveup" -> R.string.gate_giveup
+                            "timeout" -> R.string.gate_timeout; else -> R.string.gate_skip
+                        },
+                    ),
+                    if (it.result == "pass") GREEN_L else if (it.result == "fail" || it.result == "giveup") RED_L else MUTED,
+                )
+                else -> null
+            }
         }
 
         fun nowSec(): Double {
@@ -313,7 +314,7 @@ object Render {
             return d.now + ((System.currentTimeMillis() - prefs.lastOkAt).coerceAtLeast(0)) / 1000.0
         }
 
-        fun runRow(r: Run, top: Float, h: Float) {
+        fun runRow(r: Run, top: Float, h: Float, compact: Boolean = false, more: Int = 0) {
             val isBg = r.kind == "bg"
             val lc = if (isBg) 0xFFAEAEB2.toInt() else Model.familyLight(r.family)
             round(padX, top, right, top + h, dp(12), 0x0DFFFFFF, if (isBg) HAIR else alpha(lc, 0.45f))
@@ -324,10 +325,25 @@ object Render {
             c.drawRect(padX, top + h - dp(2), right, top + h, p)
             c.restore()
             p.shader = null
-            val gs = dp(22)
+            val gs = if (compact) dp(18) else dp(22)
             glyph(padX + dp(9), top + (h - gs) / 2, gs, r.family, if (isBg) "⚙" else Model.glyph(r.family, r.model ?: r.name), grey = isBg)
             val x = padX + dp(9) + gs + dp(9)
-            val avail = right - dp(10) - x
+            var avail = right - dp(10) - x
+            if (more > 0) {
+                // 还有几个放不下 / how many more didn't fit
+                val label = "+$more"
+                val mw = measure(label, 11.5f, MEDIUM)
+                text(label, right - dp(10) - mw, top + h / 2 + dp(4), 11.5f, FAINT, MEDIUM)
+                avail -= mw + dp(8)
+            }
+            if (compact) {
+                val base = top + h / 2 + dp(4.5f)
+                var cx = x
+                cx += text(fit(r.name, avail * 0.45f, 12.5f, MEDIUM), cx, base, 12.5f, INK, MEDIUM) + dp(6)
+                r.model?.let { cx += text(fit(it, x + avail - cx, 12f, MEDIUM), cx, base, 12f, lc, MEDIUM) + dp(6) }
+                r.text?.let { if (x + avail - cx > dp(30)) text(fit("· $it", x + avail - cx, 11.5f), cx, base, 11.5f, MUTED) }
+                return
+            }
             val name = fit(r.name, avail * 0.6f, 12.5f, MEDIUM)
             val nw = text(name, x, top + dp(17), 12.5f, INK, MEDIUM)
             r.model?.let { text(fit(it, avail - nw - dp(6), 12f, MEDIUM), x + nw + dp(6), top + dp(17), 12f, lc, MEDIUM) }
@@ -335,7 +351,7 @@ object Render {
         }
 
         /** 底部（额度 + 页脚）占多高 / height of the bottom block (plan usage + footer) */
-        fun bottomHeight(): Float = (if (data?.limits?.sevenDay != null) dp(30) else 0f) + dp(36)
+        fun bottomHeight(): Float = (if (data?.limits?.sevenDay != null) dp(30) else 0f) + dp(36) + dp(12)
 
         fun bottom() {
             val d = data ?: return
