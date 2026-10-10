@@ -808,6 +808,15 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ ok: true, demo: DEMO, events: stats.events, log: LOG }));
     return;
   }
+  if (url === '/mini' || url === '/mini.html') {
+    // 桌面小卡片 / desktop mini card
+    fs.readFile(path.join(APP, 'public', 'mini.html'), (err, buf) => {
+      if (err) { res.writeHead(404); res.end('mini.html missing'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+      res.end(buf);
+    });
+    return;
+  }
   if (url === '/' || url === '/index.html') {
     fs.readFile(INDEX, (err, buf) => {
       if (err) { res.writeHead(500); res.end(L('index.html 不见了', 'index.html is missing')); return; }

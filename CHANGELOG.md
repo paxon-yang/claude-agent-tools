@@ -2,6 +2,20 @@
 
 All notable changes to this project. Versions follow [semver](https://semver.org/); dates are UTC.
 
+## [Unreleased]
+
+### Added
+- **Desktop card** (`agent-viz/widget`): a small always-on-top window for macOS and Windows with the current task, model, step, running sub-agents and background tasks, and approval alerts. Also at `http://localhost:4321/mini` in any browser.
+- The board shows **background tasks** (Monitor, `run_in_background` commands) and counts background sub-agents as running instead of finished.
+- "Last activity N s ago" next to the delegation title.
+
+### Changed
+- The delegation view shows only the current turn plus anything still running; finished cards collapse to one line, running edges flow as dashed lines.
+- Task titles are shortened to one clause; the full prompt is one click away.
+
+### Fixed
+- macOS: the board service could fail to register with launchd right after an update (now waits for the old job and retries).
+
 ## [0.3.0] — 2026-10-10
 
 ### Added

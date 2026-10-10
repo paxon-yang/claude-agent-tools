@@ -124,6 +124,20 @@ flowchart LR
 | `#opus 重构登录模块` | 只这一句用 Opus |
 | Shift+Tab，然后回"执行" | Opus 出方案，Sonnet 动手 |
 
+## 桌面小卡片（macOS / Windows）
+
+<img src="docs/card.png" alt="Agent 卡片：浮在桌面上的小窗口" width="340" align="right">
+
+一个浮在桌面上的小窗口，只放现在最重要的东西：当前任务、用的模型和 effort、正在做哪一步、还在跑的子代理和后台任务；有会话等你确认时会出现红色提醒。可以拖到任意位置，图钉按钮让它总在最前，菜单栏（Windows 是右下角托盘）里的图标可以隐藏或显示。
+
+```bash
+bash ~/claude-agent-tools/agent-viz/widget/install.sh
+```
+
+第一次会下载 Electron（约 100 MB），之后登录电脑自动打开。不想装的话，浏览器打开 `http://localhost:4321/mini` 也是同一张卡片，手机上看很方便。
+
+<br clear="right">
+
 ## 到底省了多少？
 
 ```bash

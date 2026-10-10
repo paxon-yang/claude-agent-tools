@@ -127,6 +127,20 @@ Each turn's choice, and why, shows up in the Claude Code status line, in `/route
 | `#opus refactor the auth module` | Use Opus for this prompt only |
 | Shift+Tab, then *"go ahead"* | Opus plans, Sonnet executes |
 
+## Desktop card (macOS / Windows)
+
+<img src="docs/card.png" alt="Agent Card: a small always-on-top window" width="340" align="right">
+
+A small always-on-top window with only what matters right now: the current task, model and effort, the step it is on, sub-agents and background tasks that are still running, and a red banner when a session is waiting for your approval. Drag it anywhere; the pin keeps it on top; the menu-bar / tray icon hides or shows it.
+
+```bash
+bash ~/claude-agent-tools/agent-viz/widget/install.sh
+```
+
+It downloads Electron once (~100 MB) and opens at login. The same card works in any browser at `http://localhost:4321/mini`, which is handy on a phone.
+
+<br clear="right">
+
 ## How much did it save me?
 
 ```bash

@@ -1,0 +1,11 @@
+{
+  "name": "agent-card",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Desktop card for agent-viz (claude-agent-tools)",
+  "main": "main.js",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "38.8.6"
+  }
+}

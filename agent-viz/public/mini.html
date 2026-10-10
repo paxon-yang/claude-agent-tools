@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agent Card</title>
+<style>
+/* 桌面小卡片：只放"现在"最重要的东西 / desktop mini card: only what matters right now */
+:root {
+  --ink: #f5f5f7; --muted: rgba(235, 235, 245, .6); --faint: rgba(235, 235, 245, .38); --hair: rgba(255, 255, 255, .09);
+  --haiku: #1FA2B8; --sonnet: #0A7AFF; --opus: #F08C00; --fable: #A64BD6; --none: #8E8E93;
+  --haiku-l: #5AC8D8; --sonnet-l: #409CFF; --opus-l: #FFB340; --fable-l: #DA8FFF; --none-l: #AEAEB2;
+  --green: #34C759; --green-l: #63E28A; --red: #FF453A; --red-l: #FF8A80; --blue: #0A84FF;
+  --text: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  --card: rgba(28, 28, 30, .94);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #1c1c1e; color: var(--ink); font-family: var(--text); font-size: 13px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
+body.widget { background: transparent; }
+body.widget.mac { --card: rgba(28, 28, 30, .58); }
+button { font: inherit; color: inherit; }
+.card { position: relative; margin: 0; padding: 14px 14px 12px; min-height: 100vh; background: var(--card); overflow: hidden; }
+body.widget .card { min-height: 0; border-radius: 18px; border: 1px solid rgba(255, 255, 255, .12); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); }
+.glow { position: absolute; inset: -40% -20% auto; height: 260px; pointer-events: none; opacity: .55; filter: blur(30px); }
+.in { position: relative; }
+.f-haiku { --c: var(--haiku); --cl: var(--haiku-l); } .f-sonnet { --c: var(--sonnet); --cl: var(--sonnet-l); }
+.f-opus { --c: var(--opus); --cl: var(--opus-l); } .f-fable, .f-mythos { --c: var(--fable); --cl: var(--fable-l); } .f-none { --c: var(--none); --cl: var(--none-l); }
+
+.top { display: flex; align-items: center; gap: 8px; -webkit-app-region: drag; user-select: none; min-height: 24px; }
+.proj { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nav { display: flex; gap: 2px; -webkit-app-region: no-drag; }
+.nav button, .ctl button { border: 0; background: rgba(255, 255, 255, .07); width: 22px; height: 22px; border-radius: 7px; cursor: pointer; color: var(--muted); font-size: 12px; line-height: 22px; padding: 0; }
+.nav button:hover, .ctl button:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+.ctl { margin-left: auto; display: flex; gap: 4px; -webkit-app-region: no-drag; }
+.ctl button.on { color: #FFD60A; }
+body:not(.widget) .ctl .w { display: none; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.running, .pill.bg { background: rgba(52, 199, 89, .18); color: var(--green-l); }
+.pill.need { background: rgba(255, 69, 58, .22); color: var(--red-l); }
+.pill.idle, .pill.ended { background: rgba(255, 255, 255, .08); color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .pill.running i, .pill.bg i, .live i { animation: blink 1.4s ease-in-out infinite; } }
+@keyframes blink { 50% { opacity: .3; } }
+
+.alert { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 8px 10px; border-radius: 11px; background: rgba(255, 69, 58, .16); border: 1px solid rgba(255, 105, 97, .35); cursor: pointer; font-size: 12px; }
+.alert b { font-weight: 700; }
+.alert .ic { width: 16px; height: 16px; border-radius: 50%; background: var(--red); color: #fff; font-weight: 700; font-size: 10px; display: grid; place-items: center; flex: none; }
+
+.task { margin: 10px 0 8px; font-size: 18px; font-weight: 700; letter-spacing: -.2px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.task.quiet { color: var(--faint); }
+.meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #fff; }
+.glyph { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; flex: none;
+  background: linear-gradient(180deg, var(--cl), var(--c)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
+.meter { display: inline-flex; gap: 2px; } .meter i { width: 8px; height: 3px; border-radius: 9px; background: rgba(255, 255, 255, .16); } .meter i.on { background: var(--cl); }
+.why { margin-top: 6px; font-size: 11.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.now { display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 8px 10px; border-radius: 11px; background: rgba(255, 255, 255, .05); border: 1px solid var(--hair); font-size: 12px; color: var(--muted); min-height: 34px; }
+.now .mono { font-family: var(--mono); font-size: 11.5px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.dot.off { background: rgba(255, 255, 255, .22); } .dot.need { background: var(--red); }
+@media (prefers-reduced-motion: no-preference) { .dot:not(.off) { animation: blink 1.1s ease-in-out infinite; } }
+
+.ags { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.ag { display: grid; grid-template-columns: 22px 1fr auto; gap: 2px 8px; align-items: center; padding: 7px 9px; border-radius: 11px; background: rgba(255, 255, 255, .05); border: 1px solid var(--hair); position: relative; overflow: hidden; }
+.ag.running { border-color: color-mix(in srgb, var(--cl) 45%, transparent); }
+.ag.running::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 40%; background: linear-gradient(90deg, transparent, var(--cl), transparent); }
+@media (prefers-reduced-motion: no-preference) { .ag.running::after { animation: sweep 1.6s linear infinite; } }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.ag .nm { font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag .nm span { font-weight: 500; color: var(--cl); margin-left: 4px; }
+.ag .ds { grid-column: 2 / 4; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag .tm { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ag.bg .glyph { background: linear-gradient(180deg, #8E8E93, #636366); }
+.done { font-size: 11.5px; color: var(--faint); padding: 0 2px; }
+.done b { color: var(--green-l); font-weight: 600; }
+
+.foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hair); font-size: 11.5px; color: var(--muted); }
+.foot b { color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+.foot .sv { color: var(--green-l); font-weight: 600; }
+.foot a { margin-left: auto; color: #409CFF; text-decoration: none; cursor: pointer; -webkit-app-region: no-drag; white-space: nowrap; }
+.live { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 11px; }
+.live i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.live.off i { background: var(--faint); }
+.empty { padding: 18px 2px 6px; color: var(--muted); font-size: 13px; }
+.empty b { display: block; color: #fff; font-size: 15px; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="card" id="card"><div class="glow" id="glow"></div><div class="in" id="root"></div></div>
+<script>
+const W = window.widget || null;   // 桌面小窗口（Electron）注入 / injected by the desktop widget
+if (W) { document.body.classList.add('widget'); if (W.platform === 'darwin') document.body.classList.add('mac'); }
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const NAMES = { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', fable: 'Fable', mythos: 'Mythos' };
+const EFF = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
+const I18N = {
+  zh: { running: '运行中', bg: '后台在跑', need: '等你确认', idle: '等你下一步', ended: '已结束', noTask: '还没有收到任务', now: '正在', thinking: '思考中…',
+    waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端里确认', last: '上一步', idle2: '空闲',
+    needs: (p, m) => `<b>${p}</b> 在等你确认${m ? '：' + m : ''}`, done: n => `<b>✓ ${n}</b> 个已完成`, why: '为什么：', today: h => `近 ${h} 小时`, saved: n => `少花 ${n}%`,
+    full: '打开完整看板 ↗', empty: '现在没有 Claude Code 在运行', emptySub: '在任意项目里输入 claude，这里会自动出现。', live: '实时', off: '重连中', pin: '总在最前', close: '隐藏',
+    dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: '后台监视', Bash: '后台命令' }, subagent: '子代理', unknown: '模型未知' },
+  en: { running: 'Running', bg: 'Background', need: 'Needs you', idle: 'Your turn', ended: 'Ended', noTask: 'No task yet', now: 'Now', thinking: 'Thinking…',
+    waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal', last: 'Last', idle2: 'Idle',
+    needs: (p, m) => `<b>${p}</b> needs your approval${m ? ': ' + m : ''}`, done: n => `<b>✓ ${n}</b> finished`, why: 'Why: ', today: h => `Last ${h}h`, saved: n => `${n}% saved`,
+    full: 'Open full board ↗', empty: 'No Claude Code running', emptySub: 'Run claude in any project and it shows up here.', live: 'Live', off: 'Reconnecting', pin: 'Always on top', close: 'Hide',
+    dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: 'Monitor', Bash: 'Background command' }, subagent: 'Subagent', unknown: 'Unknown model' },
+};
+let LANG = 'zh', state = null, skew = 0, conn = false, idx = 0, pinned = true;
+function lang() {
+  let v = null; try { v = localStorage.getItem('viz.lang'); } catch (e) { }
+  if (v === 'en' || v === 'zh') return v;
+  if (state && (state.lang === 'en' || state.lang === 'zh')) return state.lang;
+  return /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+}
+const t = (k, ...a) => { const v = I18N[LANG][k]; return typeof v === 'function' ? v(...a) : v; };
+const f = fam => 'f-' + (fam || 'none');
+const nowS = () => Date.now() / 1000 + skew;
+const money = v => v == null ? '—' : v < 0.01 ? '<$0.01' : '$' + (v < 10 ? v.toFixed(2) : v.toFixed(1));
+const dur = sec => { sec = Math.max(0, Math.round(sec)); return t('dur', Math.floor(sec / 3600), Math.floor(sec % 3600 / 60), sec % 60); };
+const timer = (a, b) => b ? dur(b - a) : `<span data-since="${a}">${dur(nowS() - a)}</span>`;
+const stKey = x => !x.active ? 'ended' : x.status === 'needs-you' ? 'need' : x.status === 'running' ? 'running' : x.status === 'background' ? 'bg' : 'idle';
+function meter(level) { const n = EFF[level] || 0; let s = ''; for (let i = 0; i < 4; i++) s += `<i class="${i < n ? 'on' : ''}"></i>`; return level ? `<span class="meter">${s}</span>${esc(level)}` : ''; }
+function brief(p) {
+  const full = String(p == null ? '' : p).replace(/```[\s\S]*?```/g, ' ').replace(/`([^`]*)`/g, '$1').replace(/https?:\/\/\S+/g, ' ').replace(/[#>*_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let s = full.replace(/^(?:(?:请你|请帮我|你帮我|帮我|帮忙|麻烦你?|你能不能|能不能|可以帮我|我想让你|我需要你|我想|请|好的|那)[，,\s]*)+/, '')
+    .replace(/^(?:(?:please|can you|could you|would you|help me|i want you to|i need you to|i'd like you to|ok(?:ay)?|so)[,\s]+)+/i, '');
+  if (!s) s = full;
+  const cjk = /[㐀-鿿]/.test(s);
+  const Wd = str => { let w = 0; for (const ch of str) w += /[⺀-￯]/.test(ch) ? 1 : 0.55; return w; };
+  const max = cjk ? 20 : 31, min = cjk ? 6 : 10, slack = cjk ? 6 : 8;
+  const trimEnd = x => x.replace(/[。！？!?；;：:，,、\s]+$/, '');
+  let out = '';
+  for (const c of s.split(/(?<=[。！？!?；;：:，,\n])\s*/)) { out += c; if (Wd(trimEnd(out)) >= min) break; }
+  out = trimEnd(out);
+  let cut = out.length < trimEnd(s).length;
+  if (Wd(out) > max + slack) {
+    let head = '', w = 0;
+    for (const ch of out) { const cw = /[⺀-￯]/.test(ch) ? 1 : 0.55; if (w + cw > max) break; head += ch; w += cw; }
+    if (/[A-Za-z0-9]$/.test(head) && /^[A-Za-z0-9]/.test(out.slice(head.length))) head = head.replace(/[A-Za-z0-9._-]+$/, '');
+    if (!cjk && /\s/.test(head)) head = head.replace(/\s+\S*$/, '');
+    out = trimEnd(head) || out.slice(0, 12); cut = true;
+  }
+  if (!cjk) out = out.charAt(0).toUpperCase() + out.slice(1);
+  return out + (cut ? '…' : '');
+}
+const toolText = l => l === 'tool' ? 'tool' : String(l || '').replace(/→ subagent$/, '→ ' + t('subagent'));
+
+// 只看活跃的会话；默认停在最需要你看的那个 / active sessions only; default to the one that needs you most
+function sessions() { return (state.sessions || []).filter(s => s.active); }
+function pick() {
+  const ss = sessions();
+  if (!ss.length) return null;
+  const want = ss.findIndex(s => s.status === 'needs-you') >= 0 && !pick.manual ? ss.findIndex(s => s.status === 'needs-you')
+    : !pick.manual ? Math.max(0, ss.findIndex(s => s.status === 'running' || s.status === 'background')) : Math.min(idx, ss.length - 1);
+  idx = want; return ss[idx];
+}
+function go(d) { const n = sessions().length; if (!n) return; pick.manual = true; idx = (idx + d + n) % n; render(); }
+function jump(id) { const i = sessions().findIndex(s => s.id === id); if (i >= 0) { pick.manual = true; idx = i; render(); } }
+
+function render() {
+  if (!state) return;
+  const s = pick(), ss = sessions();
+  const T = state.totals || {};
+  const foot = `<div class="foot"><span class="live ${conn ? '' : 'off'}"><i></i>${t(conn ? 'live' : 'off')}</span><span>${t('today', T.hours || 24)} <b>${money(T.cost)}</b></span>
+    ${T.saved != null && T.baseline > 0 && T.saved >= .01 ? `<span class="sv">${t('saved', Math.round(T.saved * 100))}</span>` : ''}<a onclick="openFull()">${t('full')}</a></div>`;
+  const others = (state.needsYou || []).filter(n => !s || n.id !== s.id);
+  const alerts = others.map(n => `<div class="alert" onclick="jump('${esc(n.id)}')"><span class="ic">!</span><span>${t('needs', esc(n.project || '—'), esc(n.msg || ''))}</span></div>`).join('');
+  const ctl = `<div class="ctl"><button class="w ${pinned ? 'on' : ''}" title="${t('pin')}" onclick="togglePin()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M15.5 2.5l6 6-2.2 1.1-3.6 3.6.6 4.8-2 2-4.2-4.2-5.6 5.6-1.4-1.4 5.6-5.6L4.5 9.3l2-2 4.8.6 3.6-3.6z"/></svg></button><button class="w" title="${t('close')}" onclick="W && W.hide()">✕</button></div>`;
+  if (!s) {
+    $('#root').innerHTML = `<div class="top"><span class="proj">Agent</span>${ctl}</div>${alerts}<div class="empty"><b>${t('empty')}</b>${t('emptySub')}</div>${foot}`;
+    $('#glow').style.background = 'none'; fit(); return;
+  }
+  const k = stKey(s);
+  const lastTurn = (s.turns || []).filter(x => !x.handback).slice(-1)[0];
+  const task = s.task || (lastTurn && { prompt: lastTurn.prompt, startedAt: lastTurn.start, endedAt: lastTurn.end });
+  const r = s.route && s.route.last;
+  const kids = (s.agents || []).concat((s.background || []).map(b => ({ ...b, kind: 'bg', type: b.tool })));
+  const live = kids.filter(x => x.status === 'running').sort((a, b) => a.startedAt - b.startedAt);
+  const done = kids.length - live.length;
+  const liveAgents = (s.agents || []).filter(x => x.status === 'running').length;
+  const nowLine = s.currentTool ? `<span class="dot"></span><span>${t('now')}</span><span class="mono">${esc(toolText(s.currentTool))}</span>`
+    : k === 'running' ? `<span class="dot"></span><span>${liveAgents ? t('waitKids', liveAgents) : t('thinking')}</span>`
+    : k === 'bg' ? `<span class="dot"></span><span>${t('waitBg', s.bgRunning || live.length || 1)}</span>`
+    : k === 'need' ? `<span class="dot need"></span><span style="color:var(--red-l);font-weight:600">${t('approve')}${s.needMsg ? ' · ' + esc(s.needMsg) : ''}</span>`
+    : s.lastTool ? `<span class="dot off"></span><span>${t('last')}</span><span class="mono">${esc(toolText(s.lastTool))}</span>` : `<span class="dot off"></span><span>${t('idle2')}</span>`;
+  const rows = live.slice(0, 4).map(x => x.kind === 'bg'
+    ? `<div class="ag bg running f-none"><span class="glyph">◷</span><span class="nm">${esc((I18N[LANG].bgName[x.type]) || x.type)}</span><span class="tm">${timer(x.startedAt, x.endedAt)}</span><span class="ds">${esc(x.description || x.label || '')}</span></div>`
+    : `<div class="ag running ${f(x.family)}"><span class="glyph">${esc((NAMES[x.family] || x.model || '?')[0])}</span><span class="nm">${esc(x.type === 'subagent' ? t('subagent') : x.type)}<span>${esc(x.model || '')}</span></span><span class="tm">${timer(x.startedAt, x.endedAt)}</span><span class="ds">${x.currentTool ? esc(toolText(x.currentTool)) : esc(x.description || t('thinking'))}</span></div>`).join('');
+  const nav = ss.length > 1 ? `<div class="nav"><button onclick="go(-1)">‹</button><button onclick="go(1)">›</button></div>` : '';
+  $('#root').innerHTML = `<div class="top"><span class="proj">${esc(s.project || '—')}</span>${nav}<span class="pill ${k}"><i></i>${t(k)}</span>${ctl}</div>
+    ${alerts}
+    <div class="task ${task ? '' : 'quiet'}" title="${esc(task ? task.prompt : '')}">${task ? esc(brief(task.prompt)) : t('noTask')}</div>
+    <div class="meta ${f(s.family)}"><span class="chip ${f(s.family)}"><span class="glyph">${esc((NAMES[s.family] || s.model || '?')[0])}</span>${esc(s.model || t('unknown'))}</span>${meter(s.effort)}${task ? `<span>· ${timer(task.startedAt, task.endedAt || (s.active ? null : s.lastTs))}</span>` : ''}</div>
+    ${r && r.reason ? `<div class="why">${t('why')}${esc(r.reason)}</div>` : ''}
+    <div class="now">${nowLine}</div>
+    ${rows || done ? `<div class="ags">${rows}${done ? `<div class="done">${t('done', done)}</div>` : ''}</div>` : ''}
+    ${foot}`;
+  const fams = [...new Set([s.family].concat(live.map(x => x.family)).filter(Boolean))];
+  $('#glow').style.background = fams.map((fm, i) => `radial-gradient(160px 120px at ${20 + i * 30}% 40%, color-mix(in srgb, var(--${fm === 'mythos' ? 'fable' : fm}) 55%, transparent), transparent 70%)`).join(',') || 'none';
+  document.title = (state.needsYou.length ? `(${state.needsYou.length}) ` : '') + (s.project || 'Agent');
+  fit();
+}
+function fit() { if (W && W.resize) requestAnimationFrame(() => W.resize(Math.ceil($('#card').getBoundingClientRect().height))); }
+function openFull() { if (W && W.openFull) W.openFull(); else window.open('/', '_blank'); }
+function togglePin() { pinned = !pinned; if (W && W.setPinned) W.setPinned(pinned); render(); }
+if (W && W.getPinned) W.getPinned().then(v => { pinned = v; render(); });
+
+function connect() {
+  const es = new EventSource('/api/stream');
+  es.onopen = () => { conn = true; render(); };
+  es.onmessage = ev => { state = JSON.parse(ev.data); skew = state.now - Date.now() / 1000; LANG = lang(); document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en'; render(); };
+  es.onerror = () => { conn = false; render(); };
+}
+setInterval(() => { const n = nowS(); document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(n - Number(el.dataset.since)); }); }, 1000);
+addEventListener('storage', e => { if (e.key === 'viz.lang') { LANG = lang(); render(); } });
+connect();
+</script>
+</body>
+</html>

@@ -27,8 +27,8 @@ jobs:
 
       - name: Syntax checks
         run: |
-          for f in agent-viz/*.js scripts/*.js; do node --check "$f"; done
-          for f in install.sh update.sh auto-router/*.sh agent-viz/*.sh; do bash -n "$f"; done
+          for f in agent-viz/*.js agent-viz/widget/*.js scripts/*.js; do node --check "$f"; done
+          for f in install.sh update.sh auto-router/*.sh agent-viz/*.sh agent-viz/widget/*.sh; do bash -n "$f"; done
           node -e "const s=require('fs').readFileSync('agent-viz/public/index.html','utf8');const m=[...s.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).join('\n');new Function(m)"
 
       - name: auto-router — validate plugin
