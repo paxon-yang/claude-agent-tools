@@ -31,7 +31,7 @@ adb shell cmd locale set-app-locales $PKG --locales zh-CN
 adb shell am start -n $PKG/.MainActivity --es url http://10.0.2.2:4330
 sleep 12
 shot app-zh
-adb shell am start -n $PKG/.MainActivity --ez pin true
+adb shell am start -S -n $PKG/.MainActivity --ez pin true
 sleep 5
 shot pin-dialog
 tap_text '^(Add to home screen|Add automatically|Add|添加)\s*$'
