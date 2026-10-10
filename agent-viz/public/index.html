@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Agent Board</title>
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Agent">
+<meta name="theme-color" content="#f5f5f7">
 <style>
 /* 设计依据：awesome-design-md 的 Apple DESIGN.md —— 羊皮纸底色 #f5f5f7、墨色 #1d1d1f、唯一的交互蓝 #0066cc、
    SF Pro、标题 600 字重 + 负字距、发丝线代替阴影、圆角 8/11/18/胶囊、浅色与深色区块交替；
@@ -53,6 +61,8 @@ button { font: inherit; color: inherit; letter-spacing: inherit; }
 .rail { position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--hair); background: rgba(245, 245, 247, .8); -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost); z-index: 5; }
 .rail-in { height: 100%; padding: 22px 18px 20px; display: flex; flex-direction: column; gap: 28px; overflow-y: auto; }
 .brand { display: flex; align-items: center; justify-content: space-between; }
+.backcard { color: var(--link, #0066cc); text-decoration: none; font-size: 15px; margin-right: 8px; }
+body.standalone .backcard { display: inline; }
 .brand b { font-family: var(--display); font-size: 21px; font-weight: 600; letter-spacing: .231px; }
 .conn { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .conn i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
@@ -129,6 +139,9 @@ main { min-width: 0; padding-bottom: 64px; }
 .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; color: var(--ink80); font-size: 14px; }
 .reason { color: var(--ink80); }
 .reason em { font-style: normal; color: var(--muted); }
+.cachec, .gatec { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--pearl); border: 1px solid var(--hair); color: var(--ink80); white-space: nowrap; }
+.gatec.g-pass { color: #1d7d3a; border-color: rgba(52, 199, 89, .35); }
+.gatec.g-fail, .gatec.g-giveup { color: #c4281c; border-color: rgba(255, 69, 58, .35); }
 
 .panel { background: var(--canvas); border: 1px solid var(--hair); border-radius: var(--r-lg); padding: 24px; min-width: 0; }
 .panel > h2 { margin: 0 0 18px; font-family: var(--display); font-size: 21px; font-weight: 600; letter-spacing: .231px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; }
@@ -426,7 +439,7 @@ details.log summary small { font-family: var(--text); font-weight: 400; color: v
 <body>
 <div class="app">
   <aside class="rail"><div class="rail-in">
-    <div class="brand"><b data-i18n="brand">Agent Board</b><span class="conn" id="conn"><i></i><span></span></span></div>
+    <div class="brand"><a class="backcard" href="/mini" data-i18n="backCard" hidden></a><b data-i18n="brand">Agent Board</b><span class="conn" id="conn"><i></i><span></span></span></div>
     <div id="demo"></div>
     <section class="spend" id="spend"></section>
     <nav class="projects" id="projects" data-i18n-aria="projectsAria"></nav>
@@ -439,6 +452,9 @@ details.log summary small { font-family: var(--text); font-weight: 400; color: v
 <div class="scrim" id="scrim"></div>
 <aside class="sheet" id="sheet" aria-hidden="true" data-i18n-aria="details"><button class="sheet-x" id="sheetx" data-i18n-aria="close">✕</button><div id="sheetbody"></div></aside>
 <script>
+// 从手机主屏幕打开（没有浏览器的返回键）时显示“‹ 卡片” / opened from the home screen: show a way back to the card
+if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) { document.addEventListener('DOMContentLoaded', () => { document.body.classList.add('standalone'); const a = document.querySelector('.backcard'); if (a) a.hidden = false; }); }
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const NAMES = { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', fable: 'Fable', mythos: 'Mythos' };
@@ -453,7 +469,7 @@ const pl = (n, one, many) => n === 1 ? one : many;
 const I18N = {
   zh: {
     title: 'Agent 看板', brand: 'Agent 看板', connecting: '连接中', live: '实时', reconnecting: '重连中', replay: '回放',
-    projectsAria: '项目', details: '详情', close: '关闭', langLabel: '语言', langAria: '界面语言',
+    projectsAria: '项目', backCard: '‹ 卡片', details: '详情', close: '关闭', langLabel: '语言', langAria: '界面语言',
     demo: '演示模式：以下是模拟数据',
     staticNote: '这是录好的演示回放。装到自己电脑上，就能实时看到你的 Claude Code。', staticCta: '去 GitHub 安装 →',
     emptyTitle: '现在没有 Claude Code 在运行', emptyBody: '在任意项目文件夹里打开终端，输入 <code>claude</code>，这里会自动出现。',
@@ -511,12 +527,15 @@ const I18N = {
     log_compacted: '上下文已自动压缩',
     log_advisor: (mo, tx) => tx ? '顾问介入' + (mo ? '（' + mo + '）' : '') + '：' + tx : '顾问介入',
     log_route: (m, e, by, r) => `选择 ${m} · ${e}（${by ? by + '：' : ''}${r}）`,
+    log_gate: (r, cmd, by) => ({ pass: '测试关卡：通过', fail: '测试关卡：没通过，已升档接着修', giveup: '测试关卡：仍没通过，交给你', timeout: '测试关卡：超时跳过', skip: '测试关卡：跳过' })[r] + (cmd ? `（${cmd}${by ? '，' + by + ' 改的代码' : ''}）` : ''),
+    cacheLeft: m => `缓存剩 ${m} 分`, cacheCold: '缓存已过期', cacheTip: '提示缓存只对同一个模型有效；还热的时候换模型要把整段对话重读一遍',
+    gate_pass: '测试 ✓', gate_fail: '测试 ✕ 修复中', gate_giveup: '测试 ✕', gate_timeout: '测试超时', gate_skip: '测试跳过',
     dur: (h, m, s) => h ? `${h} 小时 ${m} 分` : m ? `${m} 分` + (s ? ` ${s} 秒` : '') : `${s} 秒`,
     ago: (u, n) => ({ now: '刚刚', m: `${n} 分钟前`, h: `${n} 小时前`, d: `${n} 天前` })[u],
   },
   en: {
     title: 'Agent Board', brand: 'Agent Board', connecting: 'Connecting', live: 'Live', reconnecting: 'Reconnecting', replay: 'Replay',
-    projectsAria: 'Projects', details: 'Details', close: 'Close', langLabel: 'Language', langAria: 'Interface language',
+    projectsAria: 'Projects', backCard: '‹ Card', details: 'Details', close: 'Close', langLabel: 'Language', langAria: 'Interface language',
     demo: 'Demo mode — simulated data',
     staticNote: 'This is a recorded demo. Install it to watch your own Claude Code live.', staticCta: 'Get it on GitHub →',
     emptyTitle: 'No Claude Code sessions running', emptyBody: 'Open a terminal in any project folder and run <code>claude</code>. It’ll show up here automatically.',
@@ -574,6 +593,9 @@ const I18N = {
     log_compacted: 'Context auto-compacted',
     log_advisor: (mo, tx) => tx ? `Advisor stepped in${mo ? ' (' + mo + ')' : ''}: ${tx}` : 'Advisor stepped in',
     log_route: (m, e, by, r) => `Chose ${m} · ${e} (${by ? by + ': ' : ''}${r})`,
+    log_gate: (r, cmd, by) => ({ pass: 'Test gate: passed', fail: 'Test gate: failed, stepped up to fix it', giveup: 'Test gate: still failing, left to you', timeout: 'Test gate: timed out', skip: 'Test gate: skipped' })[r] + (cmd ? ` (${cmd}${by ? ', code by ' + by : ''})` : ''),
+    cacheLeft: m => `cache ${m} min left`, cacheCold: 'cache expired', cacheTip: 'The prompt cache only works for the same model; switching while it is warm re-reads the whole conversation',
+    gate_pass: 'tests ✓', gate_fail: 'tests ✕ fixing', gate_giveup: 'tests ✕', gate_timeout: 'tests timed out', gate_skip: 'tests skipped',
     dur: (h, m, s) => h ? `${h}h ${m}m` : m ? `${m}m` + (s ? ` ${s}s` : '') : `${s}s`,
     ago: (u, n) => ({ now: 'just now', m: `${n} min ago`, h: `${n} h ago`, d: `${n} d ago` })[u],
   },
@@ -608,6 +630,7 @@ function logText(x) {
     case 'agentEnded': return t('log_agentEnded', a[0], dur(a[1] || 0));
     case 'route': return t('log_route', a[0] || '?', a[1] || '', byLabel(a[2]), a[3] || '');
     case 'advisor': return t('log_advisor', a[0] || '', a[1] || '');
+    case 'gate': return t('log_gate', a[0] || '', a[1] || '', a[2] || '');
   }
   return has('log_' + k) ? t('log_' + k, ...a) : x.join(' ');
 }
@@ -862,6 +885,8 @@ function renderHead(s) {
     <div class="meta">${chip(s.family, s.model || t('unknownModel'))}${meter(s.effort, s.family)}
       ${task ? `<span>${t('turnTime', !!(task.endedAt || !s.active), timer(task.startedAt, task.endedAt || (s.active ? null : s.lastTs)))}</span>` : ''}
       ${r ? `<span class="reason"><em>${t('whyThis')}</em>${esc(r.reason)}${s.route.mode && s.route.mode !== 'auto' ? t('routeMode', esc(s.route.mode)) : ''}${s.route.pendingDown ? t('pendingDown', esc(NAMES[s.route.pendingDown] || s.route.pendingDown)) : ''}</span>` : ''}
+      ${s.route && s.route.cacheUntil && s.active ? `<span class="cachec" title="${esc(t('cacheTip'))}" data-until="${s.route.cacheUntil}">${esc(cacheLeft(s.route.cacheUntil))}</span>` : ''}
+      ${s.route && s.route.gate ? `<span class="gatec g-${esc(s.route.gate.result)}" title="${esc(s.route.gate.command || '')}">${esc(t('gate_' + s.route.gate.result))}</span>` : ''}
       ${long ? `<button class="fullbtn" onclick="toggleFull()" aria-expanded="${headFull.open}">${t(headFull.open ? 'fullHide' : 'fullShow')}</button>` : ''}</div>
     ${long && headFull.open ? `<div class="fulltext">${esc(task.prompt)}</div>` : ''}`);
 }
@@ -1229,7 +1254,9 @@ function renderLog(s) {
 }
 
 setInterval(() => { const n = nowS(); document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(n - Number(el.dataset.since)); });
-  document.querySelectorAll('[data-ago]').forEach(el => { el.textContent = agoS(Number(el.dataset.ago)); }); }, 1000);
+  document.querySelectorAll('[data-ago]').forEach(el => { el.textContent = agoS(Number(el.dataset.ago)); });
+  document.querySelectorAll('[data-until]').forEach(el => { el.textContent = cacheLeft(Number(el.dataset.until)); }); }, 1000);
+function cacheLeft(until) { const m = Math.ceil((until - nowS()) / 60); return m > 0 ? t('cacheLeft', m) : t('cacheCold'); }
 function agoS(ts) { const d = Math.max(0, Math.round(nowS() - ts)); return d < 60 ? t('secAgo', d) : ago(ts); }
 setInterval(() => { if (state) { delete cache.tl; renderTimeline(pick() || {}); } }, 5000);
 applyLang(resolveLang());

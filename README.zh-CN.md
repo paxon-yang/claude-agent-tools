@@ -46,11 +46,13 @@ Claude Code 默认一个模型干到底，想换就得自己敲 `/model`。结�
 - **多模型协作**：大任务（比如"按照 docs/spec.md 修改"）由 Opus 统筹，`explorer` 子代理用 Haiku 读代码，`worker` 子代理用 Sonnet 写代码。
 - **先计划后执行**：计划模式（Shift+Tab）里 Opus 出方案，批准后换 Sonnet 动手。
 - **保护**：Haiku 要改第 4 个文件、或要跑 `rm -rf`、`git push`、迁移、部署这类命令时，先换 Sonnet 接手；一轮里失败 3 次当场升一档；降档要连续两轮确认。
-- **省钱**：子代理交回的结果用 Sonnet 汇总，不让 Opus 反复重读大上下文；长对话不会被锁死在 Opus。
+- **看缓存再换模型**：提示缓存只对同一个模型有效，换模型等于让新模型按"写缓存"价把整段对话重读一遍。当前模型缓存还热时，只有这一轮能省回来才降档（会自己判断你的缓存是 5 分钟还是 1 小时）；状态栏显示缓存还剩多久。
+- **测试关卡**：Haiku 或 Sonnet 改了代码，收工前先跑一遍测试；没过就当场升到 Opus 接着修——每轮最多一次，不会死循环。自动识别 npm / pnpm / yarn / bun、pytest、cargo、go、`make test`；模型自己已经跑过测试就不重复跑。
+- **`/route` 卡片，手机上也能看**：现在用哪个模型、为什么、缓存还剩多久、测试关卡、在跑的子代理、这个会话花了多少，一张卡片；终端、桌面 App、通过 Remote Control 的手机 Claude App 里都能看。
 - **实时分工图**：子代理在跑时连线上有光点流动，交回结果时一颗绿点流回主会话；悬停高亮这条线；点任意卡片看它领到的活、交回的结果和每一步工具调用。
 - **模型时间轴和花费**：每一轮、每个子代理用的模型，按模型统计 token、估算费用和**省了多少**。
 - **等你确认提醒**：会话卡在等你批准时，顶部横幅、桌面通知或提示音。
-- **随处访问**：Tailscale（私有，零配置），或用 Cloudflare 隧道挂到自己的域名 + 邮箱验证码登录。
+- **随处访问**：Tailscale（私有，零配置），或用 Cloudflare 隧道挂到自己的域名 + 邮箱验证码登录；添加到手机主屏幕后像 App 一样打开，直接是卡片。
 - **省钱报告**：`node ~/.claude/viz/app/report.js` 读你本机的会话记录，算出每个模型花了多少、全用 Opus 要多少、自动选模型接管的会话和其他会话各省多少；加 `--md` 生成可以分享的报告。
 - **中文和英文**：选模型的提示、看板（左下角 EN | 中文 一键切换）、安装脚本都跟随系统语言。
 - **苹果风格液态玻璃界面**，浅色，适配手机，尊重"减少动态效果"设置。
@@ -118,7 +120,7 @@ flowchart LR
 
 | 你输入 | 效果 |
 |---|---|
-| `/route` | 当前模型和最近的选择 |
+| `/route` | 一张卡片：当前模型和原因、缓存还剩多久、测试关卡、在跑的子代理、花费、最近的选择（手机 Claude App 里通过 Remote Control 也能用） |
 | `/route rules` | 当前规则 |
 | `/route sonnet` · `/route auto` · `/route off` | 固定模型 · 恢复自动 · 关闭 |
 | `#opus 重构登录模块` | 只这一句用 Opus |
@@ -174,6 +176,15 @@ Claude Code · 自动选模型省了多少
 | `haikuGuard.maxFiles` | `3` | Haiku 最多改几个文件就换 Sonnet |
 | `autoFable` | `false` | 最难的任务自动交给 Fable |
 | `lang` | 跟随系统 | 提示语言：`zh` 或 `en` |
+| `cache.enabled` | `true` | 降档前先算缓存账 |
+| `cache.ttlSeconds` | `"auto"` | 缓存时长：`"auto"` 自己判断（先按 1 小时），或写 `300` / `3600` |
+| `cache.prices` | 跟看板一致 | 每个模型每百万 token 的价格，只看相对大小 |
+| `qualityGate.enabled` | `true` | 便宜的模型改了代码，收工前先跑测试 |
+| `qualityGate.command` | 自动识别 | 所有项目统一用的测试命令，比如 `"npm run test:unit"` |
+| `qualityGate.trustTier` | `opus` | 这一档及以上改的代码不检查 |
+| `qualityGate.timeoutSec` | `180` | 测试超过这么久就不等了 |
+
+单个项目可以在项目目录的 `.claude/auto-router.json` 里写 `{"testCommand": "pytest -q tests/unit"}`，或者用 `{"qualityGate": false}` 关掉测试关卡。
 
 看板的设置在 `~/.claude/viz/app/config.json`（端口、估算用的价格、远程访问、`lang`）。安装前设 `CAT_LANG=zh` 或 `CAT_LANG=en` 可以指定安装提示的语言。
 
@@ -183,6 +194,12 @@ Claude Code · 自动选模型省了多少
 - **自己的域名（Cloudflare）**：先在 Cloudflare Zero Trust 给这个网址建一个 Access 应用（邮箱验证码），再运行
   `bash ~/claude-agent-tools/agent-viz/cloudflare.sh board.你的域名`。
   它只新建一条名为 `agent-board` 的隧道，不动你其他的 cloudflared 设置。
+
+## 在手机上用
+
+- **在手机上指挥 Claude**：用 Claude Code 自带的 [Remote Control](https://code.claude.com/docs/en/remote-control)。`/config` 里打开 *Enable Remote Control for all sessions*，再打开 *Push when actions required*（等你批准时推送）。批准、回答问题、推送通知都在那里。
+- **在 Claude App 里输入 `/route`**，看自动选模型现在在干什么，和终端里是同一张卡片。
+- **把看板添加到主屏幕**（Safari：分享 → 添加到主屏幕；Chrome：⋮ → 添加到主屏幕），用你的 Tailscale 或 Cloudflare 地址打开。点开全屏显示卡片，"打开完整看板"和"‹ 卡片"来回切换。
 
 ## 卸载
 
@@ -195,7 +212,9 @@ bash ~/.claude/viz/app/uninstall.sh
 
 ## 常见问题
 
-**换模型会丢上下文吗？** 不会。对话都在，只是新模型要不带缓存地重读一遍，十几次调用就能省回来。所以长对话里也允许降档。
+**换模型会丢上下文吗？** 不会。对话都在，代价是新模型要按"写缓存"价把整段对话重读一遍，而留在原模型只要按输入价的十分之一读缓存。长对话里这笔钱可能比一整轮省下的还多，所以缓存还热时，自动选模型会先算账，换了不划算就不换（`/route` 里能看到原因和估算的金额）。缓存已经过期、或者换到 Haiku 这种便宜得多的模型时，照常换。
+
+**测试关卡会不会每轮都跑一遍测试？** 只有 Haiku 或 Sonnet 这一轮改了代码（只改文档不算）、而且改完它自己没跑过测试时才跑。单个项目用 `.claude/auto-router.json` 关，全局用 `qualityGate.enabled: false` 关。
 
 **会把我的数据发出去吗？** 不会。选模型在 Claude Code 里完成；看板只读本机文件，只在本机（以及你的 Tailscale 地址或你自己配的隧道）上开放。
 

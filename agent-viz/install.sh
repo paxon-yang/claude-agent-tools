@@ -74,6 +74,8 @@ if [ "$SRC" != "$APP" ]; then
   cp "$SRC/server.js" "$SRC/capture.js" "$SRC/setup-hooks.js" "$SRC/install.sh" "$SRC/uninstall.sh" "$SRC/cloudflare.sh" "$SRC/demo-events.jsonl" "$SRC/demo-events.en.jsonl" "$APP/" || fail "$(t '复制文件失败' 'Copying files failed')"
   if [ -f "$SRC/report.js" ]; then cp "$SRC/report.js" "$APP/" || fail "$(t '复制文件失败' 'Copying files failed')"; fi
   cp "$SRC/public/index.html" "$SRC/public/mini.html" "$APP/public/" || fail "$(t '复制网页文件失败' 'Copying the web page failed')"
+  # 手机"添加到主屏幕"用的图标 / icons for "Add to Home Screen"
+  for f in icon-192.png icon-512.png icon-maskable.png apple-touch-icon.png; do [ -f "$SRC/public/$f" ] && cp "$SRC/public/$f" "$APP/public/"; done
   # 已有的 config.json 原样保留（没有 "lang" 就是跟随系统语言）/ an existing config.json is kept as is (no "lang" = auto)
   if [ -f "$APP/config.json" ]; then ok "$(t '保留你已有的 config.json' 'Kept your existing config.json')"; else cp "$SRC/config.json" "$APP/"; fi
   ok "$(t '程序已就位' 'Files in place')"

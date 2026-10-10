@@ -16,16 +16,21 @@ auto-router v0.2 · 让 Claude Code 自动选模型、自动派活
     你说"按照这个文档改"这类大活 → 主会话用 Opus 统筹
     → 派 explorer（Haiku）去读代码 → 派 worker / quick-worker（Sonnet）去写代码 → Opus 汇总检查
 
-三道保护
+五道保护
     1. Haiku 改到第 4 个文件，或要跑 rm -rf / git push / 部署 这类命令 → 当场换 Sonnet 接手
     2. 同一轮里工具连续失败 3 次 → 当场升一级模型（Haiku→Sonnet→Opus）
     3. 降级要连续两轮都判断为"简单"才会降；上下文太长时不降到窗口小的模型
+    4. 看缓存再换：当前模型的提示缓存还热、换便宜模型这一轮省不回来时，先不换（状态栏显示缓存还剩几分钟）
+    5. 测试关卡：Haiku / Sonnet 改了代码，收工前自动跑测试；没过就升到 Opus 接着修（每轮最多一次）
+       某个项目不想要：在项目里建 .claude/auto-router.json，写 {"qualityGate": false}
+       指定测试命令：{"testCommand": "pytest -q tests/unit"}
 
 计划模式（推荐给大任务）
     Shift+Tab 切到计划模式 → Opus 出方案 → 你批准 / 回一句"执行" → 换 Sonnet 干活
 
 在 Claude Code 里：
-    /route          查看现在用哪个模型、最近的选择
+    /route          一张卡片：现在用哪个模型、为什么、缓存、测试关卡、在跑的子代理、花费
+                    （手机 Claude App 里通过 Remote Control 也能用）
     /route rules    查看自动选择的规则
     /route opus     固定用某个模型（haiku / sonnet / opus / fable）
     /route auto     恢复自动

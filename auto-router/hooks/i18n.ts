@@ -20,6 +20,25 @@ const zh = {
   noDowngrade: (k: number) => `上下文 ${k}k，降档不划算，保持`,
   window: (k: number, want: string, use: string) => `对话 ${k}k，${want} 窗口不够，改用 ${use}`,
   holdDown: (reason: string, to: string) => `${reason}；先不降档，下一轮仍简单再换 ${to}`,
+  cacheHold: (to: string, cur: string, k: number, usd: string, mins: number) =>
+    `${cur} 缓存还热（剩 ${mins} 分钟）；换 ${to} 要重读 ${k}k 上下文，这一轮约多花 $${usd}，先不换`,
+  cacheLeft: (mins: number) => `缓存剩 ${mins} 分`,
+  cacheCold: '缓存已过期',
+  gateRunning: (cmd: string) => `测试关卡：正在跑 ${cmd}`,
+  gatePass: '测试关卡：测试通过 ✓',
+  gateSkipNoCmd: '测试关卡：没找到测试命令，跳过（可在项目 .claude/auto-router.json 里写 "testCommand"）',
+  gateTimeout: (s: number) => `测试关卡：测试超过 ${s} 秒没跑完，跳过`,
+  gateFailed: (to: string) => `测试没通过，换 ${to} 接着修`,
+  gateGiveUp: '测试关卡：测试仍没通过，交给你决定',
+  gateBlock: (who: string, cmd: string, code: number, out: string) => [
+    `auto-router 测试关卡：这一轮的代码是 ${who} 改的，收工前跑了 \`${cmd}\`，没有通过（退出码 ${code}）。`,
+    '请找出原因并修好，然后再结束。如果这些失败在这一轮改动之前就存在、和这次改动无关，简单说明一下就可以结束。',
+    '',
+    '测试输出（最后一段）：',
+    '```',
+    out,
+    '```',
+  ].join('\n'),
   // classifier
   classifierReason: '<= 12 Chinese characters, in Chinese',
   reasonMax: 24,
@@ -67,6 +86,20 @@ const zh = {
   recentSubs: '最近的子代理：',
   commands: '命令：/route auto | off | haiku | sonnet | opus | fable | rules',
   quote: (p: string) => `「${p}」`,
+  ttlLabel: (sec: number) => (sec >= 3600 ? '1 小时' : `${Math.round(sec / 60)} 分钟`),
+  ttlAuto: (l: string) => `自动识别，目前 ${l}`,
+  routeCache: (name: string, mins: number, ttl: string) => `提示缓存：${name} 还剩 ${mins} 分钟（缓存时长 ${ttl}）`,
+  routeCacheNone: (ttl: string) => `提示缓存：还没有热的缓存（缓存时长 ${ttl}）`,
+  routeCacheOff: '提示缓存：不考虑（cache.enabled = false）',
+  routeGate: (r: string, cmd: string) => `测试关卡：上次${({ pass: '通过', fail: '没通过，已让它接着修', giveup: '没通过，交给你了', skip: '跳过', timeout: '超时' } as Record<string, string>)[r] ?? r}${cmd ? `（${cmd}）` : ''}`,
+  routeGateNone: '测试关卡：这次会话还没跑过',
+  routeGateOff: '测试关卡：已关闭',
+  bgTask: '后台：',
+  runningNow: (n: number) => `正在跑（${n}）`,
+  nothingRunning: '没有在跑的子代理或后台任务',
+  sessionCost: (c: string, saved: number | null, base: string) => `这个会话花了 **${c}**${saved == null ? '' : ` · 比全用 ${base} 省 **${saved}%**`}`,
+  openBoard: '打开完整看板',
+  colTime: '时间', colModel: '模型', colWhy: '原因', colPrompt: '你说的',
 
   // /route rules
   followMain: '跟主会话',
@@ -88,6 +121,8 @@ const zh = {
     `· 对话超过目标模型窗口的八成时不切过去（Haiku 窗口按 ${r.haikuWindow} 算）`,
     `· 一轮里工具失败 ${r.midTurnAfter} 次 → 当场把这一轮剩下的请求升一档`,
     `· Haiku 一轮里改到第 ${r.maxFiles + 1} 个文件，或要执行危险命令 → 换 ${r.guardTo} 接手`,
+    `· ${r.cache ? `提示缓存还热时，换便宜模型这一轮省不回来就不换（缓存按 ${r.cacheTtl} 算）` : '不考虑提示缓存（cache.enabled = false）'}`,
+    `· ${r.gate ? `测试关卡：${r.gateBelow} 改了代码，收工前先跑测试，没过就换 ${r.gateTo} 接着修（每轮最多 ${r.gateRetries} 次）` : '测试关卡已关闭（qualityGate.enabled = false）'}`,
     '',
     `Fable 主力：${r.autoFable ? '最难任务、反复失败时自动启用' : '只在你写 #fable 时启用'}；顾问由 /advisor 设置，与这里无关`,
     `子代理：${r.subs}；其他类型 → ${r.subDefault}`,
@@ -113,6 +148,12 @@ export type RulesArgs = {
   autoFable: boolean
   subs: string
   subDefault: string
+  cache: boolean
+  cacheTtl: string
+  gate: boolean
+  gateBelow: string
+  gateTo: string
+  gateRetries: number
 }
 
 export type Messages = typeof zh
@@ -131,6 +172,25 @@ const en: Messages = {
   noDowngrade: (k: number) => `Context ${k}k, not worth downgrading`,
   window: (k: number, want: string, use: string) => `Context ${k}k too big for ${want}, using ${use}`,
   holdDown: (reason: string, to: string) => `${reason}; holding, ${to} next if still simple`,
+  cacheHold: (to: string, cur: string, k: number, usd: string, mins: number) =>
+    `${cur} cache is warm (${mins} min left); ${to} would re-read ${k}k tokens, ~$${usd} more this turn, staying`,
+  cacheLeft: (mins: number) => `cache ${mins} min left`,
+  cacheCold: 'cache expired',
+  gateRunning: (cmd: string) => `Test gate: running ${cmd}`,
+  gatePass: 'Test gate: tests pass ✓',
+  gateSkipNoCmd: 'Test gate: no test command found, skipped (set "testCommand" in the project\'s .claude/auto-router.json)',
+  gateTimeout: (s: number) => `Test gate: tests took over ${s}s, skipped`,
+  gateFailed: (to: string) => `Tests failed, ${to} takes over to fix`,
+  gateGiveUp: 'Test gate: tests still failing, leaving it to you',
+  gateBlock: (who: string, cmd: string, code: number, out: string) => [
+    `auto-router test gate: ${who} changed code this turn. Before finishing I ran \`${cmd}\` and it failed (exit code ${code}).`,
+    'Please find the cause and fix it before you finish. If these failures existed before this turn and are unrelated to the change, say so briefly and stop.',
+    '',
+    'Test output (tail):',
+    '```',
+    out,
+    '```',
+  ].join('\n'),
   classifierReason: '<= 6 English words, in English',
   reasonMax: 40,
 
@@ -175,6 +235,20 @@ const en: Messages = {
   recentSubs: 'Recent sub-agents:',
   commands: 'Commands: /route auto | off | haiku | sonnet | opus | fable | rules',
   quote: (p: string) => `"${p}"`,
+  ttlLabel: (sec: number) => (sec >= 3600 ? '1 hour' : `${Math.round(sec / 60)} minutes`),
+  ttlAuto: (l: string) => `detected, currently ${l}`,
+  routeCache: (name: string, mins: number, ttl: string) => `Prompt cache: ${name}, ${mins} min left (lifetime ${ttl})`,
+  routeCacheNone: (ttl: string) => `Prompt cache: nothing warm yet (lifetime ${ttl})`,
+  routeCacheOff: 'Prompt cache: ignored (cache.enabled = false)',
+  routeGate: (r: string, cmd: string) => `Test gate: last run ${({ pass: 'passed', fail: 'failed, model is fixing it', giveup: 'failed, left to you', skip: 'skipped', timeout: 'timed out' } as Record<string, string>)[r] ?? r}${cmd ? ` (${cmd})` : ''}`,
+  routeGateNone: 'Test gate: not run this session yet',
+  routeGateOff: 'Test gate: off',
+  bgTask: 'background: ',
+  runningNow: (n: number) => `Running now (${n})`,
+  nothingRunning: 'No sub-agents or background tasks running',
+  sessionCost: (c: string, saved: number | null, base: string) => `This session cost **${c}**${saved == null ? '' : ` · **${saved}%** less than all-${base}`}`,
+  openBoard: 'Open the full board',
+  colTime: 'Time', colModel: 'Model', colWhy: 'Why', colPrompt: 'Prompt',
 
   followMain: 'same as main',
   listSep: ', ',
@@ -195,6 +269,8 @@ const en: Messages = {
     `· Never switch to a model whose window is over 80% full (Haiku window counted as ${r.haikuWindow})`,
     `· ${r.midTurnAfter} tool failures within a turn → step up the rest of that turn immediately`,
     `· Haiku editing a ${ordinal(r.maxFiles + 1)} file in one turn, or running a risky command → ${r.guardTo} takes over`,
+    `· ${r.cache ? `While the prompt cache is warm, no downgrade that wouldn't pay for itself this turn (cache lifetime: ${r.cacheTtl})` : 'Prompt cache ignored (cache.enabled = false)'}`,
+    `· ${r.gate ? `Test gate: when ${r.gateBelow} changed code, tests run before the turn ends; on failure ${r.gateTo} takes over to fix (at most ${r.gateRetries}× per turn)` : 'Test gate off (qualityGate.enabled = false)'}`,
     '',
     `Fable as main model: ${r.autoFable ? 'automatic for the hardest tasks and repeated failures' : 'only when you write #fable'}; the advisor is set with /advisor and is separate from this`,
     `Sub-agents: ${r.subs}; other types → ${r.subDefault}`,

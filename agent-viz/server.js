@@ -585,7 +585,7 @@ function pollRouter(s) {
   const r = readJSON(path.join(VIZ, 'router', s.id + '.json'));
   if (!r || !Array.isArray(r.decisions)) return;
   const last = r.decisions[r.decisions.length - 1] || null;
-  const key = JSON.stringify([r.mode, r.decisions.length, last && last.at]);
+  const key = JSON.stringify([r.mode, r.decisions.length, last && last.at, r.gate && r.gate.at, r.cache && r.cache.warmUntil]);
   if (key === s.routeKey) return;
   s.routeKey = key;
   const seen = s.routeSeen || 0;
@@ -601,7 +601,16 @@ function pollRouter(s) {
     addDecision(s, { at: d.at / 1000, model: d.model, effort: d.effort, reason: d.reason, by });
   }
   if (last) s.routeSeen = last.at / 1000;
-  s.route = { mode: r.mode, last, advisorCalls: r.advisorCalls || 0, pendingDown: r.pendingDown || null };
+  // 测试关卡的结果记进日志 / test-gate results go into the event log
+  const g = r.gate;
+  if (g && g.at && g.at / 1000 > (s.gateSeen || 0)) {
+    s.gateSeen = g.at / 1000;
+    log(s, g.at / 1000, 'router', ['gate', g.result, g.command || '', g.by ? prettyModel(g.by) : ''], g.result === 'pass' ? 'info' : 'warn');
+  }
+  // 提示缓存：当前模型的缓存热到什么时候（秒）/ prompt cache: when the current model's cache goes cold (seconds)
+  const cu = r.cache && r.cache.enabled !== false && r.current && r.cache.warmUntil ? r.cache.warmUntil[r.current] : null;
+  s.route = { mode: r.mode, last, advisorCalls: r.advisorCalls || 0, pendingDown: r.pendingDown || null,
+    cacheUntil: cu ? cu / 1000 : null, cacheTtl: r.cache ? r.cache.ttl || null : null, gate: g || null };
   s.timeline.sort((a, b) => a.ts - b.ts);
   changed();
 }
@@ -806,6 +815,26 @@ const server = http.createServer((req, res) => {
   if (url === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, demo: DEMO, events: stats.events, log: LOG }));
+    return;
+  }
+  // 手机"添加到主屏幕"：图标和应用清单，点开直接是卡片 / "Add to Home Screen": icons and manifest, opens on the card
+  if (url === '/manifest.webmanifest') {
+    res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-cache' });
+    res.end(JSON.stringify({
+      name: L('Agent 看板', 'Agent Board'), short_name: L('Agent', 'Agent'), id: '/mini', start_url: '/mini', scope: '/',
+      display: 'standalone', background_color: '#1c1c1e', theme_color: '#1c1c1e',
+      icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icon-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }],
+    }));
+    return;
+  }
+  if (url === '/icon-192.png' || url === '/icon-512.png' || url === '/icon-maskable.png' || url === '/apple-touch-icon.png' || url === '/favicon.ico') {
+    const f = url === '/favicon.ico' ? 'icon-192.png' : url.slice(1);
+    fs.readFile(path.join(APP, 'public', f), (err, buf) => {
+      if (err) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
+      res.end(buf);
+    });
     return;
   }
   if (url === '/mini' || url === '/mini.html') {

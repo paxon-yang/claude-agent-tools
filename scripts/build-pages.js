@@ -68,8 +68,11 @@ function record(lang) {
 <meta property="og:image" content="https://paxon-yang.github.io/claude-agent-tools/flow.png">
 <script>window.VIZ_STATIC = 'demo/';</script>
 `;
-  const out = page.replace('</head>', head + '</head>');
-  if (out === page) throw new Error('could not inject static flag');
+  // GitHub Pages serves the demo under /claude-agent-tools/: no home-screen manifest, icons by relative path
+  const page2 = page.replace(/<link rel="manifest"[^>]*>\n/, '').replace(/href="\/(icon-192|apple-touch-icon)\.png"/g, 'href="$1.png"');
+  for (const f of ['icon-192.png', 'apple-touch-icon.png']) fs.copyFileSync(path.join(ROOT, 'agent-viz', 'public', f), path.join(OUT, f));
+  const out = page2.replace('</head>', head + '</head>');
+  if (out === page2) throw new Error('could not inject static flag');
   fs.writeFileSync(path.join(OUT, 'index.html'), out);
   console.log('wrote docs/index.html');
 })().catch(e => { console.error(e); process.exit(1); });

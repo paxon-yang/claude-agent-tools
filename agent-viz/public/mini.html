@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Agent Card</title>
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Agent">
+<meta name="theme-color" content="#1c1c1e">
 <style>
 /* 桌面小卡片：只放"现在"最重要的东西 / desktop mini card: only what matters right now */
 :root {
@@ -21,12 +29,16 @@ body.widget { background: transparent; }
 body.widget.mac { --card: rgba(28, 28, 30, .58); }
 button { font: inherit; color: inherit; }
 .card { position: relative; margin: 0; padding: 14px 14px 12px; min-height: 100vh; background: var(--card); overflow: hidden; }
+/* 手机全屏打开时让开刘海和底部横条 / clear the notch and home bar when opened from the home screen */
+body:not(.widget) .card { padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
 body.widget .card { min-height: 0; border-radius: 18px; border: 1px solid rgba(255, 255, 255, .12); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14); }
 .glow { position: absolute; inset: -40% -20% auto; height: 260px; pointer-events: none; opacity: .55; filter: blur(30px); }
 .in { position: relative; }
 .f-haiku { --c: var(--haiku); --cl: var(--haiku-l); } .f-sonnet { --c: var(--sonnet); --cl: var(--sonnet-l); }
 .f-opus { --c: var(--opus); --cl: var(--opus-l); } .f-fable, .f-mythos { --c: var(--fable); --cl: var(--fable-l); } .f-none { --c: var(--none); --cl: var(--none-l); }
 
+.xc { padding: 1px 7px; border-radius: 999px; font-size: 11px; color: var(--muted); border: 1px solid var(--hair); white-space: nowrap; }
+.xc.g-pass { color: var(--green-l); } .xc.g-fail, .xc.g-giveup { color: var(--red-l); }
 .top { display: flex; align-items: center; gap: 8px; -webkit-app-region: drag; user-select: none; min-height: 24px; }
 .proj { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .nav { display: flex; gap: 2px; -webkit-app-region: no-drag; }
@@ -98,12 +110,12 @@ const NAMES = { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', fable: 'Fable', 
 const EFF = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
 const I18N = {
   zh: { running: '运行中', bg: '后台在跑', need: '等你确认', idle: '等你下一步', ended: '已结束', noTask: '还没有收到任务', now: '正在', thinking: '思考中…',
-    waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端里确认', last: '上一步', idle2: '空闲',
+    waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端或 Claude App 里确认', cacheLeft: m => `缓存 ${m} 分`, cacheCold: '缓存已过期', gate_pass: '测试 ✓', gate_fail: '测试 ✕ 修复中', gate_giveup: '测试 ✕', gate_timeout: '测试超时', gate_skip: '测试跳过', last: '上一步', idle2: '空闲',
     needs: (p, m) => `<b>${p}</b> 在等你确认${m ? '：' + m : ''}`, done: n => `<b>✓ ${n}</b> 个已完成`, why: '为什么：', today: h => `近 ${h} 小时`, saved: n => `少花 ${n}%`,
     full: '打开完整看板 ↗', empty: '现在没有 Claude Code 在运行', emptySub: '在任意项目里输入 claude，这里会自动出现。', live: '实时', off: '重连中', pin: '总在最前', close: '隐藏',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: '后台监视', Bash: '后台命令' }, subagent: '子代理', unknown: '模型未知' },
   en: { running: 'Running', bg: 'Background', need: 'Needs you', idle: 'Your turn', ended: 'Ended', noTask: 'No task yet', now: 'Now', thinking: 'Thinking…',
-    waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal', last: 'Last', idle2: 'Idle',
+    waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal or the Claude app', cacheLeft: m => `cache ${m}m`, cacheCold: 'cache cold', gate_pass: 'tests ✓', gate_fail: 'tests ✕ fixing', gate_giveup: 'tests ✕', gate_timeout: 'tests timed out', gate_skip: 'tests skipped', last: 'Last', idle2: 'Idle',
     needs: (p, m) => `<b>${p}</b> needs your approval${m ? ': ' + m : ''}`, done: n => `<b>✓ ${n}</b> finished`, why: 'Why: ', today: h => `Last ${h}h`, saved: n => `${n}% saved`,
     full: 'Open full board ↗', empty: 'No Claude Code running', emptySub: 'Run claude in any project and it shows up here.', live: 'Live', off: 'Reconnecting', pin: 'Always on top', close: 'Hide',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: 'Monitor', Bash: 'Background command' }, subagent: 'Subagent', unknown: 'Unknown model' },
@@ -193,7 +205,7 @@ function render() {
   $('#root').innerHTML = `<div class="top"><span class="proj">${esc(s.project || '—')}</span>${nav}<span class="pill ${k}"><i></i>${t(k)}</span>${ctl}</div>
     ${alerts}
     <div class="task ${task ? '' : 'quiet'}" title="${esc(task ? task.prompt : '')}">${task ? esc(brief(task.prompt)) : t('noTask')}</div>
-    <div class="meta ${f(s.family)}"><span class="chip ${f(s.family)}"><span class="glyph">${esc((NAMES[s.family] || s.model || '?')[0])}</span>${esc(s.model || t('unknown'))}</span>${meter(s.effort)}${task ? `<span>· ${timer(task.startedAt, task.endedAt || (s.active ? null : s.lastTs))}</span>` : ''}</div>
+    <div class="meta ${f(s.family)}"><span class="chip ${f(s.family)}"><span class="glyph">${esc((NAMES[s.family] || s.model || '?')[0])}</span>${esc(s.model || t('unknown'))}</span>${meter(s.effort)}${task ? `<span>· ${timer(task.startedAt, task.endedAt || (s.active ? null : s.lastTs))}</span>` : ''}${s.route && s.route.cacheUntil && s.active ? `<span class="xc" data-until="${s.route.cacheUntil}">${esc(cacheLeft(s.route.cacheUntil))}</span>` : ''}${s.route && s.route.gate ? `<span class="xc g-${esc(s.route.gate.result)}">${esc(t('gate_' + s.route.gate.result))}</span>` : ''}</div>
     ${r && r.reason ? `<div class="why">${t('why')}${esc(r.reason)}</div>` : ''}
     <div class="now">${nowLine}</div>
     ${rows || done ? `<div class="ags">${rows}${done ? `<div class="done">${t('done', done)}</div>` : ''}</div>` : ''}
@@ -204,7 +216,8 @@ function render() {
   fit();
 }
 function fit() { if (W && W.resize) requestAnimationFrame(() => W.resize(Math.ceil($('#card').getBoundingClientRect().height))); }
-function openFull() { if (W && W.openFull) W.openFull(); else window.open('/', '_blank'); }
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || !!navigator.standalone;
+function openFull() { if (W && W.openFull) W.openFull(); else if (STANDALONE) location.href = '/'; else window.open('/', '_blank'); }
 function togglePin() { pinned = !pinned; if (W && W.setPinned) W.setPinned(pinned); render(); }
 if (W && W.getPinned) W.getPinned().then(v => { pinned = v; render(); });
 
@@ -214,7 +227,9 @@ function connect() {
   es.onmessage = ev => { state = JSON.parse(ev.data); skew = state.now - Date.now() / 1000; LANG = lang(); document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en'; render(); };
   es.onerror = () => { conn = false; render(); };
 }
-setInterval(() => { const n = nowS(); document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(n - Number(el.dataset.since)); }); }, 1000);
+setInterval(() => { const n = nowS(); document.querySelectorAll('[data-since]').forEach(el => { el.textContent = dur(n - Number(el.dataset.since)); });
+  document.querySelectorAll('[data-until]').forEach(el => { el.textContent = cacheLeft(Number(el.dataset.until)); }); }, 1000);
+function cacheLeft(until) { const m = Math.ceil((until - nowS()) / 60); return m > 0 ? t('cacheLeft', m) : t('cacheCold'); }
 addEventListener('storage', e => { if (e.key === 'viz.lang') { LANG = lang(); render(); } });
 connect();
 </script>

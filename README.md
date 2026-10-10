@@ -51,11 +51,13 @@ Use it alongside ccusage if you like its reports; use claude-code-router if you 
 - **Multi-model teamwork** — big tasks ("implement docs/spec.md") get Opus as the orchestrator, `explorer` sub-agents on Haiku to read code, `worker` sub-agents on Sonnet to write it.
 - **Plan → execute** — in plan mode (Shift+Tab) Opus writes the plan; once you approve, Sonnet carries it out.
 - **Guard rails** — Haiku hands over to Sonnet before editing a 4th file or running risky commands (`rm -rf`, `git push`, migrations, deploys); 3 tool failures in a turn escalate one tier on the spot; downgrades need two confirmations.
-- **Cost-aware** — sub-agent results are summarized on Sonnet, not re-read by Opus; no model lock-in on long chats.
+- **Cache-aware** — the prompt cache belongs to one model, so a switch makes the new model re-read the whole conversation at the cache-write price. While the current model's cache is warm, the router only downgrades when the turn will earn that back (it learns whether your cache lasts 5 minutes or 1 hour); the status line shows how long the cache has left.
+- **Test gate** — when Haiku or Sonnet changed code, your tests run before the turn ends. If they fail, the turn steps up to Opus and keeps fixing — once per turn, never in a loop. Detects npm / pnpm / yarn / bun, pytest, cargo, go and `make test`; skipped when the model already ran the tests itself.
+- **`/route` card, on your phone too** — model and why, cache time left, test gate, running sub-agents and session cost as one card in the terminal, the desktop app, and the Claude app via Remote Control.
 - **Live agent tree** — curved links with flowing particles while a sub-agent runs, a green pulse back when it reports, hover to trace a branch, click any card for its full brief, result and every tool step.
 - **Model timeline & cost** — which model ran each turn and each sub-agent, token use per model, estimated cost and *how much you saved*.
 - **"Needs you" alerts** — banner, desktop notification or sound when a session is blocked on your approval.
-- **Anywhere access** — Tailscale (private, zero config) or your own domain via Cloudflare Tunnel + Access email login.
+- **Anywhere access** — Tailscale (private, zero config) or your own domain via Cloudflare Tunnel + Access email login; add it to your phone's home screen and it opens as an app on the card view.
 - **Savings report** — `node ~/.claude/viz/app/report.js` reads your local transcripts: spend per model, all-Opus baseline, routed vs. un-routed sessions; `--md` for a shareable write-up.
 - **English and 中文** — router messages, dashboard (with an EN | 中文 switch) and installers follow your system language.
 - **Apple-style liquid-glass UI**, light theme, mobile layout, reduced-motion support.
@@ -121,7 +123,7 @@ Each turn's choice, and why, shows up in the Claude Code status line, in `/route
 
 | You type | What happens |
 |---|---|
-| `/route` | Current model and the last decisions |
+| `/route` | A card: current model and why, cache time left, test gate, running sub-agents, session cost, recent decisions (also in the Claude app via Remote Control) |
 | `/route rules` | The active rules |
 | `/route sonnet` · `/route auto` · `/route off` | Pin a model · back to automatic · disable |
 | `#opus refactor the auth module` | Use Opus for this prompt only |
@@ -177,6 +179,15 @@ Edit `~/.claude/auto-router/config.json` and restart Claude Code. The most usefu
 | `haikuGuard.maxFiles` | `3` | Files Haiku may edit before Sonnet takes over |
 | `autoFable` | `false` | Let the hardest tasks go to Fable automatically |
 | `lang` | your system | `en` or `zh` for router messages |
+| `cache.enabled` | `true` | Weigh the prompt cache before downgrading |
+| `cache.ttlSeconds` | `"auto"` | Cache lifetime: `"auto"` learns it (starts at 1 hour), or `300` / `3600` |
+| `cache.prices` | dashboard's | $ per million tokens per model; only the ratios matter |
+| `qualityGate.enabled` | `true` | Run tests before finishing when a cheaper model changed code |
+| `qualityGate.command` | detected | Test command for every project, e.g. `"npm run test:unit"` |
+| `qualityGate.trustTier` | `opus` | Code changed by this model or above isn't checked |
+| `qualityGate.timeoutSec` | `180` | Give up on a test run after this long |
+
+Per project, `.claude/auto-router.json` in the project folder can set `{"testCommand": "pytest -q tests/unit"}` or turn the gate off with `{"qualityGate": false}`.
 
 Dashboard settings live in `~/.claude/viz/app/config.json` (port, prices used for estimates, remote access, `lang`). Set `CAT_LANG=en` or `CAT_LANG=zh` before installing to force the installer language.
 
@@ -186,6 +197,12 @@ Dashboard settings live in `~/.claude/viz/app/config.json` (port, prices used fo
 - **Your own domain (Cloudflare):** create a Cloudflare Access application for the hostname (email one-time PIN), then run
   `bash ~/claude-agent-tools/agent-viz/cloudflare.sh board.example.com`.
   It creates a dedicated `agent-board` tunnel and never touches your other cloudflared config.
+
+## On your phone
+
+- **Drive Claude from your phone** with Claude Code's own [Remote Control](https://code.claude.com/docs/en/remote-control): `/config` → *Enable Remote Control for all sessions*, plus *Push when actions required* for approval alerts. Approvals, questions and pushes are all handled there.
+- **Type `/route`** in the Claude app to see what the router is doing: the same card as in the terminal.
+- **Add the board to your home screen** (Safari: Share → Add to Home Screen; Chrome: ⋮ → Add to Home screen) through your Tailscale or Cloudflare address. It opens full-screen on the card; *Open full board* and *‹ Card* switch between the two.
 
 ## Uninstall
 
@@ -198,7 +215,9 @@ Both make a backup before editing `~/.claude/settings.json` or `~/.claude/CLAUDE
 
 ## FAQ
 
-**Does switching models lose context?** No. The conversation is kept; the only cost is that the new model reads it once without cache. That pays for itself within a dozen calls, which is why the router no longer refuses to downgrade on long chats.
+**Does switching models lose context?** No. The conversation is kept; the cost is that the new model re-reads it once at the cache-write price, while the current model would have read it from cache at a tenth of the input price. In a long conversation that can outweigh a whole turn's savings, so while the cache is warm the router compares the two and stays put when switching wouldn't pay (`/route` shows the reason with the dollar estimate). With a cold cache, or a Haiku-sized task, it switches freely.
+
+**Will the test gate run my whole suite every turn?** Only on turns where Haiku or Sonnet edited code (not docs), and not when the model already ran the tests after its last edit. Turn it off per project with `.claude/auto-router.json` or globally with `qualityGate.enabled: false`.
 
 **Does it send my data anywhere?** No. Routing runs inside Claude Code; the dashboard reads local files and listens on localhost (plus your Tailscale address, or a tunnel you set up).
 

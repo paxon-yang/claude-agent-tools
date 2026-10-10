@@ -192,3 +192,111 @@ test('reasons follow cfg.lang', () => {
   expect(mergeConfig(DEFAULTS, {}).lang).toBe('en')
   expect(mergeConfig(DEFAULTS, { lang: 'fr' }).lang).toBe('en')
 })
+
+// ---- 提示缓存 / prompt cache ----
+import { guardCache, switchCost, learnTtl, tierOfModel, mergePrices } from './rules'
+import type { CacheView } from './rules'
+const NOW = 1_000_000_000
+const view = (o: Partial<CacheView> = {}): CacheView => ({
+  now: NOW, tokens: 150_000, warmUntil: { opus: NOW + 40 * 60_000 }, ttlSeconds: 3600, steps: 5, outPerStep: 800, ...o,
+})
+const down = (t: 'haiku' | 'sonnet', source: 'rule' | 'haiku' | 'continue' | 'manual' = 'haiku') => ({ tier: t, effort: 'low' as const, reason: 'x', source })
+
+test('warm Opus cache: Opus → Sonnet in a long conversation is held', () => {
+  const d = guardCache(down('sonnet'), 'opus', view(), c, 'high')
+  expect(d.tier).toBe('opus')
+  expect(d.effort).toBe('high')
+  expect(d.source).toBe('guard')
+  expect(d.reason).toContain('150k')
+  expect(d.reason).toContain('40 min')
+})
+
+test('cache guard lets the switch through when it is cheap or the cache is cold', () => {
+  // 冷缓存：换走不花额外的钱 / cold cache: switching costs nothing extra
+  expect(guardCache(down('sonnet'), 'opus', view({ warmUntil: { opus: NOW - 1 } }), c).tier).toBe('sonnet')
+  // 很短的对话：多花的钱低于门槛 / tiny context: below the threshold
+  expect(guardCache(down('sonnet'), 'opus', view({ tokens: 3000 }), c).tier).toBe('sonnet')
+  // Haiku 便宜得多，重写缓存也比 Opus 读缓存便宜 / Haiku's write is cheaper than Opus's read here
+  expect(guardCache(down('haiku'), 'opus', view(), c).tier).toBe('haiku')
+  // 很长的一轮：便宜模型每步省下的钱能补回来 / long turn: savings per step pay it back
+  expect(guardCache(down('sonnet'), 'opus', view({ steps: 60 }), c).tier).toBe('sonnet')
+})
+
+test('cache guard never blocks upgrades, manual choices or pins', () => {
+  expect(guardCache({ tier: 'opus', effort: 'high', reason: 'x', source: 'rule' }, 'sonnet', view({ warmUntil: { sonnet: NOW + 1e6 } }), c).tier).toBe('opus')
+  expect(guardCache(down('sonnet', 'manual'), 'opus', view(), c).tier).toBe('sonnet')
+  expect(guardCache({ ...down('sonnet'), source: 'pin' }, 'opus', view(), c).tier).toBe('sonnet')
+  expect(guardCache(down('sonnet'), 'opus', view(), { ...c, cache: { ...c.cache, enabled: false } }).tier).toBe('sonnet')
+  // 子代理交回结果（source continue）也要看缓存 / hand-backs count too
+  expect(guardCache(down('sonnet', 'continue'), 'opus', view(), c).tier).toBe('opus')
+})
+
+test('switch cost arithmetic', () => {
+  // 1M tokens, 1 step, no output: Opus warm read 0.4 vs Sonnet 1h write 2×2 = 4, plus 0.1 × (8 − 0.4) return risk
+  const r = switchCost('opus', 'sonnet', view({ tokens: 1_000_000, steps: 1, outPerStep: 0 }), c)
+  expect(Math.round(r.stay * 100) / 100).toBe(0.4)
+  expect(Math.round(r.go * 100) / 100).toBe(4.76)
+  // 5-minute cache: write 2 × 1.25 = 2.5, return risk 0.5 × (4 × 1.25 − 0.4) = 2.3
+  const s = switchCost('opus', 'sonnet', view({ tokens: 1_000_000, steps: 1, outPerStep: 0, ttlSeconds: 300 }), c)
+  expect(Math.round(s.go * 100) / 100).toBe(4.8)
+})
+
+test('cache lifetime is learned from real hits', () => {
+  expect(learnTtl(900, { cache_read_input_tokens: 120_000, cache_creation_input_tokens: 2_000 })).toBe(3600)
+  expect(learnTtl(900, { cache_read_input_tokens: 0, cache_creation_input_tokens: 120_000 })).toBe(300)
+  expect(learnTtl(60, { cache_read_input_tokens: 0, cache_creation_input_tokens: 120_000 })).toBe(undefined)
+  expect(learnTtl(900, { cache_read_input_tokens: 5_000, cache_creation_input_tokens: 4_000 })).toBe(undefined)
+})
+
+test('model ids and dashboard prices', () => {
+  expect(tierOfModel('claude-opus-5-5')).toBe('opus')
+  expect(tierOfModel('claude-mythos-5-1')).toBe('fable')
+  expect(tierOfModel('gpt-x')).toBe(undefined)
+  const p = mergePrices(c.cache.prices, { opus: { in: 5, out: 25, cacheRead: 0.5 }, mythos: { in: 1 }, sonnet: { in: 'x' } })
+  expect(p.opus.in).toBe(5)
+  expect(p.sonnet.in).toBe(2)
+  expect(mergeConfig(DEFAULTS, { cache: { minExtraUsd: 1 } }).cache.prices.opus.in).toBe(4)
+})
+
+// ---- 测试关卡 / test gate ----
+import { detectTestCommand, isCodeFile, looksLikeTestRun, tailOutput, shellArgv } from './rules'
+
+test('test command detection', () => {
+  expect(detectTestCommand({ packageJson: '{"scripts":{"test":"vitest run"}}' })).toBe('npm test --silent')
+  expect(detectTestCommand({ packageJson: '{"scripts":{"test":"jest"}}', pnpmLock: true })).toBe('pnpm test')
+  expect(detectTestCommand({ packageJson: '{"scripts":{"test":"echo \\"Error: no test specified\\" && exit 1"}}' })).toBe(undefined)
+  expect(detectTestCommand({ pyproject: '[tool.pytest.ini_options]\naddopts = "-q"' })).toBe('python -m pytest -q -x')
+  expect(detectTestCommand({ pyproject: '[project]\nname="x"', testsDir: true })).toBe('python -m pytest -q -x')
+  expect(detectTestCommand({ cargoToml: true })).toBe('cargo test --quiet')
+  expect(detectTestCommand({ goMod: true })).toBe('go test ./...')
+  expect(detectTestCommand({ makefile: 'build:\n\tcc x.c\ntest: build\n\t./run' })).toBe('make test')
+  expect(detectTestCommand({ packageJson: '{nope' })).toBe(undefined)
+  expect(detectTestCommand({})).toBe(undefined)
+})
+
+test('which edits count as code', () => {
+  expect(isCodeFile('/p/src/app.ts')).toBe(true)
+  expect(isCodeFile('/p/config.json')).toBe(true)
+  expect(isCodeFile('/p/README.md')).toBe(false)
+  expect(isCodeFile('/p/docs/guide.mdx')).toBe(false)
+  expect(isCodeFile('C:\\p\\CHANGELOG')).toBe(false)
+  expect(isCodeFile('/p/notes.txt')).toBe(false)
+})
+
+test('recognises a test run in Bash', () => {
+  expect(looksLikeTestRun('cd web && npm test')).toBe(true)
+  expect(looksLikeTestRun('pytest -q tests/test_api.py')).toBe(true)
+  expect(looksLikeTestRun('npx vitest run src')).toBe(true)
+  expect(looksLikeTestRun('cargo test -p core')).toBe(true)
+  expect(looksLikeTestRun('./scripts/check.sh', './scripts/check.sh')).toBe(true)
+  expect(looksLikeTestRun('npm install')).toBe(false)
+  expect(looksLikeTestRun('cat latest.txt')).toBe(false)
+  expect(looksLikeTestRun('git commit -m "test"')).toBe(false)
+})
+
+test('test output tail and shell', () => {
+  expect(tailOutput('a'.repeat(5000), 'FAIL x', 100).endsWith('FAIL x')).toBe(true)
+  expect(tailOutput('ok', '', 100)).toBe('ok')
+  expect(shellArgv('npm test', false)).toEqual(['sh', '-c', 'npm test'])
+  expect(shellArgv('npm test', true)[0]).toBe('cmd')
+})

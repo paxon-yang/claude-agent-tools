@@ -1,6 +1,6 @@
 {
   "name": "auto-router",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Picks the model every turn: Haiku for lookups and small edits, Sonnet for everyday coding, Opus for architecture and hard bugs, Fable as advisor",
   "author": {
     "name": "paxon-yang"

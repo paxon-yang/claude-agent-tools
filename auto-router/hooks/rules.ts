@@ -46,6 +46,15 @@ export type Config = {
   subagents: Record<string, Tier | 'main'>
   subagentDefault: Tier | 'main'
   subagentEffort: Record<Tier, Effort>
+  /**
+   * 提示缓存：缓存只对同一个模型有效。换模型 = 新模型按"写缓存"价把整段对话重读一遍。
+   * 缓存还热、这一轮又省不回来时，不往便宜的模型降。
+   * Prompt cache is per model: switching re-reads the whole conversation at the cache-write price.
+   * While the current model's cache is warm and the switch would not pay for itself this turn, don't downgrade.
+   */
+  cache: CacheConfig
+  /** 测试关卡：便宜的模型改了代码，收工前先跑测试；没过就换 escalateTo 接着修 */
+  qualityGate: GateConfig
   keywords: {
     haiku: string[]
     opus: string[]
@@ -55,6 +64,31 @@ export type Config = {
     frustration: string[]
     bigTask: string[]
   }
+}
+
+export type Price = { in: number; out: number }
+export type CacheConfig = {
+  enabled: boolean
+  /** 缓存多久过期（秒）；'auto' = 先按 1 小时算，再根据实际命中情况自己学 */
+  ttlSeconds: number | 'auto'
+  /** 换走以后再换回来时，当前模型缓存已过期的可能性（0–1）；null = 按缓存时长估（1 小时 0.1，5 分钟 0.5） */
+  returnWeight: number | null
+  /** 多花不到这么多美元就不拦 */
+  minExtraUsd: number
+  /** 每百万 token 的美元价（只看相对大小）；缓存读 = 输入价 × 0.1，写 = × 1.25（5 分钟）或 × 2（1 小时） */
+  prices: Record<Tier, Price>
+}
+export type GateConfig = {
+  enabled: boolean
+  /** 测试命令；null = 自动识别（package.json 的 test、pytest、cargo、go、make test） */
+  command: string | null
+  /** 这一档及以上的模型改的代码不检查 */
+  trustTier: Tier
+  /** 测试没过时换哪一档接着修 */
+  escalateTo: Tier
+  timeoutSec: number
+  /** 每一轮最多拦几次（防止原本就失败的测试让它一直修下去） */
+  maxRetries: number
 }
 
 export const ORDER: readonly Tier[] = ['haiku', 'sonnet', 'opus', 'fable']
@@ -111,6 +145,27 @@ export const DEFAULTS: Config = {
   },
   subagentDefault: 'sonnet',
   subagentEffort: { haiku: 'low', sonnet: 'medium', opus: 'medium', fable: 'medium' },
+  cache: {
+    enabled: true,
+    ttlSeconds: 'auto',
+    returnWeight: null,
+    minExtraUsd: 0.02,
+    // 和看板 config.json 的默认价一致；看板装了会改用看板的价 / same defaults as the dashboard; its prices win when installed
+    prices: {
+      haiku: { in: 0.1, out: 0.5 },
+      sonnet: { in: 2, out: 10 },
+      opus: { in: 4, out: 20 },
+      fable: { in: 10, out: 50 },
+    },
+  },
+  qualityGate: {
+    enabled: true,
+    command: null,
+    trustTier: 'opus',
+    escalateTo: 'opus',
+    timeoutSec: 180,
+    maxRetries: 1,
+  },
   keywords: {
     haiku: [
       '解释', '是什么', '什么意思', '在哪', '哪里', '找一下', '找找', '查一下', '列出', '看看',
@@ -190,7 +245,29 @@ export function mergeConfig(base: Config, over: unknown): Config {
     keywords: { ...base.keywords, ...(o.keywords ?? {}) },
     windows: { ...base.windows, ...(o.windows ?? {}) },
     haikuGuard: { ...base.haikuGuard, ...(o.haikuGuard ?? {}) },
+    cache: {
+      ...base.cache,
+      ...(o.cache ?? {}),
+      prices: mergePrices(base.cache.prices, (o.cache as Partial<CacheConfig> | undefined)?.prices),
+    },
+    qualityGate: { ...base.qualityGate, ...(o.qualityGate ?? {}) },
   }
+}
+
+/** 价格表合并：只认 haiku/sonnet/opus/fable 和数字的 in/out（看板的价格表也能直接传进来） */
+export function mergePrices(base: Record<Tier, Price>, over: unknown): Record<Tier, Price> {
+  const out = { ...base }
+  if (!over || typeof over !== 'object') return out
+  for (const t of ORDER) {
+    const p = (over as Record<string, unknown>)[t] as Partial<Price> | undefined
+    if (p && typeof p === 'object') {
+      out[t] = {
+        in: Number.isFinite(Number(p.in)) && Number(p.in) > 0 ? Number(p.in) : base[t].in,
+        out: Number.isFinite(Number(p.out)) && Number(p.out) > 0 ? Number(p.out) : base[t].out,
+      }
+    }
+  }
+  return out
 }
 
 const ASCII = /^[\x00-\x7f]+$/
@@ -418,3 +495,152 @@ export function subagentTier(type: string, main: Tier | undefined, cfg: Config):
   const m = main ?? cfg.defaultTier
   return m === 'haiku' ? 'sonnet' : m
 }
+
+// ---------------------------------------------------------------------------
+// 提示缓存 / prompt cache
+// ---------------------------------------------------------------------------
+
+/** 换模型时要用到的现状：上下文多大、各档缓存热到什么时候、这一轮大概几步、每步输出多少 */
+export type CacheView = {
+  now: number
+  /** 当前上下文 token 数 */
+  tokens: number
+  /** 各档主会话缓存的过期时间（毫秒时间戳） */
+  warmUntil: Partial<Record<Tier, number>>
+  /** 缓存时长（秒）：3600 或 300 */
+  ttlSeconds: number
+  /** 预计这一轮要发几次请求 */
+  steps: number
+  /** 每次请求大约输出多少 token */
+  outPerStep: number
+}
+
+export const isWarm = (t: Tier, v: Pick<CacheView, 'now' | 'warmUntil'>) => (v.warmUntil[t] ?? 0) > v.now
+
+/**
+ * 这一轮留在 from 和换到 to 各要花多少（美元，估算）。
+ * 第一次请求：缓存热按读价（输入 × 0.1），冷按写价（× 1.25，1 小时缓存 × 2）；之后每次都按读价。
+ * 换走时还要算上"以后换回来、from 的缓存已经过期"要多写的那一次（乘以可能性）。
+ */
+export function switchCost(from: Tier, to: Tier, v: CacheView, cfg: Config): { stay: number; go: number; rewrite: number } {
+  const C = v.tokens / 1e6
+  const n = Math.max(1, v.steps)
+  const wMult = v.ttlSeconds >= 3600 ? 2 : 1.25
+  const p = (t: Tier) => cfg.cache.prices[t] ?? DEFAULTS.cache.prices[t]
+  const r = (t: Tier) => p(t).in * 0.1
+  const w = (t: Tier) => p(t).in * wMult
+  const cost = (t: Tier) => C * (isWarm(t, v) ? r(t) : w(t)) + (n - 1) * C * r(t) + (n * v.outPerStep / 1e6) * p(t).out
+  const q = cfg.cache.returnWeight ?? (v.ttlSeconds >= 3600 ? 0.1 : 0.5)
+  const back = isWarm(from, v) ? q * C * (w(from) - r(from)) : 0
+  return { stay: cost(from), go: cost(to) + back, rewrite: C * w(to) }
+}
+
+/** 这几类决定可以因为缓存改回去；你手动指定的、固定的、升档的、计划模式定的不动 */
+const CACHE_SOFT: readonly Source[] = ['rule', 'haiku', 'fallback', 'continue']
+
+/**
+ * 缓存把关：当前模型的缓存还热、换到更便宜的模型这一轮反而更贵时，留在当前模型。
+ * keepEffort = 当前模型上一轮的 effort（不改 effort，免得白白打断缓存）。
+ */
+export function guardCache(d: Decision, current: Tier | undefined, v: CacheView, cfg: Config, keepEffort?: Effort): Decision {
+  if (!cfg.cache.enabled || !current || !CACHE_SOFT.includes(d.source)) return d
+  if (ORDER.indexOf(d.tier) >= ORDER.indexOf(current)) return d
+  if (!isWarm(current, v)) return d
+  const c = switchCost(current, d.tier, v, cfg)
+  const extra = c.go - c.stay
+  if (extra <= cfg.cache.minExtraUsd) return d
+  const m = msgs(cfg)
+  const mins = Math.max(1, Math.round(((v.warmUntil[current] ?? v.now) - v.now) / 60000))
+  return {
+    tier: current,
+    effort: keepEffort ?? cfg.effort[current],
+    reason: m.cacheHold(NAMES[d.tier], NAMES[current], Math.round(v.tokens / 1000), money(extra), mins),
+    source: 'guard',
+  }
+}
+
+const money = (x: number) => (x >= 1 ? x.toFixed(2) : x >= 0.1 ? x.toFixed(2) : x.toFixed(3))
+
+/**
+ * 根据实际命中情况推算缓存时长：隔了 5 分钟以上还能大量命中 = 1 小时缓存；
+ * 隔了 5 分钟到 1 小时、几乎没命中、却大量重写 = 5 分钟缓存。判断不了返回 undefined。
+ */
+export function learnTtl(gapSec: number, u: { cache_read_input_tokens: number; cache_creation_input_tokens: number }): 3600 | 300 | undefined {
+  if (gapSec < 330 || gapSec > 3500) return undefined
+  const read = u.cache_read_input_tokens || 0
+  const wrote = u.cache_creation_input_tokens || 0
+  if (read > 20000 && read > wrote * 4) return 3600
+  if (wrote > 20000 && read < wrote / 20) return 300
+  return undefined
+}
+
+/** 模型 id → 档 */
+export function tierOfModel(model: string | undefined | null): Tier | undefined {
+  const s = String(model ?? '').toLowerCase()
+  if (s.includes('fable') || s.includes('mythos')) return 'fable'
+  return ORDER.find(t => s.includes(t))
+}
+
+// ---------------------------------------------------------------------------
+// 测试关卡 / test gate
+// ---------------------------------------------------------------------------
+
+/** 这些文件不算代码，只改了它们不跑测试 */
+const NOT_CODE = /\.(md|markdown|mdx|txt|rst|adoc|csv|tsv|log|png|jpe?g|gif|webp|svg|ico|pdf|docx?|xlsx?|pptx?|lock)$/i
+export const isCodeFile = (file: string) => !!file && !NOT_CODE.test(file) && !/(^|[\\/])(CHANGELOG|LICENSE|README)[^\\/]*$/i.test(file)
+
+/** 项目里跟测试有关的文件内容（没有就 undefined），用来猜测试命令 */
+export type ProjectFiles = {
+  packageJson?: string
+  pnpmLock?: boolean
+  yarnLock?: boolean
+  bunLock?: boolean
+  pyproject?: string
+  pytestIni?: boolean
+  setupCfg?: string
+  toxIni?: boolean
+  testsDir?: boolean
+  cargoToml?: boolean
+  goMod?: boolean
+  makefile?: string
+}
+
+/** 自动识别测试命令；认不出返回 undefined（那就不检查） */
+export function detectTestCommand(f: ProjectFiles): string | undefined {
+  if (f.packageJson) {
+    try {
+      const pkg = JSON.parse(f.packageJson) as { scripts?: Record<string, string> }
+      const t = pkg.scripts?.test
+      if (t && !/no test specified/i.test(t)) {
+        if (f.pnpmLock) return 'pnpm test'
+        if (f.yarnLock) return 'yarn test'
+        if (f.bunLock) return 'bun run test'
+        return 'npm test --silent'
+      }
+    } catch {
+      /* package.json 写坏了就当没有 */
+    }
+  }
+  if (f.cargoToml) return 'cargo test --quiet'
+  if (f.goMod) return 'go test ./...'
+  const py = (f.pyproject && /\[tool\.pytest|pytest/.test(f.pyproject)) || f.pytestIni || (f.setupCfg && /\[tool:pytest\]/.test(f.setupCfg)) || f.toxIni
+  if (py || ((f.pyproject || f.setupCfg) && f.testsDir)) return 'python -m pytest -q -x'
+  if (f.makefile && /^test\s*:/m.test(f.makefile)) return 'make test'
+  return undefined
+}
+
+/** 这条 Bash 命令是不是在跑测试（模型自己跑过且通过了，就不用再跑一遍） */
+export function looksLikeTestRun(command: string, testCmd?: string): boolean {
+  const c = command.toLowerCase()
+  if (testCmd && c.includes(testCmd.toLowerCase().replace(/\s+--silent$/, ''))) return true
+  return /(^|[\s;&|(])(npm (run )?test|npm t|pnpm (run )?test|yarn (run )?test|bun (run )?test|npx (jest|vitest|mocha)|jest|vitest|mocha|pytest|python3? -m pytest|cargo test|go test|make (test|check)|deno test|node --test|rspec|phpunit|dotnet test|mvn test|gradle test|\.\/gradlew test)\b/.test(c)
+}
+
+/** 测试输出只留最后一段（失败信息通常在最后） */
+export function tailOutput(stdout: string, stderr: string, max = 3000): string {
+  const all = [stdout, stderr].map(s => String(s ?? '').trimEnd()).filter(Boolean).join('\n')
+  return all.length > max ? '…\n' + all.slice(-max) : all
+}
+
+/** 在 shell 里跑一条命令行 */
+export const shellArgv = (cmd: string, windows: boolean): string[] => (windows ? ['cmd', '/d', '/s', '/c', cmd] : ['sh', '-c', cmd])

@@ -2,14 +2,21 @@
 
 All notable changes to this project. Versions follow [semver](https://semver.org/); dates are UTC.
 
-## [Unreleased]
+## [0.4.0] — 2026-10-10
 
 ### Added
+- **Cache-aware routing.** The prompt cache only works for the model that wrote it, so switching makes the new model re-read the conversation at the cache-write price. While the current model's cache is warm, the router now downgrades only when the turn will earn that back, and says so with a dollar estimate. It learns whether your cache lasts 5 minutes or 1 hour from real cache hits. Sub-agent hand-backs follow the same rule. The status line shows how long the cache has left.
+- **Test gate.** When Haiku or Sonnet changed code in a turn, the project's tests run before the turn ends (npm / pnpm / yarn / bun, pytest, cargo, go, `make test`, or your own command). If they fail, the rest of the turn steps up to Opus and Claude keeps fixing; a second failure is left to you. Skipped for docs-only edits, when the model already ran the tests, or with `{"qualityGate": false}` in the project's `.claude/auto-router.json`.
+- **`/route` is a card** (Markdown), so it reads well in the terminal, the desktop app and the Claude mobile app via Remote Control: model and why, cache time left, test gate, running sub-agents and background tasks, session cost and savings (from the dashboard when it is running), recent decisions as a table.
+- Dashboard: cache time left and the last test-gate result next to the model; test-gate results in the event log.
+- Dashboard: **Add to Home Screen** — icons and a web app manifest; opens full-screen on the card, with a way back and forth to the full board.
 - **Desktop card** (`agent-viz/widget`): a small always-on-top window for macOS and Windows with the current task, model, step, running sub-agents and background tasks, and approval alerts. Also at `http://localhost:4321/mini` in any browser.
 - The board shows **background tasks** (Monitor, `run_in_background` commands) and counts background sub-agents as running instead of finished.
 - "Last activity N s ago" next to the delegation title.
 
 ### Changed
+- FAQ: corrected the claim that switching models always pays for itself within a dozen calls; with a warm cache it often does not.
+- The mini card's approval hint mentions the Claude app as well as the terminal.
 - The delegation view shows only the current turn plus anything still running; finished cards collapse to one line, running edges flow as dashed lines.
 - Task titles are shortened to one clause; the full prompt is one click away.
 
@@ -51,4 +58,5 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 
 - First version of the per-turn model router.
 
+[0.4.0]: https://github.com/paxon-yang/claude-agent-tools/compare/v0.3.0...main
 [0.3.0]: https://github.com/paxon-yang/claude-agent-tools/releases/tag/v0.3.0

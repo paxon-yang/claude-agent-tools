@@ -51,5 +51,37 @@
     "sonnet": "medium",
     "opus": "medium",
     "fable": "medium"
+  },
+  "cache": {
+    "enabled": true,
+    "ttlSeconds": "auto",
+    "returnWeight": null,
+    "minExtraUsd": 0.02,
+    "prices": {
+      "haiku": {
+        "in": 0.1,
+        "out": 0.5
+      },
+      "sonnet": {
+        "in": 2,
+        "out": 10
+      },
+      "opus": {
+        "in": 4,
+        "out": 20
+      },
+      "fable": {
+        "in": 10,
+        "out": 50
+      }
+    }
+  },
+  "qualityGate": {
+    "enabled": true,
+    "command": null,
+    "trustTier": "opus",
+    "escalateTo": "opus",
+    "timeoutSec": 180,
+    "maxRetries": 1
   }
 }
