@@ -182,7 +182,7 @@ class MainActivity : Activity() {
         preview.removeAllViews()
         val dm = resources.displayMetrics
         val wDp = if (preview.width > 0) preview.width / dm.density else dm.widthPixels / dm.density - 40f
-        val v: View = CardWidget.build(this, wDp to 250f).apply(this, preview)
+        val v: View = CardWidget.build(this, wDp to 290f).apply(this, preview)
         preview.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         showSkins()
     }

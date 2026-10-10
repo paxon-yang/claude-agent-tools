@@ -7,8 +7,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.SizeF
 import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
@@ -69,6 +71,12 @@ class CardWidget : AppWidgetProvider() {
 
         /** 卡片的大小（dp，竖屏）；拿不到就用默认的 4×3 / the card's size in dp (portrait), or the default 4×3 */
         fun sizeOf(o: Bundle?): Pair<Float, Float> {
+            // 安卓 12 起启动器会给出卡片的真实大小 / Android 12+ launchers report the actual sizes
+            if (o != null && Build.VERSION.SDK_INT >= 31) {
+                @Suppress("DEPRECATION")
+                val sizes = o.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+                sizes?.firstOrNull()?.let { if (it.width > 0 && it.height > 0) return it.width to it.height }
+            }
             val w = o?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
             val h = o?.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) ?: 0
             return (if (w > 0) w.toFloat() else 340f) to (if (h > 0) h.toFloat() else 250f)
