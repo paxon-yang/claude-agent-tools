@@ -223,6 +223,89 @@ main { min-width: 0; padding-bottom: 64px; }
 .more { font-size: 12px; color: rgba(235, 235, 245, .55); padding: 2px 4px; }
 .solo-note { margin-left: 32px; padding: 16px 18px; border-radius: var(--r-lg); color: rgba(235, 235, 245, .6); font-size: 13px; max-width: 420px; }
 
+/* ---------- 分工图的交互与动效 ---------- */
+.fsvg .eg path { fill: none; stroke-width: 1.5; stroke-linecap: round; stroke: rgba(255, 255, 255, .2); transition: stroke-width .25s, stroke .25s; }
+.fsvg .eg.running path { stroke: color-mix(in srgb, var(--c) 50%, transparent); }
+.fsvg .eg.failed path, .fsvg .eg.stopped path { stroke: rgba(255, 105, 97, .6); stroke-dasharray: 2 4; }
+.fsvg .eg { transition: opacity .25s; }
+.fsvg .eg.hl path { stroke-width: 2.5; stroke: var(--c); filter: drop-shadow(0 0 6px var(--c)); }
+.fsvg .eg.dim { opacity: .22; }
+.fsvg .eg .dot1 { stroke: var(--tile); stroke-width: 2; fill: rgba(255, 255, 255, .5); transition: r .2s; }
+.fsvg .eg.running .dot1, .fsvg .eg.hl .dot1 { fill: var(--c); }
+.fsvg .eg.failed .dot1 { fill: #FF6961; }
+.fsvg .pt { fill: var(--c); filter: drop-shadow(0 0 4px var(--c)); }
+.fsvg .back { fill: #63E28A; filter: drop-shadow(0 0 6px #34C759); }
+
+.agcol-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 4px 4px; }
+.agcol-top .agcol-h { margin: 0; }
+.filters { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .1); }
+.filters:empty { display: none; }
+.filters button { border: 0; background: none; color: rgba(235, 235, 245, .66); font-size: 12px; padding: 3px 10px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+.filters button span { opacity: .6; margin-left: 2px; }
+.filters button.on { background: rgba(255, 255, 255, .18); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22); }
+.aglist { display: flex; flex-direction: column; gap: 10px; }
+.more { align-self: flex-start; margin: 4px 0 0 4px; border: 0; background: rgba(255, 255, 255, .08); color: #fff; font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.more[hidden] { display: none; }
+
+.panel.dark .glass::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .35s;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, -30%), rgba(255, 255, 255, .14), transparent 62%); }
+.panel.dark .glass:hover::before { opacity: 1; }
+.mn, .ag { cursor: pointer; transition: transform .45s cubic-bezier(.2, .8, .2, 1), opacity .3s, border-color .3s, box-shadow .3s; }
+.mn:hover, .ag:hover { transform: translateY(-2px); }
+.mn:active, .ag:active { transform: scale(.985); }
+.mn.sel, .ag.sel { border-color: rgba(255, 255, 255, .45); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 0 0 3px rgba(41, 151, 255, .35); }
+.ag.dim { opacity: .42; }
+.ag .chev { position: absolute; right: 14px; bottom: 10px; color: rgba(235, 235, 245, .5); font-size: 16px; opacity: 0; transform: translateX(-4px); transition: opacity .25s, transform .25s; }
+.ag:hover .chev, .ag:focus-visible .chev { opacity: 1; transform: none; }
+.mn .stats .chev { margin-left: auto; color: rgba(235, 235, 245, .5); opacity: 0; transition: opacity .25s; }
+.mn:hover .stats .chev, .mn:focus-visible .stats .chev { opacity: 1; }
+.ag.enter { animation: ag-in .7s cubic-bezier(.2, .9, .25, 1.12) both; animation-delay: calc(var(--i, 0) * 70ms); }
+@keyframes ag-in { from { opacity: 0; transform: translateX(28px) scale(.96); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+.ag.just-done { animation: ag-done 1.3s ease-out; }
+@keyframes ag-done { 0% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 0 rgba(52, 199, 89, .6); } 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 0 16px rgba(52, 199, 89, 0); } }
+.ag.just-done .si.done { animation: si-pop .55s cubic-bezier(.2, .9, .3, 1.5); }
+@keyframes si-pop { from { transform: scale(.3); } to { transform: none; } }
+
+/* 详情抽屉：浅色液态玻璃 */
+.scrim { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .16); opacity: 0; pointer-events: none; transition: opacity .35s; }
+body.sheet-open .scrim { opacity: 1; pointer-events: auto; }
+.sheet { position: fixed; top: 12px; right: 12px; bottom: 12px; z-index: 31; width: min(440px, calc(100vw - 24px)); overflow-y: auto; padding: 22px 22px 28px; border-radius: 28px;
+  background: rgba(250, 250, 252, .78); -webkit-backdrop-filter: saturate(180%) blur(30px); backdrop-filter: saturate(180%) blur(30px);
+  border: 1px solid rgba(255, 255, 255, .75); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), 0 30px 80px -24px rgba(0, 0, 0, .35);
+  transform: translateX(calc(100% + 32px)); transition: transform .55s cubic-bezier(.2, .9, .22, 1); }
+body.sheet-open .sheet { transform: none; }
+.sheet-x { position: sticky; top: 0; float: right; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .06); color: var(--ink80); cursor: pointer; font-size: 12px; z-index: 1; }
+.sheet-x:hover { background: rgba(0, 0, 0, .1); }
+.sh-h { display: flex; align-items: center; gap: 12px; margin: 2px 40px 18px 0; }
+.sh-h > div { min-width: 0; flex: 1; }
+.sh-h b { display: block; font-family: var(--display); font-size: 21px; font-weight: 600; letter-spacing: .231px; }
+.sh-h span { font-size: 12px; color: var(--muted); }
+.sh-h .pill { flex: none; }
+.sh-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border-radius: var(--r-md); overflow: hidden; background: var(--hair); margin-bottom: 18px; }
+.sh-facts > div { background: rgba(255, 255, 255, .8); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.sh-facts span { font-size: 11px; color: var(--muted); }
+.sh-facts b { font-size: 14px; font-weight: 600; }
+.sheet h4 { margin: 18px 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.sh-text { font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; background: rgba(255, 255, 255, .7); border-radius: var(--r-md); padding: 12px 14px; }
+.sh-empty { color: var(--muted); font-size: 13px; }
+.steps, .dec { list-style: none; margin: 0; padding: 0; border-radius: var(--r-md); background: rgba(255, 255, 255, .7); overflow: hidden; }
+.steps li, .dec li { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: baseline; padding: 8px 12px; font-size: 12px; border-top: 1px solid var(--hair2); }
+.steps li:first-child, .dec li:first-child { border-top: 0; }
+.steps .t, .dec .t { color: var(--muted); }
+.steps .l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.steps .r { color: var(--muted); }
+.steps li.bad .r { color: var(--red-i); font-weight: 600; }
+.steps li.run .r { color: var(--green-i); font-weight: 600; }
+.dec li { grid-template-columns: 44px auto 1fr; }
+.dec .why { color: var(--ink80); }
+@media (max-width: 860px) {
+  .sheet { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 84vh; border-radius: 24px; transform: translateY(calc(100% + 24px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mn, .ag, .sheet, .scrim { transition: none; }
+  .ag.enter, .ag.just-done, .ag.just-done .si.done { animation: none; }
+}
+
 /* ---------- 时间轴 ---------- */
 .tl { position: relative; }
 .tl-axis { position: relative; height: 22px; margin-left: 112px; }
@@ -330,6 +413,8 @@ details.log summary small { font-family: var(--text); font-weight: 400; color: v
   <main id="main"></main>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="sheet" id="sheet" aria-hidden="true" aria-label="详情"><button class="sheet-x" id="sheetx" aria-label="关闭">✕</button><div id="sheetbody"></div></aside>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -496,10 +581,17 @@ function ring(pct, fam) {
   const cls = pct > .85 ? 'bad' : pct > .6 ? 'warn' : '';
   return `<div class="ring ${f(fam)} ${cls}" title="上下文占用 ${(pct * 100).toFixed(1)}%"><svg width="58" height="58" viewBox="0 0 58 58"><circle class="rbg" cx="29" cy="29" r="${r}" fill="none" stroke-width="5"/><circle class="rfg" cx="29" cy="29" r="${r}" fill="none" stroke-width="5" stroke-dasharray="${(c * v).toFixed(1)} ${c.toFixed(1)}"/></svg><span>${pct < .1 ? (pct * 100).toFixed(1) : Math.round(pct * 100)}%</span></div>`;
 }
-function renderFlow(s) {
+
+// ---------- 分工图：按 id 增量更新，卡片和连线的动画不会被刷新打断 ----------
+const NS = 'http://www.w3.org/2000/svg';
+const RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const flowState = { sid: null, prev: new Map(), filter: 'all', showAll: false, hover: null, open: null, pulse: new Set(), first: true };
+function setHTML(el, html) { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } }
+const famKey = fm => (fm === 'mythos' ? 'fable' : fm || 'none');
+
+function mainInner(s) {
   const k = stKey(s);
   const pct = s.contextLimit ? s.context / s.contextLimit : 0;
-  const a = s.advisor || {};
   const kids = s.agents || [];
   const live = kids.filter(x => x.status === 'running').length;
   const stLabel = { running: '运行中', need: '等你确认', idle: '等你下一步', ended: '已结束' }[k];
@@ -508,77 +600,235 @@ function renderFlow(s) {
     : k === 'need' ? '<span class="pulse need"></span><span style="color:#FF8A80;font-weight:600">等你在终端里确认</span>'
     : s.lastTool ? `<span class="pulse off"></span><span>上一步</span><span class="mono">${esc(s.lastTool)}</span>` : '<span class="pulse off"></span><span>空闲</span>';
   const name = s.model || '主会话';
-  const main = `<div class="mn glass ${f(s.family)}" id="fmain">
-      <div class="hd"><span class="glyph ${f(s.family)}">${esc((NAMES[s.family] || name)[0])}</span><div class="ttl"><b>${esc(name)}</b><span>主会话 · 计划、派活、汇总、检查</span></div><span class="state ${k}"><i></i>${stLabel}</span></div>
-      <div class="gauges"><div class="g-l"><div><span>effort</span>${meter(s.effort, s.family)}</div><div><span>上下文</span><b class="num">${kfmt(s.context)} / ${kfmt(s.contextLimit)}</b></div></div>${ring(pct, s.family)}</div>
-      <div class="now">${nowLine}</div>
-      ${s.test ? `<div class="test ${s.test.failed ? 'bad' : 'good'}">${s.test.failed ? '测试有失败' : '测试通过'}：${s.test.passed}/${s.test.total}</div>` : ''}
-      <div class="stats"><span>工具 <b class="num">${s.toolCount}</b> 次</span><span>子代理 <b class="num">${s.totalAgents}</b> 个</span><span>完成 <b class="num">${s.tasksDone}</b> 轮</span></div>
-    </div>`;
-  const adv = a.calls ? `<div class="adv" id="fadv"><b>Fable 顾问 · 已介入 ${a.calls} 次</b>${a.last ? '<br>' + esc(a.last.slice(0, 150)) + (a.last.length > 150 ? '…' : '') : ''}</div>` : '';
-  const shown = kids.slice(-6), hidden = kids.length - shown.length;
-  const cards = shown.map(x => `<div class="ag glass ${f(x.family)} ${esc(x.status)}" data-aid="${esc(x.id)}" data-st="${esc(x.status)}">
-      <div class="r1"><span class="glyph sm ${f(x.family)}">${esc((NAMES[x.family] || x.model || '?')[0])}</span>
-        <div class="who"><span class="ty">${esc(x.type)}</span><span class="mdl"><b>${esc(x.model || '模型未知')}</b>${meter(x.effort, x.family)}</span></div>
-        <span class="side"><span class="num">${timer(x.startedAt, x.endedAt)}</span><span class="si ${esc(x.status)}" title="${esc(STATUS[x.status] || x.status)}">${SI[x.status] || ''}</span></span></div>
-      <div class="ds" title="${esc(x.description || '')}">${esc(x.description || '（没有取到任务描述）')}</div>
-      ${x.status === 'running' ? `<div class="r3"><span>${x.currentTool ? '正在' : '思考中…'}</span>${x.currentTool ? `<span class="mono">${esc(x.currentTool)}</span>` : ''}</div>`
-        : x.lastMessage ? `<div class="r3 ret" title="${esc(x.lastMessage)}">交回：${esc(x.lastMessage)}</div>` : `<div class="r3">用了 ${x.toolCount} 次工具</div>`}
-    </div>`).join('');
-  const right = kids.length
-    ? `<span class="gap"></span><div class="agcol"><div class="agcol-h">派出 <b>${kids.length}</b> 个子代理${live ? `，<b>${live}</b> 个在跑` : '，都已交回'}</div>${cards}${hidden ? `<div class="more">还有 ${hidden} 个更早派出的</div>` : ''}</div>`
-    : `<div class="solo-note glass">这一轮没有派子代理，主会话自己在做。</div>`;
-  const fams = [...new Set(kids.map(x => x.family).filter(Boolean))];
-  const gl = [`radial-gradient(420px 320px at 18% 50%, color-mix(in srgb, var(--${s.family === 'mythos' ? 'fable' : s.family || 'none'}) 30%, transparent), transparent 70%)`]
-    .concat(fams.slice(0, 3).map((fm, i) => `radial-gradient(360px 260px at 78% ${20 + i * 30}%, color-mix(in srgb, var(--${fm === 'mythos' ? 'fable' : fm}) 24%, transparent), transparent 70%)`));
-  put('glow', `<div style="position:absolute;inset:0;background:${gl.join(',')}"></div>`);
-  put('flowsub', s.earlierAgents ? `这个会话更早还派过 ${s.earlierAgents} 个子代理` : '');
-  put('flow', `<div class="flowwrap" id="fwrap"><svg class="fsvg" id="fsvg" aria-hidden="true"></svg><div class="flowgrid ${kids.length ? '' : 'solo'}"><div class="leftcol">${main}${adv}</div>${right}</div></div>`);
-  requestAnimationFrame(drawEdges);
+  return `<div class="hd"><span class="glyph ${f(s.family)}">${esc((NAMES[s.family] || name)[0])}</span><div class="ttl"><b>${esc(name)}</b><span>主会话 · 计划、派活、汇总、检查</span></div><span class="state ${k}"><i></i>${stLabel}</span></div>
+    <div class="gauges"><div class="g-l"><div><span>effort</span>${meter(s.effort, s.family)}</div><div><span>上下文</span><b class="num">${kfmt(s.context)} / ${kfmt(s.contextLimit)}</b></div></div>${ring(pct, s.family)}</div>
+    <div class="now">${nowLine}</div>
+    ${s.test ? `<div class="test ${s.test.failed ? 'bad' : 'good'}">${s.test.failed ? '测试有失败' : '测试通过'}：${s.test.passed}/${s.test.total}</div>` : ''}
+    <div class="stats"><span>工具 <b class="num">${s.toolCount}</b> 次</span><span>子代理 <b class="num">${s.totalAgents}</b> 个</span><span>完成 <b class="num">${s.tasksDone}</b> 轮</span><span class="chev">详情 ›</span></div>`;
+}
+function agentInner(x) {
+  return `<div class="r1"><span class="glyph sm ${f(x.family)}">${esc((NAMES[x.family] || x.model || '?')[0])}</span>
+      <div class="who"><span class="ty">${esc(x.type)}</span><span class="mdl"><b>${esc(x.model || '模型未知')}</b>${meter(x.effort, x.family)}</span></div>
+      <span class="side"><span class="num">${timer(x.startedAt, x.endedAt)}</span><span class="si ${esc(x.status)}" title="${esc(STATUS[x.status] || x.status)}">${SI[x.status] || ''}</span></span></div>
+    <div class="ds">${esc(x.description || '（没有取到任务描述）')}</div>
+    ${x.status === 'running' ? `<div class="r3"><span>${x.currentTool ? '正在' : '思考中…'}</span>${x.currentTool ? `<span class="mono">${esc(x.currentTool)}</span>` : ''}</div>`
+      : x.lastMessage ? `<div class="r3 ret">交回：${esc(x.lastMessage)}</div>` : `<div class="r3">用了 ${x.toolCount} 次工具</div>`}
+    <span class="chev" aria-hidden="true">›</span>`;
 }
 
-// 按卡片的实际位置画连线：并排时从主会话右侧画曲线到每个子代理左侧；窄屏上下排列时从左边竖线分出去
+function renderFlow(s) {
+  const flow = document.getElementById('flow');
+  if (!flow) return;
+  if (flowState.sid !== s.id || !document.getElementById('fwrap')) {
+    Object.assign(flowState, { sid: s.id, prev: new Map(), filter: 'all', showAll: false, hover: null, first: true });
+    flowState.pulse.clear();
+    if (flowState.open) closeSheet();
+    flow._h = null;
+    flow.innerHTML = `<div class="flowwrap" id="fwrap"><svg class="fsvg" id="fsvg" aria-hidden="true"><g id="edges"></g></svg>
+      <div class="flowgrid" id="fgrid"><div class="leftcol"><div class="mn glass" id="fmain" tabindex="0" role="button" aria-label="查看主会话详情"></div><div id="fadvbox"></div></div>
+      <span class="gap"></span><div class="agcol" id="agcol"><div class="agcol-top"><div class="agcol-h" id="agh"></div><div class="filters" id="filters" role="tablist"></div></div>
+      <div class="aglist" id="aglist"></div><button class="more" id="agmore" hidden></button></div></div></div>`;
+  }
+  const a = s.advisor || {};
+  const kids = s.agents || [];
+  const live = kids.filter(x => x.status === 'running').length;
+  const fmain = document.getElementById('fmain');
+  fmain.className = `mn glass ${f(s.family)}${flowState.open && flowState.open.kind === 'main' ? ' sel' : ''}`;
+  setHTML(fmain, mainInner(s));
+  setHTML(document.getElementById('fadvbox'), a.calls ? `<div class="adv" id="fadv"><b>Fable 顾问 · 已介入 ${a.calls} 次</b>${a.last ? '<br>' + esc(a.last.slice(0, 150)) + (a.last.length > 150 ? '…' : '') : ''}</div>` : '');
+
+  // 筛选
+  const cnt = { all: kids.length, running: live, done: kids.filter(x => x.status === 'done').length, failed: kids.filter(x => x.status === 'failed' || x.status === 'stopped').length };
+  if (flowState.filter !== 'all' && !cnt[flowState.filter]) flowState.filter = 'all';
+  const tabs = [['all', '全部'], ['running', '在跑'], ['done', '已完成'], ['failed', '出错']].filter(([k2]) => k2 === 'all' || cnt[k2]);
+  setHTML(document.getElementById('filters'), kids.length > 1 && tabs.length > 2 ? tabs.map(([k2, l]) => `<button role="tab" data-filter="${k2}" class="${flowState.filter === k2 ? 'on' : ''}" aria-selected="${flowState.filter === k2}">${l} <span class="num">${cnt[k2]}</span></button>`).join('') : '');
+  setHTML(document.getElementById('agh'), kids.length ? `派出 <b>${kids.length}</b> 个子代理${live ? `，<b>${live}</b> 个在跑` : '，都已交回'}` : '');
+  const list = kids.filter(x => flowState.filter === 'all' || (flowState.filter === 'failed' ? (x.status === 'failed' || x.status === 'stopped') : x.status === flowState.filter));
+  const visible = flowState.showAll ? list : list.slice(-6);
+  const more = document.getElementById('agmore');
+  more.hidden = list.length <= 6;
+  more.textContent = flowState.showAll ? '收起' : `显示全部 ${list.length} 个`;
+  document.getElementById('fgrid').classList.toggle('solo', !kids.length);
+
+  const box = document.getElementById('aglist');
+  if (!kids.length) {
+    setHTML(box, '<div class="solo-note glass">这一轮没有派子代理，主会话自己在做。</div>');
+  } else {
+    if (box.querySelector('.solo-note')) { box.innerHTML = ''; box._h = null; }
+    const want = new Set(visible.map(x => x.id));
+    [...box.children].forEach(el => { if (!want.has(el.dataset.aid)) el.remove(); });
+    visible.forEach((x, i) => {
+      let el = box.querySelector(`[data-aid="${CSS.escape(x.id)}"]`);
+      if (!el) {
+        el = document.createElement('div');
+        el.dataset.aid = x.id; el.tabIndex = 0; el.setAttribute('role', 'button'); el.setAttribute('aria-label', `查看 ${x.type} 的详情`);
+        if (!RM) { el.classList.add('enter'); el.style.setProperty('--i', flowState.first ? i : 0); setTimeout(() => el.classList.remove('enter'), 1200); }
+      }
+      if (box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
+      const keep = ['enter', 'just-done', 'hl', 'dim'].filter(c => el.classList.contains(c));
+      el.className = `ag glass ${f(x.family)} ${x.status}${flowState.open && flowState.open.id === x.id ? ' sel' : ''} ${keep.join(' ')}`;
+      el.dataset.st = x.status;
+      setHTML(el, agentInner(x));
+      const prev = flowState.prev.get(x.id);
+      if (prev === 'running' && x.status !== 'running' && !RM) {
+        el.classList.add('just-done'); setTimeout(() => el.classList.remove('just-done'), 1400);
+        if (x.status === 'done') flowState.pulse.add(x.id);
+      }
+    });
+  }
+  kids.forEach(x => flowState.prev.set(x.id, x.status));
+  flowState.first = false;
+
+  const fams = [...new Set(kids.map(x => x.family).filter(Boolean))];
+  const gl = [`radial-gradient(420px 320px at 18% 50%, color-mix(in srgb, var(--${famKey(s.family)}) 30%, transparent), transparent 70%)`]
+    .concat(fams.slice(0, 3).map((fm, i) => `radial-gradient(360px 260px at 78% ${20 + i * 30}%, color-mix(in srgb, var(--${famKey(fm)}) 24%, transparent), transparent 70%)`));
+  put('glow', `<div style="position:absolute;inset:0;background:${gl.join(',')}"></div>`);
+  put('flowsub', s.earlierAgents ? `这个会话更早还派过 ${s.earlierAgents} 个子代理` : '点卡片看详情');
+  requestAnimationFrame(() => { drawEdges(); applyHover(); });
+  if (flowState.open) renderSheet(s);
+}
+
+// 连线：每个子代理一组 <g>，路径只改 d；在跑的连线上有光点从主会话流向子代理，完成时有一颗绿点流回主会话
 function drawEdges() {
-  const wrap = document.getElementById('fwrap'), svg = document.getElementById('fsvg'), mainEl = document.getElementById('fmain');
-  if (!wrap || !svg || !mainEl) return;
-  const W = wrap.getBoundingClientRect();
-  const M = mainEl.getBoundingClientRect();
-  const famVar = el => { const m = (el.className.match(/f-(\w+)/) || [])[1] || 'none'; return `var(--${m === 'mythos' ? 'fable' : m}-l)`; };
-  let out = '';
+  const wrap = document.getElementById('fwrap'), g = document.getElementById('edges'), mainEl = document.getElementById('fmain');
+  if (!wrap || !g || !mainEl) return;
+  const W = wrap.getBoundingClientRect(), M = mainEl.getBoundingClientRect();
   const cards = [...wrap.querySelectorAll('.ag')];
   const stacked = cards.length && cards[0].getBoundingClientRect().top > M.bottom - 2;
+  const x0 = stacked ? M.left - W.left + 14 : M.right - W.left, y0 = stacked ? M.bottom - W.top : M.top + M.height / 2 - W.top;
+  const seen = new Set();
   cards.forEach(el => {
+    const id = el.dataset.aid, st = el.dataset.st, safe = id.replace(/[^\w-]/g, '_');
+    seen.add(id);
     const R = el.getBoundingClientRect();
-    const st = el.dataset.st;
-    const cls = st === 'running' ? 'e-run' : st === 'failed' ? 'e-fail' : 'e-done';
-    const color = famVar(el);
-    let d, x0, y0, x1, y1;
-    if (!stacked) {
-      x0 = M.right - W.left; y0 = M.top + M.height / 2 - W.top;
-      x1 = R.left - W.left; y1 = R.top + R.height / 2 - W.top;
-      const dx = (x1 - x0) * 0.55;
-      d = `M${x0},${y0} C${x0 + dx},${y0} ${x1 - dx},${y1} ${x1},${y1}`;
-    } else {
-      x0 = M.left - W.left + 14; y0 = M.bottom - W.top;
-      x1 = R.left - W.left; y1 = R.top + R.height / 2 - W.top;
-      d = `M${x0},${y0} L${x0},${y1 - 10} Q${x0},${y1} ${x0 + 10},${y1} L${x1},${y1}`;
+    const x1 = R.left - W.left, y1 = R.top + R.height / 2 - W.top;
+    let d;
+    if (!stacked) { const dx = (x1 - x0) * 0.55; d = `M${x0},${y0} C${x0 + dx},${y0} ${x1 - dx},${y1} ${x1},${y1}`; }
+    else d = `M${x0},${y0} L${x0},${y1 - 10} Q${x0},${y1} ${x0 + 10},${y1} L${x1},${y1}`;
+    let grp = g.querySelector(`[data-e="${CSS.escape(id)}"]`), fresh = false;
+    if (!grp) {
+      grp = document.createElementNS(NS, 'g'); grp.dataset.e = id;
+      grp.innerHTML = `<path class="edge" id="ep-${safe}"/><g class="parts"></g><circle class="dot1" r="4.5"/>`;
+      g.appendChild(grp); fresh = true;
     }
-    out += `<path class="${cls}" style="--c:${color}" d="${d}"/><circle class="dot1" cx="${x1}" cy="${y1}" r="4.5" fill="${st === 'running' ? color : st === 'failed' ? 'var(--red)' : 'rgba(255,255,255,.55)'}"/>`;
+    const fm = (el.className.match(/f-(\w+)/) || [])[1];
+    grp.style.setProperty('--c', `var(--${famKey(fm)}-l)`);
+    grp.setAttribute('class', `eg ${st}${el.classList.contains('hl') ? ' hl' : ''}${el.classList.contains('dim') ? ' dim' : ''}`);
+    const path = grp.querySelector('path');
+    if (path.getAttribute('d') !== d) path.setAttribute('d', d);
+    const dot = grp.querySelector('.dot1');
+    dot.setAttribute('cx', x1); dot.setAttribute('cy', y1);
+    if (fresh && !RM && path.getTotalLength) {
+      const len = path.getTotalLength();
+      path.style.strokeDasharray = len; path.style.strokeDashoffset = len;
+      path.getBoundingClientRect();
+      path.style.transition = 'stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1)';
+      path.style.strokeDashoffset = '0';
+      setTimeout(() => { path.style.strokeDasharray = ''; path.style.strokeDashoffset = ''; path.style.transition = ''; }, 900);
+    }
+    const parts = grp.querySelector('.parts');
+    const flowing = st === 'running' && !RM;
+    if (flowing && !parts.querySelector('.pt')) {
+      parts.innerHTML = [0, 1, 2].map(i => `<circle class="pt" r="2.4"><animateMotion dur="1.8s" begin="${(-i * 0.6).toFixed(1)}s" repeatCount="indefinite"><mpath href="#ep-${safe}" xlink:href="#ep-${safe}"/></animateMotion></circle>`).join('');
+    } else if (!flowing && parts.querySelector('.pt')) parts.innerHTML = '';
+    if (flowState.pulse.has(id) && !RM) {
+      flowState.pulse.delete(id);
+      parts.insertAdjacentHTML('beforeend', `<circle class="back" r="3.5"><animateMotion dur=".9s" begin="indefinite" fill="freeze" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#ep-${safe}" xlink:href="#ep-${safe}"/></animateMotion></circle>`);
+      const c = parts.lastElementChild, am = c.querySelector('animateMotion');
+      try { am.beginElement(); } catch (e) { }
+      setTimeout(() => c.remove(), 1000);
+    }
   });
+  [...g.querySelectorAll(':scope > g[data-e]')].forEach(grp => { if (!seen.has(grp.dataset.e)) grp.remove(); });
+  let d0 = g.querySelector('.dot0');
   if (cards.length) {
-    const x0 = stacked ? M.left - W.left + 14 : M.right - W.left, y0 = stacked ? M.bottom - W.top : M.top + M.height / 2 - W.top;
-    out += `<circle class="dot0" cx="${x0}" cy="${y0}" r="5"/>`;
-  }
+    if (!d0) { d0 = document.createElementNS(NS, 'circle'); d0.setAttribute('class', 'dot0'); d0.setAttribute('r', '5'); g.appendChild(d0); }
+    d0.setAttribute('cx', x0); d0.setAttribute('cy', y0);
+  } else if (d0) d0.remove();
+  let ea = g.querySelector('.e-adv');
   const adv = document.getElementById('fadv');
-  if (adv) {
-    const A = adv.getBoundingClientRect();
-    const x = A.left - W.left - (stacked ? 0 : 14), y0 = M.bottom - W.top - 18, y1 = A.top + A.height / 2 - W.top;
-    if (!stacked) out += `<path class="e-adv" d="M${M.left - W.left + 14},${M.bottom - W.top} L${M.left - W.left + 14},${y1 - 8} Q${M.left - W.left + 14},${y1} ${M.left - W.left + 22},${y1} L${A.left - W.left},${y1}"/>`;
-    void x; void y0;
-  }
-  svg.innerHTML = out;
+  if (adv && !stacked) {
+    const A = adv.getBoundingClientRect(), xa = M.left - W.left + 14, ya = A.top + A.height / 2 - W.top;
+    if (!ea) { ea = document.createElementNS(NS, 'path'); ea.setAttribute('class', 'e-adv'); g.appendChild(ea); }
+    ea.setAttribute('d', `M${xa},${M.bottom - W.top} L${xa},${ya - 8} Q${xa},${ya} ${xa + 8},${ya} L${A.left - W.left},${ya}`);
+  } else if (ea) ea.remove();
 }
+
+// 悬停：高亮这张卡和它的连线，其余变淡
+function applyHover() {
+  const id = flowState.hover;
+  document.querySelectorAll('#aglist .ag').forEach(el => { el.classList.toggle('hl', !!id && el.dataset.aid === id); el.classList.toggle('dim', !!id && el.dataset.aid !== id); });
+  document.querySelectorAll('#edges > g[data-e]').forEach(grp => { grp.classList.toggle('hl', !!id && grp.dataset.e === id); grp.classList.toggle('dim', !!id && grp.dataset.e !== id); });
+}
+document.addEventListener('mouseover', e => {
+  const card = e.target.closest && e.target.closest('#aglist .ag');
+  const id = card ? card.dataset.aid : null;
+  if (id !== flowState.hover) { flowState.hover = id; applyHover(); }
+});
+// 液态玻璃：高光跟着鼠标走
+document.addEventListener('pointermove', e => {
+  const el = e.target.closest && e.target.closest('.panel.dark .glass');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty('--mx', (e.clientX - r.left) + 'px'); el.style.setProperty('--my', (e.clientY - r.top) + 'px');
+});
+document.addEventListener('click', e => {
+  const t = e.target;
+  const fb = t.closest && t.closest('#filters button');
+  if (fb) { flowState.filter = fb.dataset.filter; flowState.showAll = false; const s = pick(); if (s) renderFlow(s); return; }
+  if (t.closest && t.closest('#agmore')) { flowState.showAll = !flowState.showAll; const s = pick(); if (s) renderFlow(s); return; }
+  const card = t.closest && t.closest('#aglist .ag');
+  if (card) { openSheet({ kind: 'agent', id: card.dataset.aid }); return; }
+  if (t.closest && t.closest('#fmain')) { openSheet({ kind: 'main' }); return; }
+  if (t.closest && (t.closest('#scrim') || t.closest('#sheetx'))) closeSheet();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && flowState.open) { closeSheet(); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && (document.activeElement.matches('#aglist .ag') || document.activeElement.id === 'fmain')) {
+    e.preventDefault(); document.activeElement.click();
+  }
+});
 window.addEventListener('resize', () => requestAnimationFrame(drawEdges));
+
+// ---------- 详情面板（液态玻璃抽屉） ----------
+function openSheet(o) {
+  flowState.open = o; flowState.lastFocus = document.activeElement;
+  document.body.classList.add('sheet-open');
+  document.getElementById('sheet').setAttribute('aria-hidden', 'false');
+  const s = pick(); if (s) { renderFlow(s); renderSheet(s); }
+  setTimeout(() => { const x = document.getElementById('sheetx'); if (x) x.focus(); }, 50);
+}
+function closeSheet() {
+  flowState.open = null;
+  document.body.classList.remove('sheet-open');
+  const sh = document.getElementById('sheet'); if (sh) sh.setAttribute('aria-hidden', 'true');
+  document.querySelectorAll('#aglist .ag.sel, #fmain.sel').forEach(el => el.classList.remove('sel'));
+  if (flowState.lastFocus && flowState.lastFocus.focus) flowState.lastFocus.focus();
+}
+function stepsHTML(steps) {
+  if (!steps || !steps.length) return '<div class="sh-empty">还没有记录到工具调用。</div>';
+  return `<ol class="steps">${steps.slice().reverse().map(p => `<li class="${p.end ? (p.ok ? 'ok' : 'bad') : 'run'}"><span class="t num">${hm(p.ts)}</span><span class="l mono">${esc(p.label)}</span><span class="r num">${p.end ? (p.ok ? dur(p.end - p.ts) : '失败') : '进行中'}</span></li>`).join('')}</ol>`;
+}
+function renderSheet(s) {
+  const o = flowState.open; if (!o) return;
+  const body = document.getElementById('sheetbody');
+  if (o.kind === 'main') {
+    const pct = s.contextLimit ? s.context / s.contextLimit : 0;
+    const ds = (s.decisions || []).slice().reverse();
+    setHTML(body, `<div class="sh-h"><span class="glyph ${f(s.family)}">${esc((NAMES[s.family] || s.model || '?')[0])}</span><div><b>${esc(s.model || '主会话')}</b><span>主会话 · ${esc(s.project)}</span></div></div>
+      <div class="sh-facts"><div><span>effort</span><b>${esc(s.effort || '—')}</b></div><div><span>上下文</span><b class="num">${kfmt(s.context)}（${Math.round(pct * 100)}%）</b></div><div><span>工具调用</span><b class="num">${s.toolCount} 次</b></div><div><span>子代理</span><b class="num">${s.totalAgents} 个</b></div></div>
+      <h4>为什么用这个模型</h4>${ds.length ? `<ol class="dec">${ds.map(d0 => `<li><span class="t num">${hm(d0.at)}</span><span>${chip(d0.fam, d0.model)}</span><span class="why">${esc(d0.by ? d0.by + '：' : '')}${esc(d0.reason || '')}</span></li>`).join('')}</ol>` : '<div class="sh-empty">没有自动选模型的记录（可能关掉了 auto-router）。</div>'}
+      <h4>最近的步骤</h4>${stepsHTML(s.steps)}`);
+    return;
+  }
+  const x = (s.agents || []).find(y => y.id === o.id);
+  if (!x) { setHTML(body, '<div class="sh-empty" style="padding-top:40px">这个子代理不在当前这一轮里了。</div>'); return; }
+  setHTML(body, `<div class="sh-h"><span class="glyph ${f(x.family)}">${esc((NAMES[x.family] || x.model || '?')[0])}</span><div><b>${esc(x.type)}</b><span>${esc(x.model || '模型未知')} · ${esc(x.modelSource || '')}</span></div><span class="pill ${x.status === 'running' ? 'running' : x.status === 'done' ? 'idle' : 'need'}">${esc(STATUS[x.status] || x.status)}</span></div>
+    <div class="sh-facts"><div><span>用时</span><b class="num">${timer(x.startedAt, x.endedAt)}</b></div><div><span>effort</span><b>${esc(x.effort || '—')}</b></div><div><span>工具调用</span><b class="num">${x.toolCount} 次</b></div><div><span>开始</span><b class="num">${hm(x.startedAt)}</b></div></div>
+    <h4>派给它的活</h4><div class="sh-text">${esc(x.description || '（没有取到任务描述）')}</div>
+    ${x.lastMessage ? `<h4>交回的结果</h4><div class="sh-text">${esc(x.lastMessage)}</div>` : ''}
+    <h4>步骤</h4>${stepsHTML(x.steps)}`);
+}
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => requestAnimationFrame(drawEdges));
 
 // ---------- 模型时间轴 ----------

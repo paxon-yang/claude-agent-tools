@@ -94,9 +94,17 @@ export const register: Register = on => {
     let d: Decision | undefined
     if (mode === 'auto' && isHandback(e.text)) {
       // 后台子代理交回结果：主会话只是整理汇报，沿用上一轮的模型，不当成新任务重新判断
-      const t = current ?? cfg.defaultTier
+      // 汇总交回的结果用便宜一档（默认 Sonnet），不让 Opus 在长对话里一遍遍重读几十万 token
+      const cur = current ?? cfg.defaultTier
+      const ht = cfg.handbackTier
+      const t = ht && ORDER.indexOf(ht) < ORDER.indexOf(cur) ? ht : cur
       const prev = byTurn.size ? [...byTurn.values()].pop() : undefined
-      d = { tier: t, effort: prev?.tier === t ? prev.effort : cfg.effort[t], reason: '子代理交回结果，沿用上一轮', source: 'continue' }
+      d = t === cur
+        ? { tier: t, effort: prev?.tier === t ? prev.effort : cfg.effort[t], reason: '子代理交回结果，沿用上一轮', source: 'continue' }
+        : { tier: t, effort: cfg.effort[t], reason: `子代理交回结果，用 ${NAMES[t]} 汇总`, source: 'continue' }
+      let tok = 0
+      try { tok = (await $.session.usage()).context.tokens ?? 0 } catch { tok = 0 }
+      d = guardWindow(d, cur, tok, cfg)
       mainTurn = e.turnId
       loops.set('main', { files: new Set(), errors: 0, escalated: false })
       byTurn.set(e.turnId, d)
@@ -324,7 +332,8 @@ function rulesText(): string {
     `8. 其他情况 → 让 ${NAMES.haiku} 判断难度（失败时用 ${NAMES[cfg.defaultTier]}）`,
     '',
     '保护：',
-    `· 对话超过 ${k(cfg.noDowngradeAboveTokens)} 时不降档；降档要连续 ${cfg.downgradeConfirmations} 轮都判成更便宜的档`,
+    `· ${cfg.noDowngradeAboveTokens == null ? '对话再长也允许降档' : `对话超过 ${k(cfg.noDowngradeAboveTokens)} 时不降档`}；降档要连续 ${cfg.downgradeConfirmations} 轮都判成更便宜的档`,
+    `· 后台子代理交回结果时，主会话用 ${cfg.handbackTier ? NAMES[cfg.handbackTier] : '上一轮的模型'} 汇总`,
     `· 对话超过目标模型窗口的八成时不切过去（Haiku 窗口按 ${k(cfg.windows.haiku ?? 0)} 算）`,
     `· 一轮里工具失败 ${cfg.midTurnEscalateAfterErrors} 次 → 当场把这一轮剩下的请求升一档`,
     `· Haiku 一轮里改到第 ${cfg.haikuGuard.maxFiles + 1} 个文件，或要执行危险命令 → 换 ${NAMES[cfg.haikuGuard.escalateTo]} 接手`,

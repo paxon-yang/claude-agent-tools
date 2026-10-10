@@ -33,6 +33,14 @@ if [ "$SRC" != "$DEST" ]; then
   if [ -n "$KEEP" ]; then
     if printf '%s' "$KEEP" | grep -q '"executeTier"'; then
       printf '%s\n' "$KEEP" > "$DEST/config.json"; ok "保留了你改过的 config.json"
+      # 旧版默认值换成新版默认值（只改从没被你改过的那几项）
+      node -e '
+        const fs = require("fs"), p = process.argv[1]; const c = JSON.parse(fs.readFileSync(p, "utf8")); const msg = [];
+        if (c.noDowngradeAboveTokens === 80000) { c.noDowngradeAboveTokens = null; msg.push("长对话也允许降档"); }
+        if (c.subagents) for (const k of ["worker", "general-purpose"]) if (c.subagents[k] === "main") { c.subagents[k] = "sonnet"; msg.push(k + " 子代理改用 Sonnet"); }
+        if (!("handbackTier" in c)) { c.handbackTier = "sonnet"; msg.push("子代理交回结果用 Sonnet 汇总"); }
+        if (msg.length) { fs.writeFileSync(p, JSON.stringify(c, null, 2) + "\n"); console.log("  ✓ 设置已更新：" + msg.join("、")); }
+      ' "$DEST/config.json" || warn "设置迁移没成功，不影响使用"
     else
       printf '%s\n' "$KEEP" > "$DEST/config.json.v0.1-backup"
       ok "旧版 config.json 已换成新版默认设置（旧的备份为 config.json.v0.1-backup）"

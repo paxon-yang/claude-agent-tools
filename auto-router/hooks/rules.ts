@@ -20,7 +20,10 @@ export type Config = {
   autoFable: boolean
   classifierModel: string
   classifierTimeoutMs: number
-  noDowngradeAboveTokens: number
+  /** 上下文超过这个数就不往便宜的模型降；null = 不限制（默认）。换模型的一次性成本几次调用就能省回来 */
+  noDowngradeAboveTokens: number | null
+  /** 后台子代理交回结果时主会话用哪一档汇总；null = 沿用上一轮 */
+  handbackTier: Tier | null
   escalateAfterToolErrors: number
   /** 本轮内工具失败达到这个次数，就当场把这一轮剩下的请求升一档 */
   midTurnEscalateAfterErrors: number
@@ -70,7 +73,8 @@ export const DEFAULTS: Config = {
   autoFable: false,
   classifierModel: 'claude-haiku-5-5',
   classifierTimeoutMs: 6000,
-  noDowngradeAboveTokens: 80000,
+  noDowngradeAboveTokens: null,
+  handbackTier: 'sonnet',
   escalateAfterToolErrors: 3,
   midTurnEscalateAfterErrors: 3,
   downgradeConfirmations: 2,
@@ -274,7 +278,7 @@ export function parseClassifier(reply: string, cfg: Config): Decision | undefine
 export function guardDowngrade(d: Decision, current: Tier | undefined, contextTokens: number, cfg: Config): Decision {
   if (!current || d.source === 'manual' || d.source === 'pin' || d.source === 'phase') return d
   if (ORDER.indexOf(d.tier) >= ORDER.indexOf(current)) return d
-  if (contextTokens <= cfg.noDowngradeAboveTokens) return d
+  if (cfg.noDowngradeAboveTokens == null || contextTokens <= cfg.noDowngradeAboveTokens) return d
   const k = Math.round(contextTokens / 1000)
   return { tier: current, effort: cfg.effort[current], reason: `上下文 ${k}k，降档不划算，保持`, source: 'guard' }
 }

@@ -212,7 +212,12 @@ function handle(line) {
     }
     case 'PreToolUse': {
       const label = toolLabel(d.tool_name, d.tool_input);
-      const rec = { label, agentId: d.agent_id || null, startedAt: ts };
+      const step = { ts, label, end: null, ok: null };
+      const owner = agent || s;
+      owner.steps = owner.steps || [];
+      owner.steps.push(step);
+      if (owner.steps.length > 40) owner.steps.splice(0, owner.steps.length - 40);
+      const rec = { label, agentId: d.agent_id || null, startedAt: ts, step };
       if (d.tool_use_id) s.tools.set(d.tool_use_id, rec);
       if (agent) { agent.currentTool = label; agent.lastTool = label; agent.toolCount++; agent.status = 'running'; }
       else { s.currentTool = label; s.lastTool = label; s.toolCount++; if (s.status !== 'running') s.status = 'running'; s.needMsg = null; }
@@ -227,6 +232,8 @@ function handle(line) {
     case 'PostToolUse':
     case 'PostToolUseFailure': {
       const failed = e === 'PostToolUseFailure';
+      const rec0 = d.tool_use_id && s.tools.get(d.tool_use_id);
+      if (rec0 && rec0.step) { rec0.step.end = ts; rec0.step.ok = !failed; }
       if (d.tool_use_id) s.tools.delete(d.tool_use_id);
       if (agent) agent.currentTool = null; else s.currentTool = null;
       if (d.tool_name === 'Bash') {
@@ -260,7 +267,7 @@ function handle(line) {
       const a = agent || getAgent(s, d.agent_id || ('a' + ts), d.agent_type, ts);
       a.status = d.exit_reason === 'error' ? 'failed' : d.exit_reason === 'interrupted' ? 'stopped' : 'done';
       a.endedAt = ts; a.currentTool = null;
-      if (d.last_assistant_message) a.lastMessage = short(d.last_assistant_message, 400);
+      if (d.last_assistant_message) a.lastMessage = short(d.last_assistant_message, 1500);
       if (d.agent_transcript_path) a.transcript = d.agent_transcript_path;
       const dur = Math.max(0, Math.round(ts - a.startedAt));
       if (!isHelper(a)) log(s, ts, a.type, `${a.status === 'failed' ? '出错结束' : a.status === 'stopped' ? '被中断' : '完成'} · 用时 ${fmtDur(dur)}`, a.status === 'done' ? 'good' : 'bad');
@@ -549,11 +556,13 @@ function view(s) {
         modelSource: a.actualModel ? '实际运行' : a.spawnModel ? '派活时指定' : def.model ? 'agents 设置' : '继承主会话',
         effort: a.effort || def.effort || null, status: a.status, description: a.description,
         startedAt: a.startedAt, endedAt: a.endedAt, currentTool: a.currentTool, lastTool: a.lastTool, toolCount: a.toolCount,
-        lastMessage: a.lastMessage, test: a.test };
+        lastMessage: a.lastMessage, test: a.test, steps: (a.steps || []).slice(-30) };
     }),
     earlierAgents: all.length - shown.length, totalAgents: all.length,
     timeline: s.timeline.slice(-40),
     needMsg: s.needMsg || null,
+    steps: (s.steps || []).slice(-30),
+    decisions: s.decisions.slice(-12),
     turns: turnsView(s, t),
     lanes: all.slice(-24).map(a => {
       const m = resolveAgentModel(s, a);

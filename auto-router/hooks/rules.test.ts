@@ -40,11 +40,13 @@ test('Haiku 判断结果的解析', () => {
   expect(parseClassifier('不知道', c)).toBe(undefined)
 })
 
-test('长对话不降档', () => {
+test('长对话不降档（只在设置了上限时）', () => {
   const d = { tier: 'haiku' as const, effort: 'low' as const, reason: 'x', source: 'rule' as const }
-  expect(guardDowngrade(d, 'opus', 120000, c).tier).toBe('opus')
+  expect(guardDowngrade(d, 'opus', 900000, c).tier).toBe('haiku')
+  const c2 = { ...c, noDowngradeAboveTokens: 80000 }
+  expect(guardDowngrade(d, 'opus', 120000, c2).tier).toBe('opus')
   expect(guardDowngrade(d, 'opus', 20000, c).tier).toBe('haiku')
-  expect(guardDowngrade({ ...d, source: 'manual' }, 'opus', 120000, c).tier).toBe('haiku')
+  expect(guardDowngrade({ ...d, source: 'manual' }, 'opus', 120000, c2).tier).toBe('haiku')
 })
 
 test('子代理分配', () => {
