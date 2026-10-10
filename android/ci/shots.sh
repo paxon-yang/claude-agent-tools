@@ -89,5 +89,5 @@ adb shell am force-stop $PKG
 adb shell am start -n $PKG/.MainActivity
 sleep 8
 shot app-en
-adb logcat -d | grep -iE 'agentcard|AndroidRuntime|FATAL EXCEPTION' | tail -200 > out/logcat.txt || true
+adb logcat -d | grep -iE 'AgentCard|AndroidRuntime|FATAL EXCEPTION|START u0.*agentcard' | grep -v 'WindowManagerShell\|CoreBackPreview' | tail -300 > out/logcat.txt || true
 ls -la out

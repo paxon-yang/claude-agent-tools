@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
@@ -32,9 +33,12 @@ class MainActivity : Activity() {
     private lateinit var cfSecret: EditText
     private lateinit var result: TextView
     private lateinit var preview: FrameLayout
+    /** 已经问过的配对链接（屏幕旋转、换语言时界面会重建，别重复问）/ the pairing link already answered, kept across recreation */
+    private var handledPair: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handledPair = savedInstanceState?.getString("handledPair")
         setContentView(R.layout.activity_main)
         prefs = Prefs(this)
         url = findViewById(R.id.url)
@@ -82,6 +86,11 @@ class MainActivity : Activity() {
         handlePair(intent)
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("handledPair", handledPair)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -96,16 +105,19 @@ class MainActivity : Activity() {
     private fun handlePair(i: Intent?) {
         if (i == null) return
         val data = i.data ?: return
+        Log.i("AgentCard", "pair link: scheme=${data.scheme} host=${data.host} hasKey=${data.getQueryParameter("key") != null}")
         if (data.scheme != "agentcard" || data.host != "pair") return
         val u = Model.normalizeUrl(data.getQueryParameter("url") ?: return)
         val k = data.getQueryParameter("key") ?: ""
         val b = data.getQueryParameter("board")?.let { Model.normalizeUrl(it) } ?: ""
         if (u.isBlank() || k.length < 16) return
-        i.data = null
+        val link = data.toString()
+        if (link == handledPair) return
         AlertDialog.Builder(this)
             .setTitle(R.string.pair_title)
             .setMessage(getString(R.string.pair_message, u.removePrefix("https://").removePrefix("http://")))
             .setPositiveButton(R.string.pair_ok) { _, _ ->
+                handledPair = link
                 url.setText(u)
                 key.setText(k)
                 // 卡片专用网址不在 Cloudflare Access 后面，服务令牌用不上，清掉 / the card address isn't behind Access
@@ -114,7 +126,7 @@ class MainActivity : Activity() {
                 prefs.board = b
                 saveAndTest()
             }
-            .setNegativeButton(R.string.pair_cancel, null)
+            .setNegativeButton(R.string.pair_cancel) { _, _ -> handledPair = link }
             .show()
     }
 

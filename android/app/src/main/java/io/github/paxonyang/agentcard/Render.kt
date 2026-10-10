@@ -126,6 +126,7 @@ object Render {
             val c1 = if (grey) 0xFF8E8E93.toInt() else Model.familyLight(family)
             val c2 = if (grey) 0xFF636366.toInt() else Model.familyColor(family)
             p.style = Paint.Style.FILL
+            p.color = Color.WHITE  // 渐变不受上一次颜色的透明度影响 / keep the gradient at full strength
             p.shader = LinearGradient(0f, t, 0f, t + size, c1, c2, Shader.TileMode.CLAMP)
             c.drawRoundRect(RectF(l, t, l + size, t + size), size * 0.32f, size * 0.32f, p)
             p.shader = null
@@ -148,8 +149,10 @@ object Render {
             p.color = CARD
             c.drawRect(0f, 0f, W, H, p)
             val g = Model.familyColor(fam)
+            p.color = Color.WHITE  // 渐变不受上一次颜色的透明度影响 / keep the gradient at full strength
             p.shader = RadialGradient(W * 0.22f, -H * 0.15f, max(W, H) * 0.85f, intArrayOf(alpha(g, 0.42f), alpha(g, 0.12f), Color.TRANSPARENT), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, W, H, p)
+            p.color = Color.WHITE  // 渐变不受上一次颜色的透明度影响 / keep the gradient at full strength
             p.shader = RadialGradient(W * 0.95f, -H * 0.25f, max(W, H) * 0.6f, intArrayOf(alpha(Model.familyLight(fam), 0.18f), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, W, H, p)
             p.shader = null
@@ -319,6 +322,7 @@ object Render {
             val lc = if (isBg) 0xFFAEAEB2.toInt() else Model.familyLight(r.family)
             round(padX, top, right, top + h, dp(12), 0x0DFFFFFF, if (isBg) HAIR else alpha(lc, 0.45f))
             // 底部一段高光，表示在跑 / a highlight along the bottom edge: it's running
+            p.color = Color.WHITE  // 渐变不受上一次颜色的透明度影响 / keep the gradient at full strength
             p.shader = LinearGradient(padX + (right - padX) * 0.15f, 0f, padX + (right - padX) * 0.55f, 0f, intArrayOf(Color.TRANSPARENT, lc, Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
             c.save()
             c.clipPath(Path().apply { addRoundRect(RectF(padX, top, right, top + h), dp(12), dp(12), Path.Direction.CW) })
@@ -377,6 +381,7 @@ object Render {
                 }
                 val fillR = padX + (right - padX) * (pct / 100.0).toFloat()
                 if (fillR > padX + dp(2)) {
+                    p.color = Color.WHITE  // 渐变不受上一次颜色的透明度影响 / keep the gradient at full strength
                     p.shader = LinearGradient(padX, 0f, fillR, 0f, c1, c2, Shader.TileMode.CLAMP)
                     c.drawRoundRect(RectF(padX, by, fillR, by + dp(5)), dp(3), dp(3), p)
                     p.shader = null
