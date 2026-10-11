@@ -187,7 +187,8 @@ object Skins {
                 p.reset(); p.isAntiAlias = true
                 p.shader = LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), intArrayOf(withAlpha(sf, sa[0]), withAlpha(sf, sa[1]), withAlpha(sf, sa[2])), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
                 c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-                word(c, FOX_WORD, 18f, (h - 78).toFloat(), 4.2f, CLAY, if (dark) 0.55 else 0.5)
+                // PAXON 小一点，贴在小狐狸左边 / PAXON smaller, just left of the fox
+                word(c, FOX_WORD, (w - 188).toFloat(), (h - 57).toFloat(), 2.8f, CLAY, if (dark) 0.6 else 0.55)
             }
             "clay" -> {
                 blob(0.95 * w, 1.05 * h, 0.75 * r, CLAY, 0.6)
