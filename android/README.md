@@ -26,7 +26,7 @@ A home-screen widget that shows your Claude Code agent board at a glance: the cu
 - 手机装了 **Tailscale**：App 里直接填电脑的 Tailscale 地址，比如 `http://100.x.y.z:4321`，配对码留空。
 - 想让卡片也走 Cloudflare 的登录：用服务令牌（见下面），填看板网址和令牌。
 
-**皮肤：** App 里"皮肤"一栏可以单独给手机卡片选一款（工位、陶土、等高线、终端、沙丘、极光、星野），默认"跟随电脑"，用的是电脑上看板选的那款。
+**皮肤：** App 里"皮肤"一栏可以单独给手机卡片选一款（陶土、等高线、终端、沙丘、极光、星野），默认"跟随电脑"，用的是电脑上看板选的那款。
 
 **怎么刷新：** 有会话在跑时每 2 分钟刷新一次，刚闲下来的一小时里每 5 分钟一次，平时每 15 分钟一次。**点一下卡片**进入实时模式：有会话在跑时每 15 秒刷新，通知栏有一条"实时更新"（可以点"停止"），闲下来 10 分钟后自动停。卡片右下角的 ↗ 打开完整看板。
 
@@ -58,7 +58,7 @@ Show the QR code again: `phone.sh --qr`; new key (phones must rescan): `phone.sh
 - **Tailscale** on the phone: enter the computer's Tailscale address, e.g. `http://100.x.y.z:4321`, and leave the key empty.
 - Keep the card behind Cloudflare's login: use a service token (below) with the board's address.
 
-**Skins:** pick one for the phone card under "Skin" in the app (Desk, Clay, Contour, Terminal, Dunes, Aurora, Night sky). The default, "Same as computer", uses whatever the board on the computer uses.
+**Skins:** pick one for the phone card under "Skin" in the app (Clay, Contour, Terminal, Dunes, Aurora, Night sky). The default, "Same as computer", uses whatever the board on the computer uses.
 
 **Refresh:** every 2 minutes while a session is busy, every 5 minutes for an hour after it goes quiet, otherwise every 15 minutes. **Tap the card** for live mode: every 15 seconds while a session is busy, with an ongoing "Live updates" notification you can stop; it ends by itself after 10 quiet minutes. The ↗ opens the full board.
 

@@ -697,7 +697,7 @@ let localSkin = (() => { try { return localStorage.getItem('viz.skin'); } catch 
 const skinNow = () => (STATIC ? localSkin : state && state.skin) || 'none';
 function renderSkin() {
   if (!window.Skins) return;
-  Skins.apply($('#skinbg'), skinNow(), { dark: false, width: innerWidth, height: innerHeight, surface: '245,245,247', scene: { width: 270, right: 28, top: 118, opacity: 0.85 } });
+  Skins.apply($('#skinbg'), skinNow(), { dark: false, width: innerWidth, height: innerHeight, surface: '245,245,247' });
   const box = $('#skinsw');
   if (!box) return;
   if (!box.children.length) box.innerHTML = Skins.LIST.map(k => `<button type="button" data-skin="${k.id}" style="background-image:${k.id === 'none' ? 'none' : Skins.url(k.id, 52, 36, false).replace(/"/g, "'")}"></button>`).join('');

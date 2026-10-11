@@ -24,12 +24,10 @@ import kotlin.math.sin
  * Skins: a faint pattern under the card's content with a scrim on top; the same shapes as the board's public/skins.js.
  */
 object Skins {
-    /** anim = 右下角有一段会动的小场景 / anim = has an animated scene in the bottom-right corner */
-    data class Def(val id: String, val zh: String, val en: String, val anim: Boolean = false)
+    data class Def(val id: String, val zh: String, val en: String)
 
     val LIST = listOf(
         Def("none", "默认", "Default"),
-        Def("desk", "工位", "Desk", anim = true),
         Def("clay", "陶土", "Clay"),
         Def("contour", "等高线", "Contour"),
         Def("terminal", "终端", "Terminal"),
@@ -80,10 +78,7 @@ object Skins {
      * 画一张皮肤图（圆角已经裁好）。尺寸用 dp；返回 null 表示不用皮肤。
      * Draws a skin with rounded corners already clipped. Sizes in dp; null means no skin.
      */
-    fun animated(id: String) = LIST.firstOrNull { it.id == id }?.anim == true
-
-    /** withScene：把会动那一幕的第一帧也画进去（选皮肤的小缩略图用）/ withScene: include the scene's first frame (for the picker thumbnails) */
-    fun draw(context: Context, id: String, wDp: Float, hDp: Float, radiusDp: Float = 22f, dark: Boolean = isDark(context), scaleCap: Float = 2f, withScene: Boolean = false): Bitmap? {
+    fun draw(context: Context, id: String, wDp: Float, hDp: Float, radiusDp: Float = 22f, dark: Boolean = isDark(context), scaleCap: Float = 2f): Bitmap? {
         if (id == "none" || !valid(id)) return null
         val w = wDp.coerceIn(40f, 900f)
         val h = hDp.coerceIn(40f, 900f)
@@ -96,21 +91,12 @@ object Skins {
         shapes(c, id, w.toDouble(), h.toDouble(), dark)
         // 蒙版：左上（字多）厚，右下（图案集中）薄 / scrim: heavy top-left where the text is, light bottom-right
         val surface = context.getColor(R.color.c_surface)
-        // 工位自带底色，蒙版薄一些（和 skins.js 的 SCRIM_DESK 一样）/ Desk brings its own colour: thinner scrim, as SCRIM_DESK in skins.js
-        val (a0, a1) = if (id == "desk") (if (dark) 0.42 to 0.04 else 0.5 to 0.06) else if (dark) 0.68 to 0.12 else 0.8 to 0.2
+        val (a0, a1) = if (dark) 0.68 to 0.12 else 0.8 to 0.2
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.shader = LinearGradient(0f, 0f, w, h,
             intArrayOf(withAlpha(surface, a0), withAlpha(surface, (a0 + a1) / 2), withAlpha(surface, a1)),
             floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h, p)
-        if (withScene && animated(id)) {
-            context.getDrawable(R.drawable.desk_f0)?.let { f ->
-                val sw = w * 0.62f
-                val sh = sw * 0.75f
-                f.setBounds((w - sw).toInt(), (h - sh).toInt(), w.toInt(), h.toInt())
-                f.draw(c)
-            }
-        }
         return bmp
     }
 
@@ -136,38 +122,6 @@ object Skins {
             c.drawPath(path, p)
         }
         when (id) {
-            "desk" -> {
-                // 和 skins.js 的 desk 一样 / same as "desk" in skins.js
-                p.reset(); p.isAntiAlias = true
-                p.shader = if (dark) LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), 0xFF262A36.toInt(), 0xFF171A22.toInt(), Shader.TileMode.CLAMP)
-                else LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), 0xFFFCE6D4.toInt(), 0xFFE9EEF4.toInt(), Shader.TileMode.CLAMP)
-                c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-                blob(0.86 * w, 0.86 * h, 0.5 * r, CLAY, if (dark) 0.32 else 0.22)
-                blob(0.02 * w, 0.02 * h, 0.4 * r, if (dark) CLAY else SAND, if (dark) 0.12 else 0.3)
-                for (i in 0 until 5) {
-                    val y0 = (0.62 + i * 0.11) * h
-                    val x1 = (0.3 + i * 0.09) * w
-                    line(listOf((-0.02 * w) to y0, x1 to (-0.02 * h)), if (i == 2) 0xFF8E9AAF.toInt() else CLAY, if (dark) 0.16 else 0.2, 0.8)
-                }
-                for (i in 0 until 3) line(listOf((-0.02 * w) to ((0.2 + i * 0.16) * h), ((0.42 + i * 0.05) * w) to (1.02 * h)), CLAY, if (dark) 0.1 else 0.14, 0.7)
-                val bars = listOf(
-                    Triple(0.07, 0.2, 0.32), Triple(0.12, 0.27, 0.11), Triple(0.25, 0.27, 0.15), Triple(0.12, 0.33, 0.14), Triple(0.28, 0.33, 0.13), Triple(0.43, 0.33, 0.12),
-                    Triple(0.09, 0.72, 0.2), Triple(0.31, 0.72, 0.16), Triple(0.09, 0.77, 0.15), Triple(0.26, 0.77, 0.08), Triple(0.09, 0.82, 0.13), Triple(0.24, 0.82, 0.14), Triple(0.4, 0.82, 0.12),
-                )
-                bars.forEachIndexed { i, (bx, by, bw) ->
-                    p.reset(); p.isAntiAlias = true
-                    p.color = if (i >= 10) withAlpha(CLAY, 0.16) else withAlpha(ink, if (dark) 0.08 else 0.07)
-                    val rr = 4f / 3
-                    c.drawRoundRect(RectF((bx * w).toFloat(), (by * h).toFloat(), ((bx + bw) * w).toFloat(), (by * h + 4).toFloat()), rr, rr, p)
-                }
-                p.reset(); p.isAntiAlias = true
-                p.typeface = android.graphics.Typeface.MONOSPACE
-                p.textSize = 12f
-                for ((pos, txt, orange) in listOf(Triple(0.07 to 0.14, "</>", false), Triple(0.07 to 0.43, "</>", true), Triple(0.07 to 0.53, "$", false), Triple(0.05 to 0.94, "</>", true), Triple(0.37 to 0.215, "{", true))) {
-                    p.color = if (orange) withAlpha(CLAY, 0.3) else withAlpha(ink, if (dark) 0.2 else 0.18)
-                    c.drawText(txt, (pos.first * w).toFloat(), (pos.second * h).toFloat(), p)
-                }
-            }
             "clay" -> {
                 blob(0.95 * w, 1.05 * h, 0.75 * r, CLAY, 0.6)
                 blob(0.04 * w, -0.06 * h, 0.45 * r, SAND, 0.4)

@@ -96,7 +96,7 @@ class ModelTest {
         g.next()
         assertEquals(6.195825757458806, g.next() * 100, 1e-9)
         assertEquals(97.690763277933, g.next() * 100, 1e-9)
-        assertEquals(listOf("none", "desk", "clay", "contour", "terminal", "dunes", "aurora", "night"), Skins.LIST.map { it.id })
+        assertEquals(listOf("none", "clay", "contour", "terminal", "dunes", "aurora", "night"), Skins.LIST.map { it.id })
         assertFalse(Skins.valid("follow"))
         val d = Model.parse("""{"v":2,"now":5,"session":null,"others":[],"needsYou":0,"skin":"dunes","totals":{"hours":24}}""")
         assertEquals("dunes", d.skin)

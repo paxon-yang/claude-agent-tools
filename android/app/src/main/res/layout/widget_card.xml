@@ -17,19 +17,6 @@
         android:scaleType="fitXY"
         android:visibility="gone" />
 
-    <!-- 工位皮肤右下角那一幕：逐帧动画（android/tools/desk-frames.js 生成）/ the Desk skin's animated scene, frame by frame -->
-    <ProgressBar
-        android:id="@+id/skin_anim"
-        android:layout_width="150dp"
-        android:layout_height="112dp"
-        android:layout_gravity="bottom|end"
-        android:layout_marginEnd="4dp"
-        android:layout_marginBottom="28dp"
-        android:indeterminate="true"
-        android:indeterminateDrawable="@drawable/desk_anim"
-        android:indeterminateOnly="true"
-        android:visibility="gone" />
-
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"

@@ -255,7 +255,7 @@ function fit() {
     const r = $('#card').getBoundingClientRect();
     if (W && W.resize) W.resize(Math.ceil(r.height));
     if (W && W.skin && state) W.skin(state.skin || 'none');
-    if (window.Skins && state) Skins.apply($('#skin'), state.skin, { dark: true, width: r.width, height: r.height, surface: '28,28,30', scene: { width: Math.round(r.width * 0.48), right: 6, bottom: 34, opacity: 0.75 } });
+    if (window.Skins && state) Skins.apply($('#skin'), state.skin, { dark: true, width: r.width, height: r.height, surface: '28,28,30' });
   });
 }
 addEventListener('resize', () => fit());
