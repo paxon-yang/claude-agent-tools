@@ -201,7 +201,14 @@ class CardWidget : AppWidgetProvider() {
                 rv.setImageViewBitmap(R.id.ring, Ring.draw(context, wk.pct))
                 rv.setContentDescription(R.id.ring, context.getString(R.string.q_week) + " " + wk.pct.roundToInt() + "%")
                 val five = d.limits?.fiveHour
-                rv.setTextViewText(R.id.quota_sub, if (five != null) context.getString(R.string.q_5h, five.pct.roundToInt()) else "")
+                // 额度只在 Claude Code 调用模型时更新；超过 15 分钟没更新就写"截至几点" / usage only updates on Claude Code calls: label old figures
+                val at = d.limits?.at
+                val asOf = if (at != null && nowSec - at > 15 * 60) DateFormat.getTimeInstance(DateFormat.SHORT).format(Date((at * 1000).toLong())) else null
+                rv.setTextViewText(R.id.quota_sub, when {
+                    asOf != null -> context.getString(R.string.q_as_of, asOf)
+                    five != null -> context.getString(R.string.q_5h, five.pct.roundToInt())
+                    else -> ""
+                })
             } else if (d.version < 2) {
                 // 旧版看板没有额度数据：提示更新 / an older board sends no usage: say so
                 rv.setViewVisibility(R.id.quota, View.VISIBLE)

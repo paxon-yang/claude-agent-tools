@@ -540,7 +540,7 @@ const I18N = {
     log_newTask: p => '新任务：' + brief(p), log_spawned: (ty, d) => `派出 ${ty}：${d}`, log_tests: (p, n) => `测试 ${p}/${n} 通过`,
     log_toolFailed: l => `工具失败：${l}`,
     log_agentEnded: (st, d) => `${st === 'failed' ? '出错结束' : st === 'stopped' ? '被中断' : '完成'} · 用时 ${d}`,
-    qWeek: '本周额度', q5h: n => `5 小时窗口 ${n}%`, qReset: s => `${s} 重置`,
+    qWeek: '本周额度', qAsOf: s => `截至 ${s}`, qAsOfTip: '额度只在 Claude Code 调用模型时更新；在 Claude App 里用掉的，要等下次用 Claude Code 才会算进来', q5h: n => `5 小时窗口 ${n}%`, qReset: s => `${s} 重置`,
     log_turnDone: '本轮回复完成，等你下一步', log_needsYou: m => '需要你确认：' + m, log_modelSwitch: m => `切换模型 → ${m}`,
     log_compacted: '上下文已自动压缩',
     log_advisor: (mo, tx) => tx ? '顾问介入' + (mo ? '（' + mo + '）' : '') + '：' + tx : '顾问介入',
@@ -607,7 +607,7 @@ const I18N = {
     log_newTask: p => 'New task: ' + brief(p), log_spawned: (ty, d) => `Dispatched ${ty}: ${d}`, log_tests: (p, n) => `Tests: ${p}/${n} passed`,
     log_toolFailed: l => `Tool failed: ${l}`,
     log_agentEnded: (st, d) => `${st === 'failed' ? 'Failed after' : st === 'stopped' ? 'Interrupted after' : 'Finished in'} ${d}`,
-    qWeek: 'Weekly limit', q5h: n => `5-hour window ${n}%`, qReset: s => `resets ${s}`,
+    qWeek: 'Weekly limit', qAsOf: s => `as of ${s}`, qAsOfTip: 'Plan usage updates only when Claude Code calls a model; usage in the Claude app shows up after your next Claude Code turn', q5h: n => `5-hour window ${n}%`, qReset: s => `resets ${s}`,
     log_turnDone: 'Turn complete — your move', log_needsYou: m => 'Needs your approval: ' + m, log_modelSwitch: m => `Switched model → ${m}`,
     log_compacted: 'Context auto-compacted',
     log_advisor: (mo, tx) => tx ? `Advisor stepped in${mo ? ' (' + mo + ')' : ''}: ${tx}` : 'Advisor stepped in',
@@ -812,14 +812,23 @@ function resetLabel(iso) {
   const wd = LANG === 'zh' ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()] : d.toLocaleDateString('en-GB', { weekday: 'short' });
   return wd + ' ' + hmS;
 }
+// 额度是多久前的数：超过 15 分钟就标出"截至几点" / how old the usage figure is: label it after 15 minutes
+function asOf(at) {
+  if (!at || nowS() - at < 15 * 60) return '';
+  const d = new Date(at * 1000);
+  const hm = d.toLocaleTimeString(LANG === 'zh' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (nowS() - at < 20 * 3600) return hm;
+  return (LANG === 'zh' ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()] : d.toLocaleDateString('en-GB', { weekday: 'short' })) + ' ' + hm;
+}
 function quotaHtml(L) {
   if (!L || !L.sevenDay) return '';
   const p = Math.max(0, Math.min(100, L.sevenDay.pct));
   const lvl = p >= 85 ? 'hi' : p >= 60 ? 'mid' : 'ok';
   const five = L.fiveHour ? t('q5h', Math.round(L.fiveHour.pct)) : '';
   const rs = resetLabel(L.sevenDay.resetsAt);
-  return `<div class="quota q-${lvl}"><div class="qh"><span>${t('qWeek')}</span><b class="num">${Math.round(p)}%</b></div>
-    <div class="qbar"><i style="width:${p}%"></i></div><div class="qs">${[five, rs ? t('qReset', rs) : ''].filter(Boolean).join(' · ')}</div></div>`;
+  const ao = asOf(L.at);
+  return `<div class="quota q-${lvl}" title="${esc(t('qAsOfTip'))}"><div class="qh"><span>${t('qWeek')}</span><b class="num">${Math.round(p)}%</b></div>
+    <div class="qbar"><i style="width:${p}%"></i></div><div class="qs">${[ao ? t('qAsOf', ao) : '', five, rs ? t('qReset', rs) : ''].filter(Boolean).join(' · ')}</div></div>`;
 }
 function renderSpend() {
   const tt = state.totals;

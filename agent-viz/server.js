@@ -255,6 +255,18 @@ function onNotifications(s, text, ts) {
     }
   }
 }
+// 子代理被打断时常常收不到结束事件，会一直显示"在跑"。会话已经结束，或者子代理很久没有任何动静，就当它中断了。
+// An interrupted sub-agent often never sends its stop event and would show as running forever.
+// When the session is over, or the sub-agent has been silent for a long time, treat it as stopped.
+function expireAgents(s, t, active) {
+  for (const a of s.agents.values()) {
+    if (a.status !== 'running') continue;
+    const last = Math.max(a.lastTs || 0, a.startedAt || 0);
+    if (active && t - last < IDLE_MIN * 60) continue;
+    a.status = 'stopped'; a.endedAt = last; a.currentTool = null; a.stale = true;
+    if (!isHelper(a)) log(s, last, a.type, ['agentEnded', 'stopped', Math.max(0, Math.round(last - a.startedAt))], 'bad');
+  }
+}
 function expireBg(s, t) {
   for (const b of s.bg.values()) {
     if (b.status !== 'running') continue;
@@ -274,6 +286,11 @@ function handle(line) {
   const s = getSession(d, ts);
   const inAgent = !!d.agent_id;
   const agent = inAgent ? getAgent(s, d.agent_id, d.agent_type, ts) : null;
+  if (agent) {
+    agent.lastTs = Math.max(agent.lastTs || 0, ts);
+    // 当成中断的子代理又有动静了：其实还在跑 / a sub-agent taken for stopped shows life again: it is still running
+    if (agent.stale && e !== 'SubagentStop') { agent.status = 'running'; agent.endedAt = null; agent.stale = false; }
+  }
   const level = d.effort && d.effort.level;
   if (level) { if (agent) agent.effort = level; else s.effort = level; }
   if (s.ended && e !== 'SessionEnd') s.ended = false;
@@ -575,6 +592,9 @@ function onTranscript(s, o) {
 
 function onAgentTranscript(s, a, o) {
   const m = o.message;
+  // 子代理自己的记录也算它还活着 / the sub-agent's own transcript counts as a sign of life
+  const at = o.timestamp ? Date.parse(o.timestamp) / 1000 : NaN;
+  if (!isNaN(at)) a.lastTs = Math.max(a.lastTs || 0, at);
   if (o.type === 'assistant' && m && m.model && !String(m.model).startsWith('<')) {
     a.actualModel = m.model;
     if (m.usage) addUsage(s, 'a:' + a.id + ':' + (m.id || o.uuid), m.model, m.usage);
@@ -668,6 +688,7 @@ const i0 = (arr, x) => arr.indexOf(x);
 function view(s) {
   const t = now();
   const active = !s.ended && t - s.lastTs < IDLE_MIN * 60;
+  expireAgents(s, t, active);
   const all = [...s.agents.values()].filter(a => !isHelper(a)).sort((x, y) => x.startedAt - y.startedAt);
   // 更早派出、现在还在跑的子代理也要显示 / keep earlier sub-agents that are still running
   // 只显示"现在"的：这一轮派出的，加上任何还在跑的；上一轮已经做完的不再冒充当前状态

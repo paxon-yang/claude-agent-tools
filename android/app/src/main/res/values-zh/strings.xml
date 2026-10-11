@@ -52,6 +52,7 @@
 
     <string name="q_week">本周额度</string>
     <string name="q_5h">5 小时 %d%%</string>
+    <string name="q_as_of">截至 %s</string>
     <string name="q_reset">%s 重置</string>
     <string name="foot_hours">近 %d 小时</string>
     <string name="foot_saved">少花 %d%%</string>

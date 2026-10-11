@@ -31,7 +31,8 @@ data class Run(val kind: String, val name: String, val model: String?, val famil
 
 /** 订阅额度的一个窗口 / one plan-usage window */
 data class Limit(val pct: Double, val resetsAt: String?)
-data class Limits(val sevenDay: Limit?, val fiveHour: Limit?)
+/** at = 看板拿到这组数的时间（秒）/ when the board last got these figures, in seconds */
+data class Limits(val sevenDay: Limit?, val fiveHour: Limit?, val at: Double? = null)
 
 data class Other(val project: String, val status: String)
 
@@ -105,7 +106,7 @@ object Model {
         val t = o.optJSONObject("totals") ?: JSONObject()
         val lim = o.optJSONObject("limits")?.let { l ->
             fun one(k: String) = l.optJSONObject(k)?.let { x -> x.num("pct")?.let { Limit(it, x.str("resetsAt")) } }
-            Limits(one("sevenDay"), one("fiveHour")).takeIf { it.sevenDay != null || it.fiveHour != null }
+            Limits(one("sevenDay"), one("fiveHour"), l.num("at")).takeIf { it.sevenDay != null || it.fiveHour != null }
         }
         return WidgetData(
             version = o.optInt("v", 1),

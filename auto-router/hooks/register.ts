@@ -65,7 +65,8 @@ async function noteLimits($: EngineInterface) {
     const list: Limit[] = rl.map(r => ({ kind: String(r.kind), pct: Number(r.percentUsed) || 0, resetsAt: r.resetsAt ?? null }))
     if (!list.length) return
     const key = JSON.stringify(list)
-    if (key === limitsKey) return
+    // 数没变也每 5 分钟写一次时间，看板才知道这个数是不是新的 / unchanged values still get a fresh time every 5 minutes, so the board knows how current they are
+    if (key === limitsKey && limits && Date.now() - limits.at < 5 * 60_000) return
     limitsKey = key
     limits = { at: Date.now(), list }
     await writeLog($)

@@ -13,6 +13,8 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 - **Skins** for the desktop card, the dashboard and the Android card: six optional backgrounds in warm terracotta tones (Clay, Contour, Terminal, Dunes, Aurora, Night sky). Each is a faint pattern under a scrim, in light and dark. Pick one from the dashboard sidebar or the desktop card's tray menu; it is saved on the board, and the phone card follows it unless you pick its own in the app.
 
 ### Fixed
+- Sub-agents that were interrupted without sending a stop event no longer show as running for hours on the dashboard and the phone card: once their session is over, or after 30 minutes without any sign of life, they show as interrupted (they come back if they turn out to be alive).
+- Weekly plan usage now says how old it is ("as of 02:31") when the figure is more than 15 minutes old. It can only update when Claude Code calls a model, so usage in the Claude app shows up after your next Claude Code turn. The router also refreshes the timestamp every 5 minutes while a session runs, even when the numbers have not changed.
 - Android card: after an app update the home-screen card could stay on its placeholder look (phones like ColorOS block the background update). Opening the app now redraws and refreshes the card, it redraws itself after an update or reboot, and the placeholder says "Connecting…" instead of showing sample data.
 
 ## [0.4.0] — 2026-10-10
