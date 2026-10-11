@@ -211,8 +211,36 @@ function bgIdFrom(resp) {
 }
 function bgTimeout(input) {
   const v = input && (input.timeout_ms ?? input.timeoutMs ?? input.timeout);
-  if (typeof v !== 'number' || !(v > 0)) return null;
-  return v > 10000 ? v / 1000 : v;   // 毫秒或秒 / ms or s
+  if (typeof v === 'number' && v > 0) return v > 10000 ? v / 1000 : v;   // 毫秒或秒 / ms or s
+  // 命令自己带了时限（perl -e 'alarm 1700'、timeout 30m …）就按它算 / a limit inside the command itself
+  const cmd = String((input && input.command) || '');
+  const al = cmd.match(/\balarm\s*\(?\s*(\d+)/);
+  if (al) return Number(al[1]);
+  const to = cmd.match(/(?:^|[\s;&|(])g?timeout\s+(?:-{1,2}[\w-]+(?:[ =]\S+)?\s+)*(\d+(?:\.\d+)?)([smhd]?)(?=\s)/);
+  if (to) return Number(to[1]) * ({ '': 1, s: 1, m: 60, h: 3600, d: 86400 })[to[2]];
+  return null;
+}
+// BashOutput / TaskOutput 查到命令已经结束 / BashOutput or TaskOutput shows the command has finished
+const OUTPUT_TOOLS = /^(BashOutput|TaskOutput|ShellOutput)$/;
+function outputStatus(resp) {
+  const text = typeof resp === 'string' ? resp : JSON.stringify(resp || '');
+  const m = text.match(/(?:"status"\s*:\s*"|<status>\s*|\bstatus\s*[:=]\s*)(\w+)/i);
+  const st = m ? m[1].toLowerCase() : '';
+  return /^(completed|complete|exited|finished|done|success)$/.test(st) ? 'done' : /^(failed|error)$/.test(st) ? 'failed' : /^(killed|stopped|cancell?ed)$/.test(st) ? 'stopped' : null;
+}
+// 会话记录里任何地方出现 <task-notification> 都算（新版 Claude Code 不一定放在用户消息里；子代理自己的后台命令记在子代理的记录里）
+// a <task-notification> anywhere in a transcript counts (newer Claude Code doesn't always put it in a user message;
+// a sub-agent's own background commands are reported in the sub-agent's transcript)
+function scanNotifications(s, o) {
+  if (!s.bg.size && !s.agents.size) return;
+  const raw = JSON.stringify(o);
+  if (!raw.includes('<task-notification')) return;
+  const ts = o.timestamp ? Date.parse(o.timestamp) / 1000 : now();
+  const text = raw.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\//g, '/');
+  const before = [...s.bg.values()].filter(b => b.status === 'running').length + [...s.agents.values()].filter(a => a.status === 'running').length;
+  onNotifications(s, text, ts);
+  const after = [...s.bg.values()].filter(b => b.status === 'running').length + [...s.agents.values()].filter(a => a.status === 'running').length;
+  if (after !== before) changed();
 }
 function startBg(s, d, ts, agent) {
   const ti = d.tool_input || {};
@@ -354,6 +382,10 @@ function handle(line) {
       if (rec0 && rec0.step) { rec0.step.end = ts; rec0.step.ok = !failed; }
       if (d.tool_use_id) s.tools.delete(d.tool_use_id);
       if (agent) agent.currentTool = null; else s.currentTool = null;
+      if (OUTPUT_TOOLS.test(String(d.tool_name || ''))) {
+        const ti0 = d.tool_input || {}, kid = ti0.bash_id || ti0.shell_id || ti0.task_id || ti0.taskId || ti0.id, st = outputStatus(d.tool_response);
+        if (kid && st) for (const b of s.bg.values()) if (b.taskId === kid || b.id === kid || (b.taskId && (b.taskId.endsWith(kid) || kid.endsWith(b.taskId)))) endBg(s, b, ts, st, null);
+      }
       if (d.tool_name === 'Bash') {
         const t = detectTest(d.tool_input, d.tool_response);
         if (t) {
@@ -543,15 +575,11 @@ function readNew(p, onLine, firstTailBytes) {
 
 // ---------- 会话记录：实际模型、上下文、顾问 ----------
 function onTranscript(s, o) {
+  scanNotifications(s, o);
   if (o.isSidechain) return;
   const m = o.message;
   if (!m || typeof m !== 'object') return;
   const ts = o.timestamp ? Date.parse(o.timestamp) / 1000 : now();
-  if (o.type === 'user' && s.bg.size) {
-    const c = m.content;
-    const text = typeof c === 'string' ? c : Array.isArray(c) ? c.map(x => x && (typeof x.text === 'string' ? x.text : typeof x.content === 'string' ? x.content : '')).join('\n') : '';
-    if (text.includes('<task-notification')) { const before = [...s.bg.values()].filter(b => b.status === 'running').length; onNotifications(s, text, ts); if ([...s.bg.values()].filter(b => b.status === 'running').length !== before) changed(); }
-  }
   if (o.type === 'assistant') {
     if (m.model && !String(m.model).startsWith('<')) {
       s.actualModel = m.model;
@@ -591,6 +619,7 @@ function onTranscript(s, o) {
 }
 
 function onAgentTranscript(s, a, o) {
+  scanNotifications(s, o);
   const m = o.message;
   // 子代理自己的记录也算它还活着 / the sub-agent's own transcript counts as a sign of life
   const at = o.timestamp ? Date.parse(o.timestamp) / 1000 : NaN;
