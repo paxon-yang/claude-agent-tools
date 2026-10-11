@@ -24,10 +24,12 @@ import kotlin.math.sin
  * Skins: a faint pattern under the card's content with a scrim on top; the same shapes as the board's public/skins.js.
  */
 object Skins {
-    data class Def(val id: String, val zh: String, val en: String)
+    /** anim = 右下角有一只会动的小狐狸（浮在文字上面）/ anim = an animated fox in the corner, above the text */
+    data class Def(val id: String, val zh: String, val en: String, val anim: Boolean = false)
 
     val LIST = listOf(
         Def("none", "默认", "Default"),
+        Def("fox", "小狐狸", "Fox", anim = true),
         Def("clay", "陶土", "Clay"),
         Def("contour", "等高线", "Contour"),
         Def("terminal", "终端", "Terminal"),
@@ -49,6 +51,34 @@ object Skins {
         val zh = context.resources.configuration.locales[0].language == "zh"
         val d = LIST.firstOrNull { it.id == id } ?: LIST[0]
         return if (zh) d.zh else d.en
+    }
+
+    /** 5×7 像素字，和 skins.js 的 FONT 一样 / 5×7 pixel letters, same as FONT in skins.js */
+    internal val FONT = mapOf(
+        'P' to listOf("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
+        'A' to listOf("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
+        'X' to listOf("10001", "10001", "01010", "00100", "01010", "10001", "10001"),
+        'O' to listOf("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
+        'N' to listOf("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
+    )
+    const val FOX_WORD = "PAXON"
+
+    /** 像素描边立体字：两层错开的描边 + 实心字 / layered pixel lettering: two offset outlines + solid letters */
+    private fun word(c: Canvas, text: String, x0: Float, y0: Float, b: Float, color: Int, alpha: Double) {
+        val cells = ArrayList<Pair<Float, Float>>()
+        text.forEachIndexed { k, ch -> FONT[ch]?.forEachIndexed { y, row -> row.forEachIndexed { x, v -> if (v == '1') cells.add((k * 6 * b + x * b) to (y * b)) } } }
+        val save = c.saveLayerAlpha(null, (alpha * 255).roundToInt())
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 0.7f; p.color = color
+        for (off in floatArrayOf(b * 0.9f, b * 0.5f)) for ((x, y) in cells) c.drawRect(x0 + x + off + 0.4f, y0 + y + off + 0.4f, x0 + x + off + b - 0.4f, y0 + y + off + b - 0.4f, p)
+        val dk = Color.rgb((Color.red(color) * 0.82).roundToInt(), (Color.green(color) * 0.82).roundToInt(), (Color.blue(color) * 0.82).roundToInt())
+        for ((x, y) in cells) {
+            p.style = Paint.Style.FILL; p.color = color
+            c.drawRect(x0 + x, y0 + y, x0 + x + b, y0 + y + b, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 0.5f; p.color = dk
+            c.drawRect(x0 + x, y0 + y, x0 + x + b, y0 + y + b, p)
+        }
+        c.restoreToCount(save)
     }
 
     private const val CLAY = 0xFFD97757.toInt()
@@ -78,7 +108,10 @@ object Skins {
      * 画一张皮肤图（圆角已经裁好）。尺寸用 dp；返回 null 表示不用皮肤。
      * Draws a skin with rounded corners already clipped. Sizes in dp; null means no skin.
      */
-    fun draw(context: Context, id: String, wDp: Float, hDp: Float, radiusDp: Float = 22f, dark: Boolean = isDark(context), scaleCap: Float = 2f): Bitmap? {
+    fun animated(id: String) = LIST.firstOrNull { it.id == id }?.anim == true
+
+    /** withScene：把小狐狸的第一帧也画进去（选皮肤的缩略图用）/ withScene: include the fox's first frame (picker thumbnails) */
+    fun draw(context: Context, id: String, wDp: Float, hDp: Float, radiusDp: Float = 22f, dark: Boolean = isDark(context), scaleCap: Float = 2f, withScene: Boolean = false): Bitmap? {
         if (id == "none" || !valid(id)) return null
         val w = wDp.coerceIn(40f, 900f)
         val h = hDp.coerceIn(40f, 900f)
@@ -93,10 +126,21 @@ object Skins {
         val surface = context.getColor(R.color.c_surface)
         val (a0, a1) = if (dark) 0.68 to 0.12 else 0.8 to 0.2
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = LinearGradient(0f, 0f, w, h,
-            intArrayOf(withAlpha(surface, a0), withAlpha(surface, (a0 + a1) / 2), withAlpha(surface, a1)),
-            floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
-        c.drawRect(0f, 0f, w, h, p)
+        // 小狐狸自带蒙版（PAXON 在蒙版上面），这里不再盖 / the fox skin brings its own scrim (PAXON sits above it)
+        if (id != "fox") {
+            p.shader = LinearGradient(0f, 0f, w, h,
+                intArrayOf(withAlpha(surface, a0), withAlpha(surface, (a0 + a1) / 2), withAlpha(surface, a1)),
+                floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            c.drawRect(0f, 0f, w, h, p)
+        }
+        if (withScene && animated(id)) {
+            context.getDrawable(R.drawable.fox_f0)?.let { f ->
+                val fh = h * 0.62f
+                val fw = fh * f.intrinsicWidth / f.intrinsicHeight.coerceAtLeast(1)
+                f.setBounds((w - fw).toInt(), (h - fh).toInt(), w.toInt(), h.toInt())
+                f.draw(c)
+            }
+        }
         return bmp
     }
 
@@ -122,6 +166,29 @@ object Skins {
             c.drawPath(path, p)
         }
         when (id) {
+            "fox" -> {
+                // 和 skins.js 的 fox 一样 / same as "fox" in skins.js
+                p.reset(); p.isAntiAlias = true
+                p.shader = if (dark) LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), 0xFF241E1B.toInt(), 0xFF131418.toInt(), Shader.TileMode.CLAMP)
+                else LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), 0xFFFFF3EA.toInt(), 0xFFF3EEE9.toInt(), Shader.TileMode.CLAMP)
+                c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
+                blob(0.85 * w, 0.85 * h, 0.6 * w, CLAY, if (dark) 0.28 else 0.2)
+                for (i in 0 until 4) line(listOf(-10.0 to h * (0.6 + i * 0.13), (w * (0.32 + i * 0.1)) to -10.0), CLAY, if (dark) 0.14 else 0.18, 0.8)
+                for ((bx, by, bw) in listOf(Triple(18.0, 0.2, 0.3), Triple(30.0, 0.26, 0.12), Triple(30 + 0.14 * w, 0.26, 0.16))) {
+                    p.reset(); p.isAntiAlias = true; p.color = withAlpha(ink, 0.06)
+                    c.drawRoundRect(RectF(bx.toFloat(), (by * h).toFloat(), (bx + bw * w).toFloat(), (by * h + 4).toFloat()), 2f, 2f, p)
+                }
+                p.reset(); p.isAntiAlias = true; p.typeface = android.graphics.Typeface.MONOSPACE; p.textSize = 12f
+                p.color = withAlpha(CLAY, 0.25); c.drawText("</>", 16f, (0.5 * h).toFloat(), p)
+                p.color = withAlpha(CLAY, 0.22); c.drawText("$", 16f, (0.62 * h).toFloat(), p)
+                // 自带的蒙版 / its own scrim
+                val sf = if (dark) 0xFF1C1C1E.toInt() else Color.WHITE
+                val sa = if (dark) doubleArrayOf(0.5, 0.22, 0.0) else doubleArrayOf(0.55, 0.25, 0.0)
+                p.reset(); p.isAntiAlias = true
+                p.shader = LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), intArrayOf(withAlpha(sf, sa[0]), withAlpha(sf, sa[1]), withAlpha(sf, sa[2])), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+                c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
+                word(c, FOX_WORD, 18f, (h - 78).toFloat(), 4.2f, CLAY, if (dark) 0.55 else 0.5)
+            }
             "clay" -> {
                 blob(0.95 * w, 1.05 * h, 0.75 * r, CLAY, 0.6)
                 blob(0.04 * w, -0.06 * h, 0.45 * r, SAND, 0.4)

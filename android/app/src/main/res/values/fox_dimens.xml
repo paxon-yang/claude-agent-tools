@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 由 android/tools/fox-frames.js 生成：小狐狸那一层的大小（含投影留白）/ generated: size of the fox layer, shadow margin included -->
+<resources>
+    <dimen name="fox_w">102dp</dimen>
+    <dimen name="fox_h">104dp</dimen>
+    <dimen name="fox_pad">6dp</dimen>
+</resources>

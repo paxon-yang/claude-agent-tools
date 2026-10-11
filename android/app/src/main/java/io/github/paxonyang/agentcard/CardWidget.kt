@@ -108,13 +108,16 @@ class CardWidget : AppWidgetProvider() {
             val color = { id: Int -> context.getColor(id) }
 
             // 皮肤 / skin
-            val skin = runCatching { Skins.draw(context, Skins.current(prefs, prefs.data()), sizeDp.first, sizeDp.second) }.getOrNull()
+            val skinId = Skins.current(prefs, prefs.data())
+            val skin = runCatching { Skins.draw(context, skinId, sizeDp.first, sizeDp.second) }.getOrNull()
             if (skin != null) {
                 rv.setImageViewBitmap(R.id.skin, skin)
                 rv.setViewVisibility(R.id.skin, View.VISIBLE)
             } else {
                 rv.setViewVisibility(R.id.skin, View.GONE)
             }
+            // 小狐狸浮在文字上面 / the fox floats above the text
+            rv.setViewVisibility(R.id.skin_anim, if (skin != null && Skins.animated(skinId)) View.VISIBLE else View.GONE)
 
             val settings = pi(context, 2, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true)
             if (prefs.url.isBlank()) {

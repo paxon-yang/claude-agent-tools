@@ -695,9 +695,11 @@ function renderConn() { $('#conn').className = conn === 'live' ? 'conn ok' : 'co
 // the choice is saved on the board (the desktop and phone cards follow); the static demo keeps it in this browser
 let localSkin = (() => { try { return localStorage.getItem('viz.skin'); } catch (e) { return null; } })();
 const skinNow = () => (STATIC ? localSkin : state && state.skin) || 'none';
+// 只给卡片用的皮肤（小狐狸）不改网页看板 / card-only skins (the fox) leave the board as it is
+const boardSkin = id => ((window.Skins && Skins.LIST.find(k => k.id === id)) || {}).cardOnly ? 'none' : id;
 function renderSkin() {
   if (!window.Skins) return;
-  Skins.apply($('#skinbg'), skinNow(), { dark: false, width: innerWidth, height: innerHeight, surface: '245,245,247' });
+  Skins.apply($('#skinbg'), boardSkin(skinNow()), { dark: false, width: innerWidth, height: innerHeight, surface: '245,245,247' });
   const box = $('#skinsw');
   if (!box) return;
   if (!box.children.length) box.innerHTML = Skins.LIST.map(k => `<button type="button" data-skin="${k.id}" style="background-image:${k.id === 'none' ? 'none' : Skins.url(k.id, 52, 36, false).replace(/"/g, "'")}"></button>`).join('');

@@ -87,11 +87,11 @@ shot home-sample
 sleep 5
 shot home-sample-2
 # 每种皮肤一张 / one shot per skin
-for SK in clay contour terminal dunes aurora night; do
+for SK in fox clay contour terminal dunes aurora night; do
   adb shell am force-stop $PKG
   adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE" --es skin $SK
   sleep 4
-  [ $SK = clay ] && shot app-skin-picker
+  [ $SK = fox ] && shot app-skin-picker
   adb shell input keyevent KEYCODE_BACK
   sleep 3
   shot home-skin-$SK
@@ -104,7 +104,7 @@ sleep 5
 adb shell input keyevent KEYCODE_BACK
 sleep 4
 shot home-sample-dark
-for SK in contour aurora; do
+for SK in fox contour aurora; do
   adb shell am force-stop $PKG
   adb shell am start -n $PKG/.MainActivity --es sample "$SAMPLE" --es skin $SK
   sleep 4

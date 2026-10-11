@@ -207,7 +207,7 @@ class MainActivity : Activity() {
                 setPadding(pad, pad, pad, pad)
                 scaleType = ImageView.ScaleType.FIT_XY
                 val shown = if (id == Skins.FOLLOW) board ?: "none" else id
-                Skins.draw(this@MainActivity, shown, 60f, 42f, radiusDp = 9f, scaleCap = 3f)?.let { setImageBitmap(it) }
+                Skins.draw(this@MainActivity, shown, 60f, 42f, radiusDp = 9f, scaleCap = 3f, withScene = true)?.let { setImageBitmap(it) }
                 contentDescription = label
             }
             col.addView(img, LinearLayout.LayoutParams((66 * d).toInt(), (48 * d).toInt()))
