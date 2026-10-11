@@ -43,6 +43,10 @@ class Prefs(context: Context) {
     var skin: String
         get() = p.getString("skin", Skins.FOLLOW) ?: Skins.FOLLOW
         set(v) = p.edit().putString("skin", v).apply()
+    /** 上一次看到有会话在跑的时间 / when a busy session was last seen */
+    var lastBusyAt: Long
+        get() = p.getLong("lastBusyAt", 0)
+        set(v) = p.edit().putLong("lastBusyAt", v).apply()
     var liveUntil: Long
         get() = p.getLong("liveUntil", 0)
         set(v) = p.edit().putLong("liveUntil", v).apply()
@@ -116,6 +120,8 @@ object Api {
     fun refresh(context: Context): FetchResult {
         val r = fetch(context)
         CardWidget.renderAll(context)
+        // 有事在做就过几分钟再看一次（不用等 15 分钟）/ while something is going on, look again in a few minutes
+        if (r.data != null) runCatching { RefreshWorker.followUp(context, r.data) }
         return r
     }
 }

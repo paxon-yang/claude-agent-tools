@@ -82,6 +82,7 @@ class MainActivity : Activity() {
             intent?.getStringExtra("sample")?.let {
                 sampleMode = true
                 LiveService.stop(this)
+                RefreshWorker.cancelFollowUp(this)
                 prefs.lastJson = String(Base64.decode(it, Base64.DEFAULT), Charsets.UTF_8)
                 prefs.lastOkAt = System.currentTimeMillis()
                 prefs.lastError = ""
