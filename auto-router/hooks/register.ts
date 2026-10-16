@@ -39,6 +39,8 @@ const history: Logged[] = []
 let lastTurnErrors = 0
 let advisorCalls = 0
 let logFile: string | undefined
+/** 开关文件：桌面卡片托盘菜单和 /route 都写它，每一轮开始时读一次 / the on/off file: written by the desktop card's tray menu and /route, read at every turn */
+let modeFile: string | undefined
 
 // 提示缓存：主会话每个模型的缓存热到什么时候；缓存时长（秒）先按 1 小时算，跑起来以后自己学
 const warmUntil: Partial<Record<Tier, number>> = {}
@@ -107,6 +109,15 @@ export const register: Register = on => {
     mode = saved === 'off' || tierOf(String(saved)) ? (saved as Mode) : 'auto'
     try {
       const home = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE'))
+      if (home) modeFile = `${home}/.claude/auto-router/mode.json`
+    } catch {
+      modeFile = undefined
+    }
+    await syncModeFile($)
+    // 还没有开关文件（老版本升级上来）：把现在的状态写进去，桌面卡片才显示得对 / no file yet (upgrade): write the current mode so the card shows it right
+    try { if (modeFile && !(await $.fs.exists(modeFile))) await writeModeFile($) } catch { /* ignore */ }
+    try {
+      const home = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE'))
       if (home && (await $.fs.exists(`${home}/.claude/viz`))) {
         logFile = `${home}/.claude/viz/router/${await $.session.id()}.json`
       }
@@ -146,6 +157,7 @@ export const register: Register = on => {
 
   // 新任务开始：决定这一轮用哪个模型
   on('turn.start', async ($, e, next) => {
+    await syncModeFile($)
     if (mode === 'off') return next(e)
     const sid = await $.session.id()
     if (current === undefined) {
@@ -342,6 +354,7 @@ export const register: Register = on => {
     if (arg === 'auto' || arg === 'off' || tierOf(arg)) {
       mode = arg as Mode
       await $.store.set('mode', mode)
+      await writeModeFile($)
       setStatus($, modeStatus())
       void writeLog($)
       const said =
@@ -353,6 +366,33 @@ export const register: Register = on => {
     if (arg === 'rules') return { text: rulesText() }
     return { text: await statusText($) }
   })
+}
+
+/** 读开关文件：{ "mode": "auto" | "off" | "haiku" | … }。文件不在或写坏了就不动 / read the on/off file; missing or broken: leave the mode alone */
+async function syncModeFile($: EngineInterface) {
+  if (!modeFile) return
+  try {
+    if (!(await $.fs.exists(modeFile))) return
+    const v = String((JSON.parse(String(await $.fs.read(modeFile))) as { mode?: unknown }).mode ?? '').toLowerCase()
+    const m: Mode | undefined = v === 'auto' || v === 'off' ? v : tierOf(v)
+    if (m && m !== mode) {
+      mode = m
+      await $.store.set('mode', mode)
+      setStatus($, modeStatus())
+      void writeLog($)
+    }
+  } catch {
+    /* 读不了就照旧 / unreadable: keep the current mode */
+  }
+}
+
+async function writeModeFile($: EngineInterface) {
+  if (!modeFile) return
+  try {
+    await $.fs.write(modeFile, JSON.stringify({ mode, at: new Date().toISOString() }) + '\n')
+  } catch {
+    /* 写不了也不影响 /route 本身 / a failed write doesn't affect /route itself */
+  }
 }
 
 /** 定下（或改变）主会话这一轮的档：记录、状态栏、换档提示、看板日志 */

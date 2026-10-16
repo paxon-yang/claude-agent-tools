@@ -73,10 +73,33 @@ function setSkin(id) {
   fetch(BASE + '/api/skin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skin: id }) }).catch(() => { });
 }
 
+// 自动选模型的开关：和 Claude Code 里的 /route on/off 是同一个文件，下一句话起生效
+// the auto-router switch: the same file as /route auto|off in Claude Code; takes effect from the next message
+const ROUTER_DIR = path.join(os.homedir(), '.claude', 'auto-router');
+const MODE_FILE = path.join(ROUTER_DIR, 'mode.json');
+function routerMode() {
+  try { return String(JSON.parse(fs.readFileSync(MODE_FILE, 'utf8')).mode || 'auto').toLowerCase(); } catch { return 'auto'; }
+}
+function setRouter(on) {
+  try { fs.writeFileSync(MODE_FILE, JSON.stringify({ mode: on ? 'auto' : 'off', at: new Date().toISOString(), by: 'card' }) + '\n'); } catch { }
+  buildMenu();
+}
+function routerItem() {
+  if (!fs.existsSync(ROUTER_DIR)) return [];
+  const m = routerMode();
+  const pinned = m !== 'auto' && m !== 'off';
+  const name = pinned ? m.charAt(0).toUpperCase() + m.slice(1) : '';
+  return [{
+    label: pinned ? L(`自动选模型（现在固定用 ${name}）`, `Auto model routing (pinned to ${name})`) : L('自动选模型', 'Auto model routing'),
+    type: 'checkbox', checked: m === 'auto', click: item => setRouter(item.checked),
+  }, { type: 'separator' }];
+}
+
 function buildMenu() {
   if (!tray) return;
   const visible = win && win.isVisible();
   tray.setContextMenu(Menu.buildFromTemplate([
+    ...routerItem(),
     { label: visible ? L('隐藏卡片', 'Hide card') : L('显示卡片', 'Show card'), click: () => (visible ? hideCard() : showCard()) },
     { label: L('总在最前', 'Always on top'), type: 'checkbox', checked: prefs.pinned, click: m => setPinned(m.checked) },
     ...(SKINS.length ? [{ label: L('皮肤', 'Skin'), submenu: SKINS.map(k => ({ label: ZH ? k.zh : k.en, type: 'radio', checked: k.id === skin, click: () => setSkin(k.id) })) }] : []),
@@ -102,6 +125,8 @@ app.whenReady().then(() => {
   tray.on('click', () => (win && win.isVisible() ? hideCard() : showCard()));
   createWindow();
   buildMenu();
+  // 在 Claude Code 里用 /route 改了开关，菜单的勾也跟着变 / keep the tick in sync when /route changes it
+  try { fs.watchFile(MODE_FILE, { interval: 2000 }, () => buildMenu()); } catch { }
 });
 app.on('window-all-closed', e => e.preventDefault());
 app.on('activate', () => showCard());

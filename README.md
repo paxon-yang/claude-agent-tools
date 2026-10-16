@@ -125,7 +125,7 @@ Each turn's choice, and why, shows up in the Claude Code status line, in `/route
 |---|---|
 | `/route` | A card: current model and why, cache time left, test gate, running sub-agents, session cost, recent decisions (also in the Claude app via Remote Control) |
 | `/route rules` | The active rules |
-| `/route sonnet` · `/route auto` · `/route off` | Pin a model · back to automatic · disable |
+| `/route sonnet` · `/route auto` · `/route off` | Pin a model · back to automatic · disable (the desktop card's tray menu has an "Auto model routing" switch for the same thing) |
 | `#opus refactor the auth module` | Use Opus for this prompt only |
 | Shift+Tab, then *"go ahead"* | Opus plans, Sonnet executes |
 

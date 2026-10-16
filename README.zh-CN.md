@@ -122,7 +122,7 @@ flowchart LR
 |---|---|
 | `/route` | 一张卡片：当前模型和原因、缓存还剩多久、测试关卡、在跑的子代理、花费、最近的选择（手机 Claude App 里通过 Remote Control 也能用） |
 | `/route rules` | 当前规则 |
-| `/route sonnet` · `/route auto` · `/route off` | 固定模型 · 恢复自动 · 关闭 |
+| `/route sonnet` · `/route auto` · `/route off` | 固定模型 · 恢复自动 · 关闭（桌面卡片托盘菜单里的"自动选模型"开关也能一键开关） |
 | `#opus 重构登录模块` | 只这一句用 Opus |
 | Shift+Tab，然后回"执行" | Opus 出方案，Sonnet 动手 |
 

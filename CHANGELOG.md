@@ -5,6 +5,7 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 ## [Unreleased]
 
 ### Added
+- **On/off switch in the desktop card's tray menu**: "Auto model routing" turns the router off or back on, from the next message. It shares `~/.claude/auto-router/mode.json` with `/route auto|off`, so the tick follows changes made in Claude Code.
 - **Android home-screen card** (`android/`): a widget with the current task, model and effort, running sub-agents, cache time left, test gate and 24-hour cost; refreshes every 15 minutes, and every 15 seconds in live mode (tap the card) while a session is busy. Works over Tailscale or behind Cloudflare Access with a service token. Built and signed by GitHub Actions; the latest APK is always at the `card-android` release.
 - Dashboard: `/api/widget`, a small summary for the card.
 - **Weekly plan usage** everywhere: the router records Claude Code's 5-hour and 7-day usage windows; the dashboard sidebar, the desktop card and the Android card show how much of the week is used and when it resets.

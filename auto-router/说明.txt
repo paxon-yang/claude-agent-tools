@@ -34,7 +34,7 @@ auto-router v0.2 · 让 Claude Code 自动选模型、自动派活
     /route rules    查看自动选择的规则
     /route opus     固定用某个模型（haiku / sonnet / opus / fable）
     /route auto     恢复自动
-    /route off      关闭自动选择
+    /route off      关闭自动选择（桌面卡片的托盘菜单里也有"自动选模型"开关，点一下就关/开，下一句话起生效）
     在提示里写 #opus / #fable / #haiku 等，只对这一句生效
 
 改规则：编辑 ~/.claude/auto-router/config.json，然后重开 Claude Code
