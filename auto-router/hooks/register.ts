@@ -9,7 +9,7 @@
 // - /route 查看和手动控制
 import type { EngineInterface, Register } from 'claude-code'
 import {
-  DEFAULTS, NAMES, ORDER, classifierPrompt, classifierSystem, detectTestCommand, guardCache, guardDowngrade, guardHysteresis, guardWindow,
+  DEFAULTS, NAMES, ORDER, classifierPrompt, classifierSystem, detectTestCommand, guardCache, guardDowngrade, guardHysteresis, guardSticky, guardWindow,
   isCodeFile, isHandback, isRisky, learnTtl, looksLikeTestRun, mergeConfig, mergePrices, parseClassifier, ruleDecide, shellArgv,
   subagentTier, tailOutput, tierOf, tierOfModel, up,
 } from './rules'
@@ -151,9 +151,24 @@ export const register: Register = on => {
   })
 
   // 记下这一句是不是在计划模式里发的（Shift+Tab 切换）
-  on('classic.UserPromptSubmit', ($, e, next) => {
+  // 主会话不换模型时（sticky）：一眼看得出的难活，提示主会话交给 architect 子代理
+  // sticky strategy: for work the rules can tell is hard, tell the main session to hand it to the architect sub-agent
+  on('classic.UserPromptSubmit', async ($, e, next) => {
     permissionMode = String(e.permission_mode ?? 'default')
-    return next(e)
+    const r = await next(e)
+    try {
+      const text = String(e.prompt ?? '')
+      if (mode !== 'auto' || cfg.strategy !== 'sticky' || permissionMode === 'plan' || isHandback(text)) return r
+      const d = ruleDecide(text, current, lastTurnErrors, cfg)
+      if (!d) return r
+      const s = guardSticky(d, current, cfg)
+      if (!s.delegate) return r
+      const hint = M().delegateHint(cfg.stickyAgent, NAMES[s.delegate])
+      const prev = (r && typeof r === 'object' && Array.isArray((r as { additionalContext?: string[] }).additionalContext)) ? (r as { additionalContext: string[] }).additionalContext : []
+      return { ...(r as object), additionalContext: [...prev, hint] }
+    } catch {
+      return r
+    }
   }).catch(($, e, next) => next(e))
 
   // 新任务开始：决定这一轮用哪个模型
@@ -216,6 +231,8 @@ export const register: Register = on => {
         d = r.isAnswered ? parseClassifier(r.text, cfg) : undefined
         if (!d) d = { tier: cfg.defaultTier, effort: cfg.effort[cfg.defaultTier], reason: M().fallback, source: 'fallback' }
       }
+      // 难活不换主模型，交给子代理（strategy = sticky）/ hard work doesn't move the main session; a sub-agent takes it
+      d = guardSticky(d, current, cfg)
       let tokens = 0
       try {
         tokens = (await $.session.usage()).context.tokens ?? 0
@@ -724,6 +741,8 @@ function rulesText(): string {
     gateBelow: ORDER.filter(t => ORDER.indexOf(t) < ORDER.indexOf(cfg.qualityGate.trustTier)).map(t => NAMES[t]).join(m.listSep),
     gateTo: NAMES[cfg.qualityGate.escalateTo],
     gateRetries: cfg.qualityGate.maxRetries,
+    sticky: cfg.strategy === 'sticky',
+    stickyAgent: cfg.stickyAgent,
   }))
 }
 

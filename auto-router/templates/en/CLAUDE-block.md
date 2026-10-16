@@ -4,6 +4,7 @@
 - Reading code, finding files, tracing call paths → send explorer sub-agents, several in parallel if useful; the main session should not read lots of files itself.
 - Looking up docs or how a library is used → send researcher.
 - Each independent piece of the plan → send worker; small changes such as copy, config or renames → send quick-worker.
+- The main session normally keeps its model (a switch re-reads the whole conversation at the cache-write price). Architecture and design decisions, tricky bugs, the hardest piece of a big refactor, reviewing important changes → send architect (Opus); the main session splits the work, summarizes and reviews.
 - When delegating, state clearly: the goal, the files involved, what must not be touched, the acceptance criteria, and what to hand back.
 - The main session owns planning, delegating, summarizing, running tests and reviewing; check what sub-agents hand back instead of taking it as fact.
 - Before a big plan, when the same error keeps coming back, and before declaring a long task done, consult the advisor (if enabled).

@@ -52,6 +52,12 @@ if [ "$SRC" != "$DEST" ]; then
         if (c.noDowngradeAboveTokens === 80000) { c.noDowngradeAboveTokens = null; msg.push(zh ? "长对话也允许降档" : "downgrades allowed in long conversations"); }
         if (c.subagents) for (const k of ["worker", "general-purpose"]) if (c.subagents[k] === "main") { c.subagents[k] = "sonnet"; msg.push(zh ? k + " 子代理改用 Sonnet" : k + " sub-agent now uses Sonnet"); }
         if (!("handbackTier" in c)) { c.handbackTier = "sonnet"; msg.push(zh ? "子代理交回结果用 Sonnet 汇总" : "sub-agent hand-backs summarized by Sonnet"); }
+        if (!("strategy" in c)) {
+          c.strategy = "sticky"; c.stickyAgent = "architect";
+          if (c.subagents && !c.subagents.architect) c.subagents.architect = "opus";
+          if (c.subagentEffort && c.subagentEffort.opus === "medium") c.subagentEffort.opus = "high";
+          msg.push(zh ? "主会话不再为难活换模型，难活交给 architect 子代理（Opus）" : "the main session no longer switches up for hard work; the architect sub-agent (Opus) takes it");
+        }
         // Everyone who installed before i18n used the Chinese UI: keep it Chinese
         if (!("lang" in c)) { out = { lang: "zh", ...c }; msg.push(zh ? "界面语言保持中文（config.json 里 \"lang\" 可改成 \"en\"）" : "UI language kept as Chinese (set \"lang\": \"en\" in config.json to switch)"); }
         if (msg.length) { fs.writeFileSync(p, JSON.stringify(out, null, 2) + "\n"); console.log((zh ? "  ✓ 设置已更新：" : "  ✓ Settings updated: ") + msg.join(zh ? "、" : "; ")); }
@@ -102,7 +108,7 @@ fi
 { [ -s "$CMD" ] && echo ""; cat "$TPL/CLAUDE-block.md"; } >> "$CMD"
 ok "$(t '已在 ~/.claude/CLAUDE.md 末尾写入派活规则（原文件备份为 CLAUDE.md.bak-auto-router）' 'Added delegation rules to the end of ~/.claude/CLAUDE.md (original backed up as CLAUDE.md.bak-auto-router)')"
 mkdir -p "$HOME/.claude/agents"
-for a in explorer researcher worker quick-worker; do
+for a in explorer researcher worker quick-worker architect; do
   if [ -f "$HOME/.claude/agents/$a.md" ]; then
     ok "$(t "子代理 $a 已存在，保留你自己的版本" "Sub-agent $a already exists; keeping your version")"
   else

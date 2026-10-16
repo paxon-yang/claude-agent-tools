@@ -305,3 +305,40 @@ test('test output tail and shell', () => {
   expect(shellArgv('npm test', false)).toEqual(['sh', '-c', 'npm test'])
   expect(shellArgv('npm test', true)[0]).toBe('cmd')
 })
+
+// ---- 主会话不为难活换模型 / sticky main session ----
+import { guardSticky } from './rules'
+test('sticky: hard work keeps the main session and is delegated', () => {
+  const opus = { tier: 'opus' as const, effort: 'high' as const, reason: 'x', source: 'rule' as const }
+  const d = guardSticky(opus, 'sonnet', DEFAULTS)
+  expect(d.tier).toBe('sonnet')
+  expect(d.delegate).toBe('opus')
+  expect(d.source).toBe('guard')
+  // 从 Haiku 起步：最多自动升到 Sonnet / from Haiku: up to Sonnet on its own
+  expect(guardSticky(opus, 'haiku', DEFAULTS).tier).toBe('sonnet')
+  expect(guardSticky({ ...opus, tier: 'sonnet' }, 'haiku', DEFAULTS).delegate).toBe(undefined)
+  // 已经在 Opus（比如失败升档后）：不往下拽 / already on Opus after an escalation: stays
+  expect(guardSticky(opus, 'opus', DEFAULTS).tier).toBe('opus')
+  // 第一轮 / first turn
+  expect(guardSticky(opus, undefined, DEFAULTS).tier).toBe('sonnet')
+  // Haiku 判断的、兜底的也一样 / classifier and fallback too
+  expect(guardSticky({ ...opus, source: 'haiku' }, 'sonnet', DEFAULTS).tier).toBe('sonnet')
+})
+
+test('sticky never overrides manual tags, plan mode, escalations, pins or perTurn', () => {
+  const opus = { tier: 'opus' as const, effort: 'high' as const, reason: 'x' }
+  expect(guardSticky({ ...opus, source: 'manual' }, 'sonnet', DEFAULTS).tier).toBe('opus')
+  expect(guardSticky({ ...opus, source: 'escalate' }, 'sonnet', DEFAULTS).tier).toBe('opus')
+  expect(guardSticky({ ...opus, source: 'pin' }, 'sonnet', DEFAULTS).tier).toBe('opus')
+  expect(guardSticky({ ...opus, source: 'rule', phase: 'plan' }, 'sonnet', DEFAULTS).tier).toBe('opus')
+  expect(guardSticky({ ...opus, source: 'rule' }, 'sonnet', { ...DEFAULTS, strategy: 'perTurn' }).tier).toBe('opus')
+  // 往下的决定不归它管 / downgrades are not its business
+  expect(guardSticky({ tier: 'haiku', effort: 'low', reason: 'x', source: 'rule' }, 'sonnet', DEFAULTS).tier).toBe('haiku')
+})
+
+test('architect sub-agent runs on Opus with high effort', () => {
+  expect(subagentTier('architect', 'sonnet', DEFAULTS)).toBe('opus')
+  expect(DEFAULTS.subagentEffort.opus).toBe('high')
+  expect(mergeConfig(DEFAULTS, { strategy: 'bogus' }).strategy).toBe('sticky')
+  expect(mergeConfig(DEFAULTS, { strategy: 'perTurn' }).strategy).toBe('perTurn')
+})

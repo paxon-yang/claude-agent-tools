@@ -3,7 +3,7 @@
 # Claude Agent Tools
 
 **给 Claude Code 自动选模型 + 实时代理看板。**<br>
-简单问题交给 Haiku，日常开发交给 Sonnet，大任务由 Opus 统筹派活——
+简单问题交给 Haiku，日常开发交给 Sonnet，难活派给 Opus 子代理——
 每个代理用的什么模型、花了多少钱，实时看得见。
 
 **[▶ 在线看演示](https://paxon-yang.github.io/claude-agent-tools/)** · [English](README.md) · [简体中文](README.zh-CN.md)
@@ -43,7 +43,7 @@ Claude Code 默认一个模型干到底，想换就得自己敲 `/model`。结�
 ## 功能
 
 - **每轮自动选模型**：先按规则判断，拿不准再让 Haiku 判断。提示里写 `#opus` `#sonnet` `#haiku` `#fable` 只对这一句生效；`/route opus` 固定模型。
-- **多模型协作**：大任务（比如"按照 docs/spec.md 修改"）由 Opus 统筹，`explorer` 子代理用 Haiku 读代码，`worker` 子代理用 Sonnet 写代码。
+- **多模型协作**：主会话用 Sonnet 统筹，`explorer` 子代理用 Haiku 读代码，`worker` 子代理用 Sonnet 写代码，最难的部分交给 `architect` 子代理（Opus）。
 - **先计划后执行**：计划模式（Shift+Tab）里 Opus 出方案，批准后换 Sonnet 动手。
 - **保护**：Haiku 要改第 4 个文件、或要跑 `rm -rf`、`git push`、迁移、部署这类命令时，先换 Sonnet 接手；一轮里失败 3 次当场升一档；降档要连续两轮确认。
 - **看缓存再换模型**：提示缓存只对同一个模型有效，换模型等于让新模型按"写缓存"价把整段对话重读一遍。当前模型缓存还热时，只有这一轮能省回来才降档（会自己判断你的缓存是 5 分钟还是 1 小时）；状态栏显示缓存还剩多久。
@@ -106,13 +106,16 @@ flowchart LR
   P[你的提示] --> M{写了 #标签 或 /route 固定?}
   M -- 是 --> T[用指定的模型]
   M -- 否 --> R{规则}
-  R -- "计划模式 / 多步骤大任务 / 架构" --> O[Opus · 统筹]
   R -- "提问、查找、小改动" --> H[Haiku]
-  R -- 拿不准 --> C[Haiku 判断] --> S[Sonnet / Haiku / Opus + effort]
-  O -. 派活 .-> E[explorer · Haiku]
-  O -. 派活 .-> W[worker · Sonnet]
-  E & W -. 交回结果 .-> SUM[Sonnet 汇总]
+  R -- "日常开发 / 拿不准" --> S[Sonnet · 主会话]
+  R -- "架构 / 疑难 / 大任务" --> S
+  S -. 难的部分 .-> A[architect · Opus]
+  S -. 读代码 .-> E[explorer · Haiku]
+  S -. 写代码 .-> W[worker · Sonnet]
+  R -- "计划模式 / #opus / 反复失败" --> O[Opus · 主会话]
 ```
+
+主会话尽量不换模型：换模型要按"写缓存"价把整段对话重读一遍，长对话里往往比省下的还多。所以难活不换主模型，而是交给 `architect` 子代理（Opus），它有自己的新上下文，不影响主会话的缓存。想让主会话直接用 Opus：写 `#opus`、用计划模式，或者连续失败时会自动升档。想要以前"每一轮都按难度换主模型"的做法，在 config.json 里写 `"strategy": "perTurn"`。
 
 每一轮选了什么、为什么，Claude Code 底部状态栏、`/route` 命令和看板上都能看到。
 

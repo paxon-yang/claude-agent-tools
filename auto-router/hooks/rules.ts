@@ -14,11 +14,21 @@ export type Decision = {
   source: Source
   /** plan = 计划模式里想方案；批准计划后这一轮换成 executeTier */
   phase?: 'plan'
+  /** 主会话不升档时，这件活本来想用的档（交给子代理去做）/ the tier this work wanted when the main session stays put (a sub-agent does it) */
+  delegate?: Tier
 }
 
 export type Config = {
   /** UI language for reasons, status line and /route output: 'en' | 'zh' */
   lang: Lang
+  /**
+   * sticky（默认）：主会话尽量不换模型，自动只升到 defaultTier；更难的活交给 stickyAgent 子代理（Opus），因为换模型要按写缓存价重读整段对话。
+   * perTurn：每一轮按难度给主会话选模型（旧做法）。
+   * sticky (default): the main session rarely switches and only moves up to defaultTier by itself; harder work goes to the
+   * stickyAgent sub-agent (Opus), since a switch re-reads the whole conversation at the cache-write price. perTurn: the old per-turn choice.
+   */
+  strategy: 'sticky' | 'perTurn'
+  stickyAgent: string
   models: Record<Tier, string>
   defaultTier: Tier
   effort: Record<Tier, Effort>
@@ -106,6 +116,8 @@ export const NAMES: Record<Tier, string> = {
 
 export const DEFAULTS: Config = {
   lang: 'en',
+  strategy: 'sticky',
+  stickyAgent: 'architect',
   models: {
     haiku: 'claude-haiku-5-5',
     sonnet: 'claude-sonnet-5-5',
@@ -144,11 +156,12 @@ export const DEFAULTS: Config = {
     'statusline-setup': 'haiku',
     'quick-worker': 'sonnet',
     worker: 'sonnet',
+    architect: 'opus',
     'general-purpose': 'sonnet',
     Plan: 'main',
   },
   subagentDefault: 'sonnet',
-  subagentEffort: { haiku: 'low', sonnet: 'medium', opus: 'medium', fable: 'medium' },
+  subagentEffort: { haiku: 'low', sonnet: 'medium', opus: 'high', fable: 'medium' },
   cache: {
     enabled: true,
     ttlSeconds: 'auto',
@@ -242,6 +255,7 @@ export function mergeConfig(base: Config, over: unknown): Config {
     ...base,
     ...o,
     lang: langOf(o.lang ?? base.lang),
+    strategy: o.strategy === 'perTurn' || o.strategy === 'sticky' ? o.strategy : base.strategy,
     models: { ...base.models, ...(o.models ?? {}) },
     effort: { ...base.effort, ...(o.effort ?? {}) },
     subagents: { ...base.subagents, ...(o.subagents ?? {}) },
@@ -494,6 +508,23 @@ export function guardHysteresis(d: Decision, current: Tier | undefined, pending:
     decision: { tier: keep, effort: cfg.effort[keep], reason: msgs(cfg).holdDown(d.reason, NAMES[d.tier]), source: 'guard' },
     pending: d.tier,
   }
+}
+
+/**
+ * 主会话不为难活换模型（strategy = sticky）：规则或 Haiku 判断想升到 defaultTier 以上时，留在
+ * max(当前, defaultTier)，记下本来想用的档（delegate），这件活交给 stickyAgent 子代理。
+ * 你手动指定、计划模式、失败升档、固定模型都不受影响。
+ * Main session doesn't switch up for hard work (strategy = sticky): when a rule or the classifier wants more than defaultTier,
+ * stay on max(current, defaultTier) and record the wanted tier (delegate) for the stickyAgent sub-agent. Manual tags, plan mode,
+ * escalations and pins are untouched.
+ */
+export function guardSticky(d: Decision, current: Tier | undefined, cfg: Config): Decision {
+  if (cfg.strategy !== 'sticky' || d.phase) return d
+  if (d.source !== 'rule' && d.source !== 'haiku' && d.source !== 'fallback') return d
+  const floor = Math.max(ORDER.indexOf(cfg.defaultTier), current ? ORDER.indexOf(current) : -1)
+  if (ORDER.indexOf(d.tier) <= floor) return d
+  const keep = ORDER[floor]
+  return { tier: keep, effort: cfg.effort[keep], reason: msgs(cfg).stickyDelegate(NAMES[d.tier], cfg.stickyAgent), source: 'guard', delegate: d.tier }
 }
 
 export function subagentTier(type: string, main: Tier | undefined, cfg: Config): Tier {

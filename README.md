@@ -48,7 +48,7 @@ Use it alongside ccusage if you like its reports; use claude-code-router if you 
 ## Features
 
 - **Per-turn routing** — keyword rules first, then a Haiku classifier for the rest. Tag a prompt with `#opus`, `#sonnet`, `#haiku` or `#fable` to override once; `/route opus` to pin.
-- **Multi-model teamwork** — big tasks ("implement docs/spec.md") get Opus as the orchestrator, `explorer` sub-agents on Haiku to read code, `worker` sub-agents on Sonnet to write it.
+- **Multi-model teamwork** — the main session orchestrates on Sonnet, `explorer` sub-agents on Haiku read code, `worker` sub-agents on Sonnet write it, and the hardest parts go to the `architect` sub-agent on Opus.
 - **Plan → execute** — in plan mode (Shift+Tab) Opus writes the plan; once you approve, Sonnet carries it out.
 - **Guard rails** — Haiku hands over to Sonnet before editing a 4th file or running risky commands (`rm -rf`, `git push`, migrations, deploys); 3 tool failures in a turn escalate one tier on the spot; downgrades need two confirmations.
 - **Cache-aware** — the prompt cache belongs to one model, so a switch makes the new model re-read the whole conversation at the cache-write price. While the current model's cache is warm, the router only downgrades when the turn will earn that back (it learns whether your cache lasts 5 minutes or 1 hour); the status line shows how long the cache has left.
@@ -109,13 +109,16 @@ flowchart LR
   P[Your prompt] --> M{#tag or /route pin?}
   M -- yes --> T[That model]
   M -- no --> R{Rules}
-  R -- "plan mode / big multi-step task / architecture" --> O[Opus · orchestrates]
   R -- "question, lookup, tiny edit" --> H[Haiku]
-  R -- unsure --> C[Haiku classifier] --> S[Sonnet / Haiku / Opus + effort]
-  O -. delegates .-> E[explorer · Haiku]
-  O -. delegates .-> W[worker · Sonnet]
-  E & W -. report back .-> SUM[Sonnet summarizes]
+  R -- "everyday coding / unsure" --> S[Sonnet · main session]
+  R -- "architecture / hard bug / big task" --> S
+  S -. hard parts .-> A[architect · Opus]
+  S -. read code .-> E[explorer · Haiku]
+  S -. write code .-> W[worker · Sonnet]
+  R -- "plan mode / #opus / repeated failures" --> O[Opus · main session]
 ```
+
+The main session rarely switches models: a switch re-reads the whole conversation at the cache-write price, which in a long conversation usually costs more than it saves. So hard work doesn't move the main session; it goes to the `architect` sub-agent (Opus), which has its own fresh context and leaves the main session's cache alone. To put the main session itself on Opus, write `#opus`, use plan mode, or let repeated failures escalate. For the old "pick the main model every turn" behaviour, set `"strategy": "perTurn"` in config.json.
 
 Each turn's choice, and why, shows up in the Claude Code status line, in `/route`, and on the dashboard.
 

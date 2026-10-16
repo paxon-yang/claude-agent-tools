@@ -1,5 +1,7 @@
 {
   "lang": "en",
+  "strategy": "sticky",
+  "stickyAgent": "architect",
   "models": {
     "haiku": "claude-haiku-5-5",
     "sonnet": "claude-sonnet-5-5",
@@ -43,13 +45,14 @@
     "quick-worker": "sonnet",
     "worker": "sonnet",
     "general-purpose": "sonnet",
-    "Plan": "main"
+    "Plan": "main",
+    "architect": "opus"
   },
   "subagentDefault": "sonnet",
   "subagentEffort": {
     "haiku": "low",
     "sonnet": "medium",
-    "opus": "medium",
+    "opus": "high",
     "fable": "medium"
   },
   "cache": {

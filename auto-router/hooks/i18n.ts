@@ -20,6 +20,9 @@ const zh = {
   noDowngrade: (k: number) => `上下文 ${k}k，降档不划算，保持`,
   window: (k: number, want: string, use: string) => `对话 ${k}k，${want} 窗口不够，改用 ${use}`,
   holdDown: (reason: string, to: string) => `${reason}；先不降档，下一轮仍简单再换 ${to}`,
+  stickyDelegate: (want: string, agent: string) => `像是 ${want} 的活：主会话不换（换模型要重写缓存），难的部分交给 ${agent} 子代理`,
+  delegateHint: (agent: string, want: string) =>
+    `（auto-router）这件事难度较高（${want} 级）。主会话保持当前模型、不切换；请把设计、疑难排查或最难的实现交给 ${agent} 子代理（${want}）完成，给它写清目标、相关文件、约束和验收标准；主会话负责拆分、汇总和复核。很简单的部分照常自己做或交给其他子代理。`,
   cacheHold: (to: string, cur: string, k: number, usd: string, mins: number) =>
     `${cur} 缓存还热（剩 ${mins} 分钟）；换 ${to} 要重读 ${k}k 上下文，这一轮约多花 $${usd}，先不换`,
   cacheLeft: (mins: number) => `缓存剩 ${mins} 分`,
@@ -110,12 +113,13 @@ const zh = {
     '2. 只回了"继续/好的/ok"之类 → 沿用上一轮',
     `3. 上一轮工具失败 ≥ ${r.escalateAfter} 次，或你说"还是不对/又错了" → 升一档`,
     `4. 计划模式（Shift+Tab）→ ${r.plan} 想方案，批准计划后这一轮换 ${r.execute} 执行`,
-    `5. 多步骤大任务（按文档/方案修改、@文档、很长、列了 4 条以上要求）→ 主会话 ${r.bigTask} 统筹`,
-    `6. 提到架构、重构、迁移、安全、性能、审查等 → ${r.opus}`,
+    `5. 多步骤大任务（按文档/方案修改、@文档、很长、列了 4 条以上要求）→ ${r.sticky ? `主会话不换，交给 ${r.stickyAgent} 子代理（${r.bigTask}）` : `主会话 ${r.bigTask} 统筹`}`,
+    `6. 提到架构、重构、迁移、安全、性能、审查等 → ${r.sticky ? `主会话不换，交给 ${r.stickyAgent} 子代理（${r.opus}）` : r.opus}`,
     `7. 提问、解释、查找、总结、翻译、改名等，且不要求改代码 → ${r.haiku}`,
     `8. 其他情况 → 让 ${r.haiku} 判断难度（失败时用 ${r.defaultTier}）`,
     '',
     '保护：',
+    ...(r.sticky ? [`· 主会话最高只自动升到 ${r.defaultTier}；要更强的模型：写 #opus、用计划模式，或连续失败时自动升档（换模型要重写整段缓存，难活交给子代理更省）`] : []),
     `· ${r.noDowngradeAbove == null ? '对话再长也允许降档' : `对话超过 ${r.noDowngradeAbove} 时不降档`}；降档要连续 ${r.confirmations} 轮都判成更便宜的档`,
     `· 后台子代理交回结果时，主会话用 ${r.handback ?? '上一轮的模型'} 汇总`,
     `· 对话超过目标模型窗口的八成时不切过去（Haiku 窗口按 ${r.haikuWindow} 算）`,
@@ -154,6 +158,8 @@ export type RulesArgs = {
   gateBelow: string
   gateTo: string
   gateRetries: number
+  sticky: boolean
+  stickyAgent: string
 }
 
 export type Messages = typeof zh
@@ -172,6 +178,9 @@ const en: Messages = {
   noDowngrade: (k: number) => `Context ${k}k, not worth downgrading`,
   window: (k: number, want: string, use: string) => `Context ${k}k too big for ${want}, using ${use}`,
   holdDown: (reason: string, to: string) => `${reason}; holding, ${to} next if still simple`,
+  stickyDelegate: (want: string, agent: string) => `${want}-level work: main session stays put (a switch re-writes the cache); hard parts go to the ${agent} sub-agent`,
+  delegateHint: (agent: string, want: string) =>
+    `(auto-router) This is hard (${want}-level). Keep the main session on its current model, don't switch; hand the design, the tricky debugging or the hardest implementation to the ${agent} sub-agent (${want}) with a clear goal, the relevant files, constraints and acceptance criteria; the main session splits the work, summarizes and reviews. Do simple parts yourself or with the other sub-agents as usual.`,
   cacheHold: (to: string, cur: string, k: number, usd: string, mins: number) =>
     `${cur} cache is warm (${mins} min left); ${to} would re-read ${k}k tokens, ~$${usd} more this turn, staying`,
   cacheLeft: (mins: number) => `cache ${mins} min left`,
@@ -258,12 +267,13 @@ const en: Messages = {
     '2. Just "continue / ok / go ahead" → keep last turn\'s model',
     `3. ≥ ${r.escalateAfter} tool failures last turn, or you say "still failing / same error" → step up one tier`,
     `4. Plan mode (Shift+Tab) → ${r.plan} plans; once the plan is approved, ${r.execute} executes the rest of the turn`,
-    `5. Multi-step task (follow a doc/spec/plan, @a doc, very long, 4+ listed requirements) → main session on ${r.bigTask} orchestrates`,
-    `6. Mentions architecture, refactor, migration, security, performance, review, etc. → ${r.opus}`,
+    `5. Multi-step task (follow a doc/spec/plan, @a doc, very long, 4+ listed requirements) → ${r.sticky ? `main session stays put; the ${r.stickyAgent} sub-agent (${r.bigTask}) takes the hard parts` : `main session on ${r.bigTask} orchestrates`}`,
+    `6. Mentions architecture, refactor, migration, security, performance, review, etc. → ${r.sticky ? `main session stays put; the ${r.stickyAgent} sub-agent (${r.opus}) takes it` : r.opus}`,
     `7. Questions, explanations, lookups, summaries, translation, renames, etc., with no code changes → ${r.haiku}`,
     `8. Anything else → ${r.haiku} rates the difficulty (falls back to ${r.defaultTier})`,
     '',
     'Safeguards:',
+    ...(r.sticky ? [`· The main session only moves up to ${r.defaultTier} on its own; for a stronger model write #opus, use plan mode, or let repeated failures escalate (a switch re-writes the whole cache; hard work is cheaper in a sub-agent)`] : []),
     `· ${r.noDowngradeAbove == null ? 'Downgrades allowed however long the conversation' : `No downgrades once the conversation exceeds ${r.noDowngradeAbove}`}; a downgrade needs ${r.confirmations} turns in a row rated cheaper`,
     `· When a background sub-agent hands back results, the main session summarizes with ${r.handback ?? 'last turn\'s model'}`,
     `· Never switch to a model whose window is over 80% full (Haiku window counted as ${r.haikuWindow})`,

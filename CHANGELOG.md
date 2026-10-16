@@ -4,6 +4,9 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 
 ## [Unreleased]
 
+### Changed
+- **The main session keeps its model; hard work goes to an Opus sub-agent.** Switching the main session's model re-reads the whole conversation at the cache-write price, which in long conversations usually costs more than the switch saves. The new default strategy (`"strategy": "sticky"`) only moves the main session up to Sonnet by itself; work the rules or the classifier rate as Opus-level stays on the main model and is handed to the new `architect` sub-agent (Opus, high effort), with a note to the model saying so. `#opus`, plan mode, repeated failures and `/route opus` still put the main session itself on Opus. `"strategy": "perTurn"` brings back the old per-turn choice. Updating keeps your config and adds the new keys.
+
 ### Added
 - **Switch between conversations on the cards.** The desktop card shows how many conversations are open and how many are running, with a row of chips (status dot + project) to jump between them. The Android card gets ‹ 1/3 › to step through them; `/api/widget?session=<id>` returns the one you picked, and the card falls back to the board's own choice when that session ends.
 - **On/off switch in the desktop card's tray menu**: "Auto model routing" turns the router off or back on, from the next message. It shares `~/.claude/auto-router/mode.json` with `/route auto|off`, so the tick follows changes made in Claude Code.
