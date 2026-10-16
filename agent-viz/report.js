@@ -17,6 +17,7 @@ const os = require('os');
 const readline = require('readline');
 
 const REPO_URL = 'https://github.com/paxon-yang/claude-agent-tools';
+const { fillBaselines, DEFAULT_TTL_SEC } = require('./baseline');
 const DEFAULT_PRICES = {
   haiku: { in: 0.10, out: 0.50 },
   sonnet: { in: 2, out: 10 },
@@ -298,12 +299,16 @@ function addTo(a, r) { a.messages++; a.in += r.in; a.out += r.out; a.cr += r.cr;
 
 function summarize(recs, prices, baselineModel) {
   const bp = priceOf(prices, family(baselineModel) || String(baselineModel).toLowerCase());
-  const byFam = {}, rawModels = {};
-  let cost = 0, baseline = 0, unpricedMessages = 0;
+  const byFam = {}, baseFam = {}, rawModels = {};
+  let cost = 0, baseline = 0, unpricedMessages = 0, switchWrites = 0;
   const total = emptyAgg();
   for (const r of recs) {
     const k = r.fam || 'unpriced';
     addTo(byFam[k] || (byFam[k] = emptyAgg()), r);
+    // 对照组用"不换模型"时的缓存账 / the baseline uses the no-switch cache accounting
+    const b = r.base || r;
+    addTo(baseFam[k] || (baseFam[k] = emptyAgg()), b);
+    if (r.fam) switchWrites += r.cw - b.cw;
     addTo(total, r);
     rawModels[r.model || '(unknown)'] = (rawModels[r.model || '(unknown)'] || 0) + 1;
   }
@@ -312,13 +317,13 @@ function summarize(recs, prices, baselineModel) {
     const a = byFam[k];
     const p = k === 'unpriced' ? null : priceOf(prices, k);
     const c = costOf(a, p);
-    const b = c == null ? null : costOf(a, bp);
+    const b = c == null ? null : costOf(baseFam[k], bp);
     if (c == null) unpricedMessages += a.messages;
     else { cost += c; if (b != null) baseline += b; }
     models.push({ family: k, name: DISPLAY[k] || null, messages: a.messages, input: a.in, cacheRead: a.cr, cacheWrite: a.cw, output: a.out, cost: c, baseline: b });
   }
   for (const m of models) m.share = m.cost != null && cost > 0 ? m.cost / cost : (m.cost != null ? 0 : null);
-  return { total, models, rawModels, cost, baseline: bp ? baseline : null, unpricedMessages, verdict: verdict(cost, bp ? baseline : null, total.messages) };
+  return { total, models, rawModels, cost, baseline: bp ? baseline : null, unpricedMessages, switchWrites, verdict: verdict(cost, bp ? baseline : null, total.messages) };
 }
 function verdict(cost, baseline, messages) {
   if (!messages) return { kind: 'nodata', saved: null, savedAmount: null };
@@ -350,7 +355,7 @@ function groupSessions(recs, prices, baselineModel, projectCwd) {
       const c = r.fam ? costOf(r, priceOf(prices, r.fam)) : null;
       if (c == null) continue;
       cost += c;
-      const b = costOf(r, bp); if (b != null) baseline += b;
+      const b = costOf(r.base || r, bp); if (b != null) baseline += b;
       famCost[r.fam] = (famCost[r.fam] || 0) + c;
     }
     const main = Object.keys(famCost).sort((a, b) => famCost[b] - famCost[a])[0] || null;
@@ -378,6 +383,11 @@ async function buildReport(opt) {
     startMs = nowMs - days * 86400000;
   }
   const { recs, projectCwd, stats } = await scan(home, startMs, nowMs);
+  // 主会话按会话、时间排好，算出对照组的缓存账 / main-session records per session, in time order, for the baseline cache accounting
+  const ttl = Number(cfg.baselineCacheTtl) > 0 ? Number(cfg.baselineCacheTtl) : DEFAULT_TTL_SEC;
+  const mains = new Map();
+  for (const r of recs) if (r.mainFile && !r.sidechain) (mains.get(r.session) || mains.set(r.session, []).get(r.session)).push(r);
+  for (const list of mains.values()) fillBaselines(list.sort((a, b) => a.ts - b.ts), ttl);
   const sum = summarize(recs, prices, baselineModel);
   const sessions = groupSessions(recs, prices, baselineModel, projectCwd);
   const routedSet = routedSessions(home);
@@ -403,6 +413,7 @@ async function buildReport(opt) {
       sessions: sessions.length, messages: sum.total.messages,
       input: sum.total.in, cacheRead: sum.total.cr, cacheWrite: sum.total.cw, output: sum.total.out,
       cost: sum.cost, baseline: sum.baseline, saved: sum.verdict.saved, savedAmount: sum.verdict.savedAmount,
+      switchCacheWrites: sum.switchWrites,
       verdict: sum.verdict.kind, unpricedMessages: sum.unpricedMessages,
     },
     models: sum.models,

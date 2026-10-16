@@ -58,7 +58,10 @@ const PRICES = Object.assign({
   opus: { in: 4, out: 20 },
   fable: { in: 10, out: 50, cacheRead: 0.25, cacheWrite: 12.5 },
 }, CONFIG.prices || {});
-const BASELINE = CONFIG.baselineModel || 'opus';      // "全用这个模型要花多少"的对照
+const BASELINE = CONFIG.baselineModel || 'opus';
+const { baselineUsage, ctxOf, DEFAULT_TTL_SEC } = require('./baseline');
+// 对照组按多长的缓存时间算（秒）/ cache lifetime assumed for the baseline (seconds)
+const BASE_TTL = Number(CONFIG.baselineCacheTtl) > 0 ? Number(CONFIG.baselineCacheTtl) : DEFAULT_TTL_SEC;      // "全用这个模型要花多少"的对照
 
 function readJSON(p) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } }
 const now = () => Date.now() / 1000;
@@ -499,12 +502,19 @@ function closeTurn(s, ts) {
   const t = s.turns[s.turns.length - 1];
   if (t && !t.end) t.end = ts;
 }
-function addUsage(s, key, model, u) {
+function addUsage(s, key, model, u, tsSec) {
   const fam = family(model);
   if (!fam || !u) return;
   // 同一条消息在会话记录里可能分几行写入，用最后一次的数字
-  s.usage.set(key, { fam, in: u.input_tokens || 0, out: u.output_tokens || 0,
-    cr: u.cache_read_input_tokens || 0, cw: u.cache_creation_input_tokens || 0 });
+  const rec = { fam, in: u.input_tokens || 0, out: u.output_tokens || 0,
+    cr: u.cache_read_input_tokens || 0, cw: u.cache_creation_input_tokens || 0 };
+  // 主会话：对照组不为换模型重写缓存（见 baseline.js）/ main session: the baseline doesn't pay for switch rewrites (see baseline.js)
+  if (tsSec != null) {
+    if (key !== s.bLastKey) { s.bPrev = s.bLast; s.bLastKey = key; }
+    rec.base = baselineUsage(rec, s.bPrev, tsSec * 1000, BASE_TTL);
+    s.bLast = { ts: tsSec * 1000, ctx: ctxOf(rec) };
+  }
+  s.usage.set(key, rec);
   if (s.usage.size > 20000) s.usage.delete(s.usage.keys().next().value);
 }
 function addDecision(s, d) {
@@ -524,8 +534,10 @@ function costOf(u, fam) {
 function usageSummary(maps) {
   const by = {};
   for (const m of maps) for (const u of m.values()) {
-    const b = by[u.fam] || (by[u.fam] = { in: 0, out: 0, cr: 0, cw: 0 });
+    const b = by[u.fam] || (by[u.fam] = { in: 0, out: 0, cr: 0, cw: 0, base: { in: 0, out: 0, cr: 0, cw: 0 } });
     b.in += u.in; b.out += u.out; b.cr += u.cr; b.cw += u.cw;
+    const x = u.base || u;
+    b.base.in += x.in; b.base.out += x.out; b.base.cr += x.cr; b.base.cw += x.cw;
   }
   let cost = 0, baseline = 0, unpriced = false;
   for (const fam of Object.keys(by)) {
@@ -533,8 +545,9 @@ function usageSummary(maps) {
     by[fam].cost = c;
     by[fam].tokens = by[fam].in + by[fam].out + by[fam].cr + by[fam].cw;
     if (c == null) unpriced = true; else cost += c;
-    const b = costOf(by[fam], BASELINE);
+    const b = costOf(by[fam].base, BASELINE);
     if (b != null) baseline += b;
+    delete by[fam].base;
   }
   return { byModel: by, cost, baseline, saved: baseline > 0 ? Math.max(0, 1 - cost / baseline) : null, unpriced };
 }
@@ -585,7 +598,7 @@ function onTranscript(s, o) {
       s.actualModel = m.model;
       const key0 = m.id || o.uuid;
       if (key0 !== s.lastMsgKey) { s.lastMsgKey = key0; s.msgModels.push({ ts, fam: family(m.model) }); if (s.msgModels.length > 3000) s.msgModels.splice(0, 1000); }
-      if (m.usage) addUsage(s, 'm:' + key0, m.model, m.usage);
+      if (m.usage) addUsage(s, 'm:' + key0, m.model, m.usage, ts);
     }
     const u = m.usage;
     if (u) {
