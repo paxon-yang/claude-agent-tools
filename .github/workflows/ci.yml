@@ -89,6 +89,13 @@ jobs:
           grep -q 'auto-router:start' "$HOME/.claude/CLAUDE.md"
           grep -q 'capture.js' "$HOME/.claude/settings.json"
           plugins="$(claude plugin list)"; echo "$plugins" | grep 'auto-router@paxon-local'
+          # the installed copy has to run on its own (catches modules the installer forgot to copy)
+          node "$HOME/.claude/viz/app/server.js" --demo --port 4399 > demo.log 2>&1 &
+          demo=$!
+          for i in $(seq 1 15); do sleep 1; curl -s http://127.0.0.1:4399/api/health | grep -q '"ok":true' && break; done
+          curl -sf http://127.0.0.1:4399/api/health || { cat demo.log; exit 1; }
+          kill "$demo" || true
+          node "$HOME/.claude/viz/app/report.js" --json > /dev/null
           if [ "$RUNNER_OS" != "Linux" ]; then
             # macOS (launchd) and Windows (Startup folder) start the board in the background
             for i in $(seq 1 20); do sleep 1; curl -s http://127.0.0.1:4321/api/health | grep -q '"ok":true' && break; done
