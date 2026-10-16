@@ -66,7 +66,11 @@ export type Config = {
   }
 }
 
-export type Price = { in: number; out: number }
+/** 每百万 token 的美元价；cacheRead 不填时按官方比例（Opus/Sonnet × 0.05、Haiku × 0.1、Fable × 0.025）；
+ *  longAbove/longMult：提示超过这么多 token 的请求整体乘价（Haiku 5.5：10 万以上 × 5）
+ *  $ per million tokens; cacheRead defaults to the official ratio; longAbove/longMult: long-prompt surcharge (Haiku 5.5: ×5 over 100K) */
+export type Price = { in: number; out: number; cacheRead?: number; longAbove?: number; longMult?: number }
+const CACHE_READ_RATIO: Record<Tier, number> = { haiku: 0.1, sonnet: 0.05, opus: 0.05, fable: 0.025 }
 export type CacheConfig = {
   enabled: boolean
   /** 缓存多久过期（秒）；'auto' = 先按 1 小时算，再根据实际命中情况自己学 */
@@ -75,7 +79,7 @@ export type CacheConfig = {
   returnWeight: number | null
   /** 多花不到这么多美元就不拦 */
   minExtraUsd: number
-  /** 每百万 token 的美元价（只看相对大小）；缓存读 = 输入价 × 0.1，写 = × 1.25（5 分钟）或 × 2（1 小时） */
+  /** 每百万 token 的美元价（官方价格表，2026-10 核对）；写缓存 = 输入价 × 1.25（5 分钟）或 × 2（1 小时） */
   prices: Record<Tier, Price>
 }
 export type GateConfig = {
@@ -152,10 +156,10 @@ export const DEFAULTS: Config = {
     minExtraUsd: 0.02,
     // 和看板 config.json 的默认价一致；看板装了会改用看板的价 / same defaults as the dashboard; its prices win when installed
     prices: {
-      haiku: { in: 0.1, out: 0.5 },
-      sonnet: { in: 2, out: 10 },
-      opus: { in: 4, out: 20 },
-      fable: { in: 10, out: 50 },
+      haiku: { in: 0.1, out: 0.5, cacheRead: 0.01, longAbove: 100_000, longMult: 5 },
+      sonnet: { in: 2, out: 10, cacheRead: 0.1 },
+      opus: { in: 4, out: 20, cacheRead: 0.2 },
+      fable: { in: 10, out: 50, cacheRead: 0.25 },
     },
   },
   qualityGate: {
@@ -254,17 +258,20 @@ export function mergeConfig(base: Config, over: unknown): Config {
   }
 }
 
-/** 价格表合并：只认 haiku/sonnet/opus/fable 和数字的 in/out（看板的价格表也能直接传进来） */
+/** 价格表合并：只认 haiku/sonnet/opus/fable 和正数的 in/out/cacheRead/longAbove/longMult（看板的价格表也能直接传进来） */
 export function mergePrices(base: Record<Tier, Price>, over: unknown): Record<Tier, Price> {
   const out = { ...base }
   if (!over || typeof over !== 'object') return out
+  const pos = (v: unknown) => Number.isFinite(Number(v)) && Number(v) > 0
   for (const t of ORDER) {
     const p = (over as Record<string, unknown>)[t] as Partial<Price> | undefined
     if (p && typeof p === 'object') {
-      out[t] = {
-        in: Number.isFinite(Number(p.in)) && Number(p.in) > 0 ? Number(p.in) : base[t].in,
-        out: Number.isFinite(Number(p.out)) && Number(p.out) > 0 ? Number(p.out) : base[t].out,
-      }
+      const merged: Price = { ...base[t], in: pos(p.in) ? Number(p.in) : base[t].in, out: pos(p.out) ? Number(p.out) : base[t].out }
+      if (pos(p.cacheRead)) merged.cacheRead = Number(p.cacheRead)
+      else if (pos(p.in) && Number(p.in) !== base[t].in) delete merged.cacheRead // 改了输入价没给读缓存价：按比例重算 / new input price, no read price: use the ratio
+      if (pos(p.longAbove)) merged.longAbove = Number(p.longAbove)
+      if (pos(p.longMult)) merged.longMult = Number(p.longMult)
+      out[t] = merged
     }
   }
   return out
@@ -519,7 +526,7 @@ export const isWarm = (t: Tier, v: Pick<CacheView, 'now' | 'warmUntil'>) => (v.w
 
 /**
  * 这一轮留在 from 和换到 to 各要花多少（美元，估算）。
- * 第一次请求：缓存热按读价（输入 × 0.1），冷按写价（× 1.25，1 小时缓存 × 2）；之后每次都按读价。
+ * 第一次请求：缓存热按读价（官方价，约输入 × 0.05～0.1），冷按写价（× 1.25，1 小时缓存 × 2）；之后每次都按读价。
  * 换走时还要算上"以后换回来、from 的缓存已经过期"要多写的那一次（乘以可能性）。
  */
 export function switchCost(from: Tier, to: Tier, v: CacheView, cfg: Config): { stay: number; go: number; rewrite: number } {
@@ -527,9 +534,12 @@ export function switchCost(from: Tier, to: Tier, v: CacheView, cfg: Config): { s
   const n = Math.max(1, v.steps)
   const wMult = v.ttlSeconds >= 3600 ? 2 : 1.25
   const p = (t: Tier) => cfg.cache.prices[t] ?? DEFAULTS.cache.prices[t]
-  const r = (t: Tier) => p(t).in * 0.1
-  const w = (t: Tier) => p(t).in * wMult
-  const cost = (t: Tier) => C * (isWarm(t, v) ? r(t) : w(t)) + (n - 1) * C * r(t) + (n * v.outPerStep / 1e6) * p(t).out
+  // Haiku 5.5：提示超过 10 万 token 的请求整体加价 / Haiku 5.5: long prompts pay more on every rate
+  const k = (t: Tier) => { const x = p(t); return x.longAbove && x.longMult && v.tokens > x.longAbove ? x.longMult : 1 }
+  const r = (t: Tier) => k(t) * (p(t).cacheRead ?? p(t).in * CACHE_READ_RATIO[t])
+  const w = (t: Tier) => k(t) * p(t).in * wMult
+  const o = (t: Tier) => k(t) * p(t).out
+  const cost = (t: Tier) => C * (isWarm(t, v) ? r(t) : w(t)) + (n - 1) * C * r(t) + (n * v.outPerStep / 1e6) * o(t)
   const q = cfg.cache.returnWeight ?? (v.ttlSeconds >= 3600 ? 0.1 : 0.5)
   const back = isWarm(from, v) ? q * C * (w(from) - r(from)) : 0
   return { stay: cost(from), go: cost(to) + back, rewrite: C * w(to) }

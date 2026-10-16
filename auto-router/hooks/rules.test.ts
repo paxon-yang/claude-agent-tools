@@ -216,10 +216,15 @@ test('cache guard lets the switch through when it is cheap or the cache is cold'
   expect(guardCache(down('sonnet'), 'opus', view({ warmUntil: { opus: NOW - 1 } }), c).tier).toBe('sonnet')
   // 很短的对话：多花的钱低于门槛 / tiny context: below the threshold
   expect(guardCache(down('sonnet'), 'opus', view({ tokens: 3000 }), c).tier).toBe('sonnet')
-  // Haiku 便宜得多，重写缓存也比 Opus 读缓存便宜 / Haiku's write is cheaper than Opus's read here
-  expect(guardCache(down('haiku'), 'opus', view(), c).tier).toBe('haiku')
+  // 对话不到 10 万 token：Haiku 写缓存和 Opus 读缓存一样便宜，换 / under 100K tokens Haiku's write costs about Opus's read: switch
+  expect(guardCache(down('haiku'), 'opus', view({ tokens: 60_000 }), c).tier).toBe('haiku')
   // 很长的一轮：便宜模型每步省下的钱能补回来 / long turn: savings per step pay it back
   expect(guardCache(down('sonnet'), 'opus', view({ steps: 60 }), c).tier).toBe('sonnet')
+})
+
+test('Haiku long-prompt pricing: a 150K Opus conversation is not moved to Haiku', () => {
+  // Haiku 5.5 over 100K pays 5x: its 1h write (1.0/M) is 5x Opus's warm read (0.2/M)
+  expect(guardCache(down('haiku'), 'opus', view(), c).tier).toBe('opus')
 })
 
 test('cache guard never blocks upgrades, manual choices or pins', () => {
@@ -232,13 +237,13 @@ test('cache guard never blocks upgrades, manual choices or pins', () => {
 })
 
 test('switch cost arithmetic', () => {
-  // 1M tokens, 1 step, no output: Opus warm read 0.4 vs Sonnet 1h write 2×2 = 4, plus 0.1 × (8 − 0.4) return risk
+  // 1M tokens, 1 step, no output: Opus warm read 0.2 vs Sonnet 1h write 2×2 = 4, plus 0.1 × (8 − 0.2) return risk
   const r = switchCost('opus', 'sonnet', view({ tokens: 1_000_000, steps: 1, outPerStep: 0 }), c)
-  expect(Math.round(r.stay * 100) / 100).toBe(0.4)
-  expect(Math.round(r.go * 100) / 100).toBe(4.76)
-  // 5-minute cache: write 2 × 1.25 = 2.5, return risk 0.5 × (4 × 1.25 − 0.4) = 2.3
+  expect(Math.round(r.stay * 100) / 100).toBe(0.2)
+  expect(Math.round(r.go * 100) / 100).toBe(4.78)
+  // 5-minute cache: write 2 × 1.25 = 2.5, return risk 0.5 × (4 × 1.25 − 0.2) = 2.4
   const s = switchCost('opus', 'sonnet', view({ tokens: 1_000_000, steps: 1, outPerStep: 0, ttlSeconds: 300 }), c)
-  expect(Math.round(s.go * 100) / 100).toBe(4.8)
+  expect(Math.round(s.go * 100) / 100).toBe(4.9)
 })
 
 test('cache lifetime is learned from real hits', () => {

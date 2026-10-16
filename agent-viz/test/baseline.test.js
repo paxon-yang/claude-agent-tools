@@ -54,7 +54,7 @@ test('report: switching sessions no longer inflate the all-Opus baseline', () =>
     ].join('\n') + '\n');
     const rep = JSON.parse(execFileSync(process.execPath, [path.join(__dirname, '..', 'report.js'), '--home', home, '--json', '--days', '1'], { encoding: 'utf8' }));
     // all-Opus: each request only writes what was added since the previous one, the rest is read from cache
-    const opus = (i, o, cr, cw) => (i * 4 + o * 20 + cr * 0.4 + cw * 5) / 1e6;
+    const opus = (i, o, cr, cw) => (i * 4 + o * 20 + cr * 0.2 + cw * 5) / 1e6;
     const base = opus(10, 1000, 0, 200000) + opus(10, 300, 200000, 1010) + opus(10, 1000, 201010, 490);
     assert.ok(Math.abs(rep.totals.baseline - base) < 1e-9, `${rep.totals.baseline} != ${base}`);
     assert.strictEqual(rep.totals.switchCacheWrites, 200000 + 1010);

@@ -51,7 +51,8 @@ const KEEP_HOURS = Number(CONFIG.keepHours || 24);
 const ROTATE_MB = Number(CONFIG.rotateAtMB || 50);
 const KEEP_ARCHIVES = Number(CONFIG.keepArchives || 7);
 const REMOTE = CONFIG.remote || 'tailscale';           // 'tailscale'：同时在 Tailscale 地址上开放；'off'：只在本机
-// 每百万 token 的美元价格（估算用）。cacheRead/cacheWrite 不填时按输入价的 0.1 倍 / 1.25 倍算
+// 每百万 token 的美元价格（估算用）。cacheRead/cacheWrite 不填时按官方比例算（见 prices.js）
+const { rates, requestCost } = require('./prices');
 const PRICES = Object.assign({
   haiku: { in: 0.10, out: 0.50 },
   sonnet: { in: 2, out: 10 },
@@ -521,33 +522,21 @@ function addDecision(s, d) {
   s.decisions.push({ at: d.at, fam: family(d.model), model: prettyModel(d.model), effort: d.effort, reason: d.reason, by: d.by });
   if (s.decisions.length > 300) s.decisions.splice(0, s.decisions.length - 300);
 }
-function price(fam) {
-  const p = PRICES[fam];
-  if (!p || p.in == null) return null;
-  return { in: p.in, out: p.out, cr: p.cacheRead != null ? p.cacheRead : p.in * 0.1, cw: p.cacheWrite != null ? p.cacheWrite : p.in * 1.25 };
-}
-function costOf(u, fam) {
-  const p = price(fam);
-  if (!p) return null;
-  return (u.in * p.in + u.out * p.out + u.cr * p.cr + u.cw * p.cw) / 1e6;
-}
+function price(fam) { return rates(fam, PRICES[fam]); }
+function costOf(u, fam) { return requestCost(u, price(fam)); }
+// 每条请求单独算钱（Haiku 5.5 长提示加价按请求判断），再按模型汇总 / price each request, then sum per model
 function usageSummary(maps) {
   const by = {};
-  for (const m of maps) for (const u of m.values()) {
-    const b = by[u.fam] || (by[u.fam] = { in: 0, out: 0, cr: 0, cw: 0, base: { in: 0, out: 0, cr: 0, cw: 0 } });
-    b.in += u.in; b.out += u.out; b.cr += u.cr; b.cw += u.cw;
-    const x = u.base || u;
-    b.base.in += x.in; b.base.out += x.out; b.base.cr += x.cr; b.base.cw += x.cw;
-  }
   let cost = 0, baseline = 0, unpriced = false;
-  for (const fam of Object.keys(by)) {
-    const c = costOf(by[fam], fam);
-    by[fam].cost = c;
-    by[fam].tokens = by[fam].in + by[fam].out + by[fam].cr + by[fam].cw;
-    if (c == null) unpriced = true; else cost += c;
-    const b = costOf(by[fam].base, BASELINE);
-    if (b != null) baseline += b;
-    delete by[fam].base;
+  for (const m of maps) for (const u of m.values()) {
+    const b = by[u.fam] || (by[u.fam] = { in: 0, out: 0, cr: 0, cw: 0, cost: 0, tokens: 0 });
+    b.in += u.in; b.out += u.out; b.cr += u.cr; b.cw += u.cw; b.tokens += u.in + u.out + u.cr + u.cw;
+    const c = costOf(u, u.fam);
+    if (c == null) { unpriced = true; b.cost = null; continue; }
+    if (b.cost != null) b.cost += c;
+    cost += c;
+    const x = costOf(u.base || u, BASELINE);
+    if (x != null) baseline += x;
   }
   return { byModel: by, cost, baseline, saved: baseline > 0 ? Math.max(0, 1 - cost / baseline) : null, unpriced };
 }

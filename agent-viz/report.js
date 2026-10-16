@@ -18,6 +18,7 @@ const readline = require('readline');
 
 const REPO_URL = 'https://github.com/paxon-yang/claude-agent-tools';
 const { fillBaselines, DEFAULT_TTL_SEC } = require('./baseline');
+const { rates, requestCost } = require('./prices');
 const DEFAULT_PRICES = {
   haiku: { in: 0.10, out: 0.50 },
   sonnet: { in: 2, out: 10 },
@@ -203,11 +204,11 @@ function family(model) {
 function priceOf(prices, fam) {
   let p = prices[fam];
   if ((!p || p.in == null) && fam === 'mythos') p = prices.fable;
-  if (!p || p.in == null || p.out == null) return null;
-  const pin = Number(p.in), pout = Number(p.out);
-  return { in: pin, out: pout, cr: p.cacheRead != null ? Number(p.cacheRead) : pin * 0.1, cw: p.cacheWrite != null ? Number(p.cacheWrite) : pin * 1.25 };
+  return rates(fam, p);
 }
-function costOf(u, p) { return p ? (u.in * p.in + u.out * p.out + u.cr * p.cr + u.cw * p.cw) / 1e6 : null; }
+// 一条请求的花费：Haiku 5.5 的长提示加价要按每条请求单独判断，所以不能先把 token 加总再乘单价
+// per-request cost: Haiku 5.5's long-prompt rate is decided per request, so never price summed tokens
+function costOf(u, p) { return requestCost(u, p); }
 
 // ---------- 读取会话记录 / scan transcripts ----------
 function listJsonl(dir) {
@@ -299,27 +300,28 @@ function addTo(a, r) { a.messages++; a.in += r.in; a.out += r.out; a.cr += r.cr;
 
 function summarize(recs, prices, baselineModel) {
   const bp = priceOf(prices, family(baselineModel) || String(baselineModel).toLowerCase());
-  const byFam = {}, baseFam = {}, rawModels = {};
+  const byFam = {}, rawModels = {}, famCost = {}, famBase = {};
   let cost = 0, baseline = 0, unpricedMessages = 0, switchWrites = 0;
   const total = emptyAgg();
   for (const r of recs) {
     const k = r.fam || 'unpriced';
     addTo(byFam[k] || (byFam[k] = emptyAgg()), r);
-    // 对照组用"不换模型"时的缓存账 / the baseline uses the no-switch cache accounting
-    const b = r.base || r;
-    addTo(baseFam[k] || (baseFam[k] = emptyAgg()), b);
-    if (r.fam) switchWrites += r.cw - b.cw;
     addTo(total, r);
     rawModels[r.model || '(unknown)'] = (rawModels[r.model || '(unknown)'] || 0) + 1;
+    const c = k === 'unpriced' ? null : costOf(r, priceOf(prices, k));
+    if (c == null) { unpricedMessages++; continue; }
+    // 对照组用"不换模型"时的缓存账 / the baseline uses the no-switch cache accounting
+    const b = r.base || r;
+    switchWrites += r.cw - b.cw;
+    famCost[k] = (famCost[k] || 0) + c; cost += c;
+    const bc = costOf(b, bp);
+    if (bc != null) { famBase[k] = (famBase[k] || 0) + bc; baseline += bc; }
   }
   const models = [];
   for (const k of Object.keys(byFam).sort((a, b) => FAMILY_ORDER.indexOf(a) - FAMILY_ORDER.indexOf(b))) {
     const a = byFam[k];
-    const p = k === 'unpriced' ? null : priceOf(prices, k);
-    const c = costOf(a, p);
-    const b = c == null ? null : costOf(baseFam[k], bp);
-    if (c == null) unpricedMessages += a.messages;
-    else { cost += c; if (b != null) baseline += b; }
+    const c = k in famCost ? famCost[k] : null;
+    const b = c == null || !bp ? null : (famBase[k] || 0);
     models.push({ family: k, name: DISPLAY[k] || null, messages: a.messages, input: a.in, cacheRead: a.cr, cacheWrite: a.cw, output: a.out, cost: c, baseline: b });
   }
   for (const m of models) m.share = m.cost != null && cost > 0 ? m.cost / cost : (m.cost != null ? 0 : null);
@@ -334,7 +336,6 @@ function verdict(cost, baseline, messages) {
   if (saved > -0.005) return { kind: 'same', saved, savedAmount: baseline - cost };
   return { kind: 'more', saved, savedAmount: baseline - cost };
 }
-
 function groupSessions(recs, prices, baselineModel, projectCwd) {
   const bp = priceOf(prices, family(baselineModel) || String(baselineModel).toLowerCase());
   const map = new Map();

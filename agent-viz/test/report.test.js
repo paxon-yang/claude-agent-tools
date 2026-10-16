@@ -16,18 +16,21 @@ test.after(() => fs.rmSync(home, { recursive: true, force: true }));
 const run = (...args) => execFileSync(process.execPath, [REPORT, '--home', home, ...args], { encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
 const rep = JSON.parse(run('--json', '--days', '7'));
 
-// Independent cost math (per million tokens)
-const P = { haiku: [0.1, 0.5, 0.01, 0.125], sonnet: [2, 10, 0.2, 2.5], opus: [4, 20, 0.4, 5] };
-const cost = (fam, i, o, cr, cw) => (i * P[fam][0] + o * P[fam][1] + cr * P[fam][2] + cw * P[fam][3]) / 1e6;
+// Independent cost math (per million tokens), official ratios: cache read 0.05x (Opus, Sonnet) / 0.1x (Haiku),
+// cache write 1.25x; Haiku 5.5 requests with a prompt over 100K tokens pay 5x on every rate.
+const P = { haiku: [0.1, 0.5, 0.01, 0.125], sonnet: [2, 10, 0.1, 2.5], opus: [4, 20, 0.2, 5] };
+const cost = (fam, i, o, cr, cw) => (fam === 'haiku' && i + cr + cw > 100000 ? 5 : 1) * (i * P[fam][0] + o * P[fam][1] + cr * P[fam][2] + cw * P[fam][3]) / 1e6;
 const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg}: ${a} != ${b}`);
 
-const T = {
-  haiku: [100000 + 50000 + 40000, 50000 + 20000 + 10000, 1000000 + 500000, 200000], // a1(last) + a3 + c2
-  sonnet: [200000, 100000, 2000000, 0],                                            // a2
-  opus: [300000 + 100000, 150000 + 80000, 3000000, 400000],                        // b1 + c1 (b0 too old)
+const REQ = {
+  haiku: [[100000, 50000, 1000000, 200000], [50000, 20000, 500000, 0], [40000, 10000, 0, 0]], // a1(last) + a3 + c2
+  sonnet: [[200000, 100000, 2000000, 0]],                                                      // a2
+  opus: [[300000, 150000, 3000000, 400000], [100000, 80000, 0, 0]],                            // b1 + c1 (b0 too old)
 };
-const famCost = f => cost(f, ...T[f]);
-const famBase = f => cost('opus', ...T[f]);
+const sum4 = rs => rs.reduce((a, r) => a.map((x, i) => x + r[i]), [0, 0, 0, 0]);
+const T = { haiku: sum4(REQ.haiku), sonnet: sum4(REQ.sonnet), opus: sum4(REQ.opus) };
+const famCost = f => REQ[f].reduce((a, r) => a + cost(f, ...r), 0);
+const famBase = f => REQ[f].reduce((a, r) => a + cost('opus', ...r), 0);
 const totalCost = famCost('haiku') + famCost('sonnet') + famCost('opus');
 const totalBase = famBase('haiku') + famBase('sonnet') + famBase('opus');
 

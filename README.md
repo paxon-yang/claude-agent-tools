@@ -218,7 +218,7 @@ Both make a backup before editing `~/.claude/settings.json` or `~/.claude/CLAUDE
 
 ## FAQ
 
-**Does switching models lose context?** No. The conversation is kept; the cost is that the new model re-reads it once at the cache-write price, while the current model would have read it from cache at a tenth of the input price. In a long conversation that can outweigh a whole turn's savings, so while the cache is warm the router compares the two and stays put when switching wouldn't pay (`/route` shows the reason with the dollar estimate). With a cold cache, or a Haiku-sized task, it switches freely.
+**Does switching models lose context?** No. The conversation is kept; the cost is that the new model re-reads it once at the cache-write price, while the current model would have read it from cache (1/20 of the input price on Opus and Sonnet). In a long conversation that usually outweighs a whole turn's savings, so while the cache is warm the router compares the two and stays put when switching wouldn't pay (`/route` shows the reason with the dollar estimate). With a cold cache, or a short conversation (under 100K tokens a move to Haiku costs about nothing extra), it switches freely. Haiku 5.5 bills requests with prompts over 100K tokens at 5x, so in a long conversation a move to Haiku rarely pays.
 
 **Will the test gate run my whole suite every turn?** Only on turns where Haiku or Sonnet edited code (not docs), and not when the model already ran the tests after its last edit. Turn it off per project with `.claude/auto-router.json` or globally with `qualityGate.enabled: false`.
 
