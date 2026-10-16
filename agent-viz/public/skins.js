@@ -53,8 +53,8 @@
       [[18, 0.2, 0.3], [30, 0.26, 0.12], [30 + 0.14 * w, 0.26, 0.16]].forEach(([x, y, bw]) => out.push({ t: 'rect', x, y: y * h, w: bw * w, h: 4, color: ink, a: 0.06 }));
       out.push({ t: 'text', x: 16, y: 0.5 * h, s: 12, text: '</>', color: CLAY, a: 0.25 }, { t: 'text', x: 16, y: 0.62 * h, s: 12, text: '$', color: CLAY, a: 0.22 });
       out.push({ t: 'scrim', color: dark ? '#1C1C1E' : '#FFFFFF', a: dark ? [0.5, 0.22, 0] : [0.55, 0.25, 0] });
-      // PAXON 小一点，贴在小狐狸左边 / PAXON smaller, just left of the fox
-      out.push({ t: 'word', x: w - 188, y: h - 57, b: 2.8, text: FOX_WORD, color: CLAY, a: dark ? 0.6 : 0.55 });
+      // PAXON 小一点，贴在小狐狸左边，底边离页脚的分隔线留几像素 / PAXON smaller, just left of the fox, a few px clear of the footer rule
+      out.push({ t: 'word', x: w - 188, y: h - 68, b: 2.8, text: FOX_WORD, color: CLAY, a: dark ? 0.6 : 0.55 });
       return out;
     }
     if (id === 'clay') {
