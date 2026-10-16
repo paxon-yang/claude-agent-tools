@@ -48,6 +48,17 @@ body.widget .card { min-height: 0; border-radius: 18px; border: 1px solid rgba(2
 .top { display: flex; align-items: center; gap: 8px; -webkit-app-region: drag; user-select: none; min-height: 24px; }
 .proj { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .nav { display: flex; gap: 2px; -webkit-app-region: no-drag; }
+/* 会话切换条：有几个对话、谁在跑，点一下切过去 / session switcher: how many conversations, which are running, tap to switch */
+.sw { margin: 8px 0 0; -webkit-app-region: no-drag; }
+.sw .cnt { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+.sw .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.sw .chips::-webkit-scrollbar { display: none; }
+.sc { flex: none; display: inline-flex; align-items: center; gap: 5px; max-width: 98px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--hair); background: rgba(255, 255, 255, .05); color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.sc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc i { flex: none; width: 6px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .3); }
+.sc.running i, .sc.bg i { background: var(--green-l); } .sc.need i { background: var(--red-l); }
+.sc.on { color: #fff; background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .24); }
+.sc:hover { color: #fff; }
 .nav button, .ctl button { border: 0; background: rgba(255, 255, 255, .07); width: 22px; height: 22px; border-radius: 7px; cursor: pointer; color: var(--muted); font-size: 12px; line-height: 22px; padding: 0; }
 .nav button:hover, .ctl button:hover { background: rgba(255, 255, 255, .14); color: #fff; }
 .ctl { margin-left: auto; display: flex; gap: 4px; -webkit-app-region: no-drag; }
@@ -124,12 +135,12 @@ const NAMES = { haiku: 'Haiku', sonnet: 'Sonnet', opus: 'Opus', fable: 'Fable', 
 const EFF = { low: 1, medium: 2, high: 3, xhigh: 4, max: 4 };
 const I18N = {
   zh: { running: '运行中', bg: '后台在跑', need: '等你确认', idle: '等你下一步', ended: '已结束', noTask: '还没有收到任务', now: '正在', thinking: '思考中…',
-    waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端或 Claude App 里确认', qWeek: '本周额度', qAsOf: s => `截至 ${s}`, qAsOfTip: '额度只在 Claude Code 调用模型时更新；在 Claude App 里用掉的，要等下次用 Claude Code 才会算进来', q5h: n => `5 小时 ${n}%`, qReset: s => `${s} 重置`, cacheLeft: m => `缓存 ${m} 分`, cacheCold: '缓存已过期', gate_pass: '测试 ✓', gate_fail: '测试 ✕ 修复中', gate_giveup: '测试 ✕', gate_timeout: '测试超时', gate_skip: '测试跳过', last: '上一步', idle2: '空闲',
+    waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端或 Claude App 里确认', sessCount: (n, r) => `${n} 个对话${r ? ` · ${r} 个在跑` : ''}`, qWeek: '本周额度', qAsOf: s => `截至 ${s}`, qAsOfTip: '额度只在 Claude Code 调用模型时更新；在 Claude App 里用掉的，要等下次用 Claude Code 才会算进来', q5h: n => `5 小时 ${n}%`, qReset: s => `${s} 重置`, cacheLeft: m => `缓存 ${m} 分`, cacheCold: '缓存已过期', gate_pass: '测试 ✓', gate_fail: '测试 ✕ 修复中', gate_giveup: '测试 ✕', gate_timeout: '测试超时', gate_skip: '测试跳过', last: '上一步', idle2: '空闲',
     needs: (p, m) => `<b>${p}</b> 在等你确认${m ? '：' + m : ''}`, done: n => `<b>✓ ${n}</b> 个已完成`, why: '为什么：', today: h => `近 ${h} 小时`, saved: n => `少花 ${n}%`,
     full: '打开完整看板 ↗', empty: '现在没有 Claude Code 在运行', emptySub: '在任意项目里输入 claude，这里会自动出现。', live: '实时', off: '重连中', pin: '总在最前', close: '隐藏',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: '后台监视', Bash: '后台命令' }, subagent: '子代理', unknown: '模型未知' },
   en: { running: 'Running', bg: 'Background', need: 'Needs you', idle: 'Your turn', ended: 'Ended', noTask: 'No task yet', now: 'Now', thinking: 'Thinking…',
-    waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal or the Claude app', qWeek: 'This week', qAsOf: s => `as of ${s}`, qAsOfTip: 'Plan usage updates only when Claude Code calls a model; usage in the Claude app shows up after your next Claude Code turn', q5h: n => `5h ${n}%`, qReset: s => `resets ${s}`, cacheLeft: m => `cache ${m}m`, cacheCold: 'cache cold', gate_pass: 'tests ✓', gate_fail: 'tests ✕ fixing', gate_giveup: 'tests ✕', gate_timeout: 'tests timed out', gate_skip: 'tests skipped', last: 'Last', idle2: 'Idle',
+    waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal or the Claude app', sessCount: (n, r) => `${n} sessions${r ? ` · ${r} running` : ''}`, qWeek: 'This week', qAsOf: s => `as of ${s}`, qAsOfTip: 'Plan usage updates only when Claude Code calls a model; usage in the Claude app shows up after your next Claude Code turn', q5h: n => `5h ${n}%`, qReset: s => `resets ${s}`, cacheLeft: m => `cache ${m}m`, cacheCold: 'cache cold', gate_pass: 'tests ✓', gate_fail: 'tests ✕ fixing', gate_giveup: 'tests ✕', gate_timeout: 'tests timed out', gate_skip: 'tests skipped', last: 'Last', idle2: 'Idle',
     needs: (p, m) => `<b>${p}</b> needs your approval${m ? ': ' + m : ''}`, done: n => `<b>✓ ${n}</b> finished`, why: 'Why: ', today: h => `Last ${h}h`, saved: n => `${n}% saved`,
     full: 'Open full board ↗', empty: 'No Claude Code running', emptySub: 'Run claude in any project and it shows up here.', live: 'Live', off: 'Reconnecting', pin: 'Always on top', close: 'Hide',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: 'Monitor', Bash: 'Background command' }, subagent: 'Subagent', unknown: 'Unknown model' },
@@ -241,7 +252,11 @@ function render() {
     ? `<div class="ag bg running f-none"><span class="glyph">◷</span><span class="nm">${esc((I18N[LANG].bgName[x.type]) || x.type)}</span><span class="tm">${timer(x.startedAt, x.endedAt)}</span><span class="ds">${esc(x.description || x.label || '')}</span></div>`
     : `<div class="ag running ${f(x.family)}"><span class="glyph">${esc((NAMES[x.family] || x.model || '?')[0])}</span><span class="nm">${esc(x.type === 'subagent' ? t('subagent') : x.type)}<span>${esc(x.model || '')}</span></span><span class="tm">${timer(x.startedAt, x.endedAt)}</span><span class="ds">${x.currentTool ? esc(toolText(x.currentTool)) : esc(x.description || t('thinking'))}</span></div>`).join('');
   const nav = ss.length > 1 ? `<div class="nav"><button onclick="go(-1)">‹</button><button onclick="go(1)">›</button></div>` : '';
+  // 两个以上的对话：一排小标签，显示有几个、谁在跑，点一下切换 / two or more: a row of chips, how many and who is running, tap to switch
+  const nRun = ss.filter(x => x.status === 'running' || x.status === 'background').length;
+  const sw = ss.length > 1 ? `<div class="sw"><div class="cnt">${t('sessCount', ss.length, nRun)}</div><div class="chips">${ss.map(x => `<button class="sc ${stKey(x)} ${x === s ? 'on' : ''}" title="${esc(x.project || '—')} · ${esc(t(stKey(x)))}" onclick="jump('${esc(x.id)}')"><i></i><span>${esc(x.project || '—')}</span></button>`).join('')}</div></div>` : '';
   $('#root').innerHTML = `<div class="top"><span class="proj">${esc(s.project || '—')}</span>${nav}<span class="pill ${k}"><i></i>${t(k)}</span>${ctl}</div>
+    ${sw}
     ${alerts}
     <div class="task ${task ? '' : 'quiet'}" title="${esc(task ? task.prompt : '')}">${task ? esc(brief(task.prompt)) : t('noTask')}</div>
     <div class="meta ${f(s.family)}"><span class="chip ${f(s.family)}"><span class="glyph">${esc((NAMES[s.family] || s.model || '?')[0])}</span>${esc(s.model || t('unknown'))}</span>${meter(s.effort)}${task ? `<span>· ${timer(task.startedAt, task.endedAt || (s.active ? null : s.lastTs))}</span>` : ''}${s.route && s.route.cacheUntil && s.active ? `<span class="xc" data-until="${s.route.cacheUntil}">${esc(cacheLeft(s.route.cacheUntil))}</span>` : ''}${s.route && s.route.gate ? `<span class="xc g-${esc(s.route.gate.result)}">${esc(t('gate_' + s.route.gate.result))}</span>` : ''}</div>
@@ -252,6 +267,7 @@ function render() {
   const fams = [...new Set([s.family].concat(live.map(x => x.family)).filter(Boolean))];
   $('#glow').style.background = fams.map((fm, i) => `radial-gradient(160px 120px at ${20 + i * 30}% 40%, color-mix(in srgb, var(--${fm === 'mythos' ? 'fable' : fm}) 55%, transparent), transparent 70%)`).join(',') || 'none';
   document.title = (state.needsYou.length ? `(${state.needsYou.length}) ` : '') + (s.project || 'Agent');
+  const on = document.querySelector('.sc.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   fit();
 }
 function fit() {

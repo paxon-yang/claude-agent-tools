@@ -24,6 +24,8 @@ data class Session(
     val gate: String?,
     val reason: String? = null,
     val running: List<Run> = emptyList(),
+    /** 会话 id（新版看板才有）/ session id (newer boards only) */
+    val id: String? = null,
 )
 
 /** 在跑的子代理或后台任务 / a running sub-agent or background task */
@@ -34,7 +36,7 @@ data class Limit(val pct: Double, val resetsAt: String?)
 /** at = 看板拿到这组数的时间（秒）/ when the board last got these figures, in seconds */
 data class Limits(val sevenDay: Limit?, val fiveHour: Limit?, val at: Double? = null)
 
-data class Other(val project: String, val status: String)
+data class Other(val project: String, val status: String, val id: String? = null)
 
 data class Totals(val cost: Double?, val baseline: Double?, val saved: Double?, val hours: Int, val baselineModel: String)
 
@@ -49,6 +51,8 @@ data class WidgetData(
     val limits: Limits? = null,
     /** 电脑上看板选的皮肤 / the skin chosen on the board */
     val skin: String? = null,
+    /** 活跃会话的顺序（id），卡片上左右切换用；旧版看板没有 / active sessions in order (ids) for switching; absent on older boards */
+    val order: List<String> = emptyList(),
 )
 
 /** 卡片上的状态 / the status the card shows */
@@ -94,13 +98,14 @@ object Model {
                         add(Run(x.str("kind") ?: "agent", x.str("name") ?: "?", x.str("model"), x.str("family"), x.str("text")))
                     }
                 },
+                id = it.str("id"),
             )
         }
         val others = buildList {
             val a = o.optJSONArray("others")
             if (a != null) for (i in 0 until a.length()) {
                 val x = a.optJSONObject(i) ?: continue
-                add(Other(x.str("project") ?: "?", x.str("status") ?: "idle"))
+                add(Other(x.str("project") ?: "?", x.str("status") ?: "idle", x.str("id")))
             }
         }
         val t = o.optJSONObject("totals") ?: JSONObject()
@@ -117,6 +122,10 @@ object Model {
             totals = Totals(t.num("cost"), t.num("baseline"), t.num("saved"), t.optInt("hours", 24), t.str("baselineModel") ?: "opus"),
             limits = lim,
             skin = o.str("skin"),
+            order = buildList {
+                val a = o.optJSONArray("order")
+                if (a != null) for (i in 0 until a.length()) a.optString(i).takeIf { it.isNotBlank() }?.let { add(it) }
+            },
         )
     }
 

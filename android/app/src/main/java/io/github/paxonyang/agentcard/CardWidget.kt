@@ -46,6 +46,19 @@ class CardWidget : AppWidgetProvider() {
         // 点卡片：进入实时模式（有会话在跑时每 15 秒刷新）/ tap: live mode, refreshing every 15 s while busy
         when (intent.action) {
             ACTION_TAP -> LiveService.start(context)
+            // ‹ ›：换到上一个 / 下一个对话，马上去拉那个会话的数据 / switch to the previous / next conversation and fetch it at once
+            ACTION_PREV, ACTION_NEXT -> {
+                val prefs = Prefs(context)
+                val d = prefs.data()
+                val order = d?.order.orEmpty()
+                if (order.size > 1) {
+                    val i = order.indexOf(d?.session?.id ?: "").coerceAtLeast(0)
+                    val step = if (intent.action == ACTION_NEXT) 1 else -1
+                    prefs.session = order[(i + step + order.size) % order.size]
+                    val pending = goAsync()
+                    Thread { try { Api.refresh(context) } finally { pending.finish() } }.start()
+                }
+            }
             // 装了新版本或开机：先用上次的数据重画（不然桌面会停在空白的初始样子），再去拉新的
             // after an app update or reboot: redraw from the last data at once, then fetch fresh
             Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_BOOT_COMPLETED -> {
@@ -60,6 +73,8 @@ class CardWidget : AppWidgetProvider() {
 
     companion object {
         const val ACTION_TAP = "io.github.paxonyang.agentcard.TAP"
+        const val ACTION_PREV = "io.github.paxonyang.agentcard.PREV"
+        const val ACTION_NEXT = "io.github.paxonyang.agentcard.NEXT"
 
         fun renderAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -147,6 +162,7 @@ class CardWidget : AppWidgetProvider() {
                 rv.setViewVisibility(R.id.line, View.GONE)
                 rv.setTextViewText(R.id.cost, "")
                 rv.setTextViewText(R.id.updated, "")
+                rv.setViewVisibility(R.id.switcher, View.GONE)
                 return rv
             }
 
@@ -167,7 +183,20 @@ class CardWidget : AppWidgetProvider() {
             dot(rv, pulse)
             rv.setTextViewText(R.id.status, context.getString(label))
             rv.setTextColor(R.id.status, color(tint))
-            rv.setTextViewText(R.id.project, (s?.project ?: "") + if (d.others.isNotEmpty()) "  +${d.others.size}" else "")
+            // 几个对话、现在看的是第几个；‹ › 切换（旧版看板没有 order，就只写 +N）
+            // how many conversations and which one this is; ‹ › to switch (older boards send no order: just +N)
+            val order = d.order
+            if (order.size > 1 && prefs.url.isNotBlank()) {
+                val at = order.indexOf(s?.id ?: "")
+                rv.setViewVisibility(R.id.switcher, View.VISIBLE)
+                rv.setTextViewText(R.id.sw_count, "${if (at >= 0) at + 1 else 1}/${order.size}")
+                rv.setOnClickPendingIntent(R.id.sw_prev, pi(context, 4, Intent(context, CardWidget::class.java).setAction(ACTION_PREV), false))
+                rv.setOnClickPendingIntent(R.id.sw_next, pi(context, 5, Intent(context, CardWidget::class.java).setAction(ACTION_NEXT), false))
+                rv.setTextViewText(R.id.project, s?.project ?: "")
+            } else {
+                rv.setViewVisibility(R.id.switcher, View.GONE)
+                rv.setTextViewText(R.id.project, (s?.project ?: "") + if (d.others.isNotEmpty()) "  +${d.others.size}" else "")
+            }
 
             // 模型 / model
             rv.setTextViewTextSize(R.id.model, TypedValue.COMPLEX_UNIT_SP, 21f)
@@ -289,7 +318,8 @@ class CardWidget : AppWidgetProvider() {
                     rv.setTextColor(R.id.updated, color(R.color.c_green))
                 }
                 else -> {
-                    rv.setTextViewText(R.id.updated, clock(max(prefs.lastOkAt, 0)))
+                    // 写明是"几点更新的"，不像是时钟 / say it is the update time, so it doesn't read as a clock
+                    rv.setTextViewText(R.id.updated, if (prefs.lastOkAt > 0) context.getString(R.string.updated_at, clock(prefs.lastOkAt)) else "")
                     rv.setTextColor(R.id.updated, color(R.color.c_label3))
                 }
             }

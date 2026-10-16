@@ -67,7 +67,9 @@ async function noteLimits($: EngineInterface) {
     const list: Limit[] = rl.map(r => ({ kind: String(r.kind), pct: Number(r.percentUsed) || 0, resetsAt: r.resetsAt ?? null }))
     if (!list.length) return
     const key = JSON.stringify(list)
-    // 数没变也每 5 分钟写一次时间，看板才知道这个数是不是新的 / unchanged values still get a fresh time every 5 minutes, so the board knows how current they are
+    // 只在一轮结束后调用（刚收到模型回复，这个数是新的）；数没变也每 5 分钟写一次时间
+    // called only after a turn (a response just arrived, so the figure is current); unchanged values still get a new time every 5 minutes
+    // 以前每 30 秒的定时器也会刷新时间，闲着的会话让旧数字看起来像新的 / a 30-second timer used to refresh it too, making an idle session's old figure look current
     if (key === limitsKey && limits && Date.now() - limits.at < 5 * 60_000) return
     limitsKey = key
     limits = { at: Date.now(), list }
@@ -135,10 +137,9 @@ export const register: Register = on => {
     }
     const learned = Number(await $.store.get('cacheTtl'))
     ttl = typeof cfg.cache.ttlSeconds === 'number' ? cfg.cache.ttlSeconds : learned === 300 || learned === 3600 ? learned : 3600
-    $.clock.every(30000, () => {
-      renderStatus($)
-      void noteLimits($)
-    })
+    // 只刷新状态栏；额度只在真的收到模型回复后记录（turn.complete），时间才可信
+    // status line only; plan usage is recorded after a real model response (turn.complete), so its time is honest
+    $.clock.every(30000, () => renderStatus($))
     await $.command.register({
       name: 'route',
       description: M().cmdDescription,

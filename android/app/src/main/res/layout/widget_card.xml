@@ -82,6 +82,51 @@
                         android:text="@string/preview_project"
                         android:textColor="@color/c_label2"
                         android:textSize="13sp" />
+
+                    <!-- 几个对话在跑，‹ › 切换 / how many conversations, ‹ › to switch -->
+                    <LinearLayout
+                        android:id="@+id/switcher"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/sw_prev"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="@string/sw_prev"
+                            android:paddingStart="10dp"
+                            android:paddingTop="2dp"
+                            android:paddingEnd="6dp"
+                            android:paddingBottom="2dp"
+                            android:text="‹"
+                            android:textColor="@color/c_label2"
+                            android:textSize="17sp" />
+
+                        <TextView
+                            android:id="@+id/sw_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="1/2"
+                            android:textColor="@color/c_label3"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/sw_next"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:contentDescription="@string/sw_next"
+                            android:paddingStart="6dp"
+                            android:paddingTop="2dp"
+                            android:paddingEnd="4dp"
+                            android:paddingBottom="2dp"
+                            android:text="›"
+                            android:textColor="@color/c_label2"
+                            android:textSize="17sp" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout

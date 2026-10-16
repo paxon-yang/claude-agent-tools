@@ -857,11 +857,16 @@ function brief(p) {
   if (!cjk) out = out.charAt(0).toUpperCase() + out.slice(1);
   return out + (cut ? '…' : '');
 }
-function widgetView() {
+function widgetSel(req) {
+  const m = String(req.url || '').match(/[?&]session=([\w.-]{1,80})/);
+  return m ? m[1] : null;
+}
+// sel：手机卡片上选中的会话 id（还活跃就用它）/ sel: the session picked on the phone card (used while it is still active)
+function widgetView(sel) {
   const snap = snapshot();
   const act = snap.sessions.filter(x => x.active);
   // 先看等你确认的，再看在跑的，再看最近的 / needs-you first, then running, then the latest
-  const s = act.find(x => x.status === 'needs-you') || act.find(x => x.status === 'running' || x.status === 'background') || act[0] || snap.sessions[0] || null;
+  const s = (sel && act.find(x => x.id === sel)) || act.find(x => x.status === 'needs-you') || act.find(x => x.status === 'running' || x.status === 'background') || act[0] || snap.sessions[0] || null;
   const one = s && {
     id: s.id, project: s.project, status: s.status, active: s.active,
     task: s.task ? brief(s.task.prompt) : null, taskStartedAt: s.task ? s.task.startedAt : null, taskEndedAt: s.task ? s.task.endedAt || null : null,
@@ -881,7 +886,9 @@ function widgetView() {
   return {
     v: 2, now: snap.now, lang: LANG, demo: DEMO,   // v2: running list and plan limits
     session: one,
-    others: act.filter(x => x !== s).slice(0, 5).map(x => ({ project: x.project, status: x.status })),
+    others: act.filter(x => x !== s).slice(0, 5).map(x => ({ id: x.id, project: x.project, status: x.status })),
+    // 活跃会话的顺序，手机卡片左右切换用 / active sessions in order, for switching on the phone card
+    order: act.map(x => x.id),
     needsYou: snap.needsYou.length,
     limits: snap.limits,
     skin: snap.skin,
@@ -979,7 +986,7 @@ function handleCard(req, res, url, cc) {
   if (!keyOk(given, cc.key)) return plain(401, 'bad key', { 'X-Agent-Card': 'bad-key' });
   if (url === '/api/widget') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(widgetView()));
+    res.end(JSON.stringify(widgetView(widgetSel(req))));
     return;
   }
   // 配对页：手机扫码后打开，下载 App、一键连接 / pairing page: opened from the QR code; get the app, connect in one tap
@@ -1034,7 +1041,7 @@ const server = http.createServer((req, res) => {
   }
   if (url === '/api/widget') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(widgetView()));
+    res.end(JSON.stringify(widgetView(widgetSel(req))));
     return;
   }
   if (url === '/api/skin' && req.method === 'POST') {

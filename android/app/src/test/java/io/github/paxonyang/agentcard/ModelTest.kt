@@ -64,6 +64,17 @@ class ModelTest {
         assertFalse(Model.busy(idle))
     }
 
+    @Test fun sessionOrderForSwitching() {
+        val d = Model.parse("""{"v":2,"now":5,"session":{"id":"b","project":"api","status":"running","active":true},"others":[{"id":"a","project":"web","status":"idle"}],"order":["a","b"],"needsYou":0,"totals":{"hours":24}}""")
+        assertEquals(listOf("a", "b"), d.order)
+        assertEquals("b", d.session!!.id)
+        assertEquals("a", d.others.single().id)
+        // older boards: no order, no ids
+        val old = Model.parse("""{"v":2,"now":5,"session":{"project":"api","status":"running","active":true},"others":[],"needsYou":0,"totals":{"hours":24}}""")
+        assertEquals(emptyList<String>(), old.order)
+        assertNull(old.session!!.id)
+    }
+
     @Test fun emptyBoard() {
         val d = Model.parse("""{"v":1,"now":5,"session":null,"others":[],"needsYou":0,"totals":{"cost":0,"baseline":0,"saved":null,"hours":24,"baselineModel":"opus"}}""")
         assertNull(d.session)

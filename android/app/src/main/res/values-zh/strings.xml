@@ -40,7 +40,9 @@
     <string name="cost_line">近 %1$d 小时 %2$s · 比全用 %4$s 少花 %3$d%%</string>
     <string name="cost_line_plain">近 %1$d 小时 %2$s</string>
     <string name="live">实时</string>
-    <string name="updated_at">%s</string>
+    <string name="updated_at">%s 更新</string>
+    <string name="sw_prev">上一个对话</string>
+    <string name="sw_next">下一个对话</string>
     <string name="stale">未连接 · %s</string>
 
     <string name="err_no_url">点这里设置看板地址</string>

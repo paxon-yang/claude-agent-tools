@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 /** 设置和上一次拿到的数据都放这里 / settings and the last fetched data */
 class Prefs(context: Context) {
@@ -50,6 +51,10 @@ class Prefs(context: Context) {
     var liveUntil: Long
         get() = p.getLong("liveUntil", 0)
         set(v) = p.edit().putLong("liveUntil", v).apply()
+    /** 卡片上用 ‹ › 选中的会话 id；空 = 看板自己挑 / the session picked with ‹ › on the card; empty = let the board pick */
+    var session: String
+        get() = p.getString("session", "") ?: ""
+        set(v) = p.edit().putString("session", v).apply()
 
     fun data(): WidgetData? = lastJson.takeIf { it.isNotBlank() }?.let { runCatching { Model.parse(it) }.getOrNull() }
 }
@@ -65,8 +70,10 @@ object Api {
         val prefs = Prefs(context)
         val base = prefs.url
         if (base.isBlank()) return FetchResult(null, Fail.NO_URL).also { prefs.lastError = Fail.NO_URL.name }
-        val r = get(base, prefs.cfId, prefs.cfSecret, prefs.key)
+        val r = get(base, prefs.cfId, prefs.cfSecret, prefs.key, prefs.session)
         if (r.data != null) {
+            // 选中的会话已经结束：交回给看板自己挑 / the picked session has ended: let the board pick again
+            if (prefs.session.isNotBlank() && prefs.session !in r.data.order) prefs.session = ""
             prefs.lastJson = r.raw
             prefs.lastOkAt = System.currentTimeMillis()
             prefs.lastError = ""
@@ -76,10 +83,11 @@ object Api {
         return r
     }
 
-    fun get(base: String, cfId: String, cfSecret: String, key: String = ""): FetchResult {
+    fun get(base: String, cfId: String, cfSecret: String, key: String = "", session: String = ""): FetchResult {
         var conn: HttpURLConnection? = null
+        val q = if (session.isBlank()) "" else "?session=" + URLEncoder.encode(session, "UTF-8")
         return try {
-            conn = (URL("$base/api/widget").openConnection() as HttpURLConnection).apply {
+            conn = (URL("$base/api/widget$q").openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8000
                 readTimeout = 8000
                 instanceFollowRedirects = false
