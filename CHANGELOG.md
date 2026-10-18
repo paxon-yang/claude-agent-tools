@@ -5,6 +5,7 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 ## [Unreleased]
 
 ### Changed
+- **The desktop card no longer opens at login.** It runs only when you open the **Agent Card** app (Spotlight / Dock on macOS, Start menu on Windows), and the ✕ on the card now quits it to free the memory instead of hiding it. "Open at login" in the tray menu turns auto-start back on; updates keep that choice, and reopen the card only if it was open. Updating no longer opens the dashboard in the browser either; only a first install does.
 - **The main session keeps its model; hard work goes to an Opus sub-agent.** Switching the main session's model re-reads the whole conversation at the cache-write price, which in long conversations usually costs more than the switch saves. The new default strategy (`"strategy": "sticky"`) only moves the main session up to Sonnet by itself; work the rules or the classifier rate as Opus-level stays on the main model and is handed to the new `architect` sub-agent (Opus, high effort), with a note to the model saying so. `#opus`, plan mode, repeated failures and `/route opus` still put the main session itself on Opus. `"strategy": "perTurn"` brings back the old per-turn choice. Updating keeps your config and adds the new keys.
 
 ### Added

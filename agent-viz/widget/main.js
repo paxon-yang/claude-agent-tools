@@ -64,6 +64,7 @@ ipcMain.on('card:resize', (_e, h) => {
   if (Math.abs(cur - height) > 1) win.setSize(w, height, false);
 });
 ipcMain.on('card:hide', () => hideCard());
+ipcMain.on('card:quit', () => app.quit());   // 卡片上的 ✕：整个程序退出，内存全部释放 / the ✕ on the card quits, freeing all its memory
 ipcMain.on('card:pin', (_e, v) => setPinned(v));
 ipcMain.handle('card:pinned', () => prefs.pinned);
 ipcMain.on('card:full', () => shell.openExternal(BASE + '/'));
@@ -95,6 +96,53 @@ function routerItem() {
   }, { type: 'separator' }];
 }
 
+// 登录时自动打开：默认关（省内存），在菜单栏图标里勾选。标记文件让安装脚本在更新时保留你的选择；
+// 勾选/取消只改文件，下次登录才生效，不影响现在这一个卡片
+// open at login: off by default (saves memory); tick it in the menu-bar/tray menu. A marker file lets the installer keep
+// the choice across updates. Ticking only writes files, effective from the next login; the running card is left alone
+const AUTOSTART_MARK = path.join(os.homedir(), '.claude', 'viz', 'widget.autostart');
+const LABEL = 'local.claude-agent-card';
+const autostartOn = () => fs.existsSync(AUTOSTART_MARK);
+function setAutostart(on) {
+  const exe = process.execPath, dir = __dirname, lang = process.env.CAT_LANG || (ZH ? 'zh' : 'en');
+  try {
+    if (process.platform === 'darwin') {
+      const plist = path.join(os.homedir(), 'Library', 'LaunchAgents', LABEL + '.plist');
+      const log = path.join(os.homedir(), '.claude', 'viz', 'widget.log');
+      const x = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      if (on) {
+        fs.mkdirSync(path.dirname(plist), { recursive: true });
+        fs.writeFileSync(plist, [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+          '<plist version="1.0">', '<dict>',
+          `  <key>Label</key><string>${LABEL}</string>`,
+          `  <key>ProgramArguments</key><array><string>${x(exe)}</string><string>${x(dir)}</string></array>`,
+          `  <key>EnvironmentVariables</key><dict><key>CAT_LANG</key><string>${lang}</string></dict>`,
+          '  <key>RunAtLoad</key><true/>',
+          `  <key>StandardOutPath</key><string>${x(log)}</string>`,
+          `  <key>StandardErrorPath</key><string>${x(log)}</string>`,
+          '</dict>', '</plist>', '',
+        ].join('\n'));
+      } else fs.rmSync(plist, { force: true });
+    } else if (process.platform === 'win32') {
+      const startup = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup');
+      const vbs = path.join(startup, 'claude-agent-card.vbs');
+      if (on) {
+        fs.mkdirSync(startup, { recursive: true });
+        fs.writeFileSync(vbs, [
+          "' Agent Card: start at Windows login",
+          'Set sh = CreateObject("WScript.Shell")',
+          `sh.Environment("PROCESS")("CAT_LANG") = "${lang}"`,
+          `sh.Run """${exe}"" ""${dir}""", 0, False`, '',
+        ].join('\r\n'));
+      } else fs.rmSync(vbs, { force: true });
+    }
+    if (on) fs.writeFileSync(AUTOSTART_MARK, new Date().toISOString() + '\n'); else fs.rmSync(AUTOSTART_MARK, { force: true });
+  } catch { }
+  buildMenu();
+}
+
 function buildMenu() {
   if (!tray) return;
   const visible = win && win.isVisible();
@@ -105,7 +153,9 @@ function buildMenu() {
     ...(SKINS.length ? [{ label: L('皮肤', 'Skin'), submenu: SKINS.map(k => ({ label: ZH ? k.zh : k.en, type: 'radio', checked: k.id === skin, click: () => setSkin(k.id) })) }] : []),
     { label: L('打开完整看板', 'Open full board'), click: () => shell.openExternal(BASE + '/') },
     { type: 'separator' },
-    { label: L('退出', 'Quit'), click: () => app.quit() },
+    ...(process.platform === 'darwin' || process.platform === 'win32'
+      ? [{ label: L('登录时自动打开', 'Open at login'), type: 'checkbox', checked: autostartOn(), click: m => setAutostart(m.checked) }] : []),
+    { label: L('退出（释放内存）', 'Quit (frees memory)'), click: () => app.quit() },
   ]));
 }
 

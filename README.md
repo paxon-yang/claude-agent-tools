@@ -142,7 +142,7 @@ A small always-on-top window with only what matters right now: the current task,
 bash ~/claude-agent-tools/agent-viz/widget/install.sh
 ```
 
-It downloads Electron once (~100 MB) and opens at login. The same card works in any browser at `http://localhost:4321/mini`, which is handy on a phone.
+It downloads Electron once (~100 MB). The card only runs when you open it: click **Agent Card** (macOS: ⌘ Space → "Agent", or drag it from `~/Applications` to the Dock; Windows: Start menu), and the ✕ on the card quits it and frees the memory. To have it open at login, tick "Open at login" in its menu-bar / tray icon. The same card works in any browser at `http://localhost:4321/mini`, which is handy on a phone.
 
 **Skins.** Optional backgrounds in warm terracotta tones: Fox (animated: a small voxel fox typing at a desk; desktop and phone cards only), Clay, Contour, Terminal, Dunes, Aurora and Night sky. Each is a faint pattern under a scrim, so the text stays readable. Pick one from the dashboard sidebar (Skin) or the card's menu-bar / tray icon. The desktop card, the dashboard and the Android card (set to "Same as computer") all follow it.
 

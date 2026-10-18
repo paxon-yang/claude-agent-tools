@@ -54,12 +54,24 @@ ELECTRON="$(cd "$DEST" && "$NODE" -e "console.log(require('electron'))")"
 ok "Electron"
 
 echo ""
-echo "$(t '[3/3] 登录后自动打开，并现在启动' '[3/3] Open at login, and start it now')"
+echo "$(t '[3/3] 放一个「Agent 卡片」程序：点它才打开，不再开机自动弹出' '[3/3] Adding an "Agent Card" app: it opens only when you click it, not at login')"
+# 默认不随登录启动（省内存）。卡片菜单里勾了「登录时自动打开」会留下这个标记，更新时照旧保留
+# not started at login by default (saves memory). Ticking "Open at login" in the card's menu leaves this marker; updates keep it
+MARK="$VIZ/widget.autostart"
+# 更新前卡片开着，更新后就重新打开；本来关着就保持关着
+# if the card was open before the update, reopen it afterwards; if it was closed, leave it closed
+WAS_RUNNING=0
+if [ -f "$VIZ/widget.pid" ] && kill -0 "$(cat "$VIZ/widget.pid" 2>/dev/null)" 2>/dev/null; then WAS_RUNNING=1; fi
+FIRST=0; [ -f "$VIZ/widget.installed" ] || FIRST=1
 case "$(uname -s)" in
 Darwin)
   mkdir -p "$HOME/Library/LaunchAgents"
   la_stop "$LABEL"
-  cat > "$PLIST" <<PL
+  # 等旧卡片真正退出，不然新开的会撞上「只能开一个」的锁 / wait for the old card to exit, or the new one hits the single-instance lock
+  if [ -f "$VIZ/widget.pid" ]; then OLD="$(cat "$VIZ/widget.pid")"; kill "$OLD" >/dev/null 2>&1
+    for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$OLD" 2>/dev/null || break; sleep 0.5; done; fi
+  if [ -f "$MARK" ]; then
+    cat > "$PLIST" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -73,12 +85,17 @@ Darwin)
 </dict>
 </plist>
 PL
-  # 「Agent 卡片」小程序：放在 ~/Applications 里，聚焦搜索（⌘ 空格）输入 Agent 就能把卡片叫出来
-  # a tiny "Agent Card" app in ~/Applications: Spotlight (⌘ Space) → "Agent" brings the card back
+    ok "$(t '登录时自动打开：开（你在卡片菜单里勾选过）' 'Open at login: on (you ticked it in the card menu)')"
+  else
+    rm -f "$PLIST"
+    ok "$(t '登录时不再自动打开（想要的话，卡片的菜单栏图标里勾「登录时自动打开」）' 'Not opened at login (tick "Open at login" in its menu-bar icon if you want that)')"
+  fi
+  # 「Agent 卡片」小程序：这就是开关。点它打开卡片；卡片上的 ✕ 关掉程序、释放内存
+  # the "Agent Card" app is the switch: click it to open the card; the ✕ on the card quits and frees the memory
   APPDIR="$HOME/Applications"; mkdir -p "$APPDIR"
   for n in "Agent 卡片" "Agent Card"; do rm -rf "$APPDIR/$n.app"; done
   APPNAME="$(t 'Agent 卡片' 'Agent Card')"
-  if osacompile -o "$APPDIR/$APPNAME.app" -e "do shell script quoted form of \"$ELECTRON\" & \" \" & quoted form of \"$DEST\" & \" > /dev/null 2>&1 &\"" >/dev/null 2>&1; then
+  if osacompile -o "$APPDIR/$APPNAME.app" -e "do shell script \"CAT_LANG=$L \" & quoted form of \"$ELECTRON\" & \" \" & quoted form of \"$DEST\" & \" >> \" & quoted form of \"$VIZ/widget.log\" & \" 2>&1 &\"" >/dev/null 2>&1; then
     # 用看板的图标 / use the board's icon
     ICON_SRC="$SRC/../public/icon-512.png"
     if [ -f "$ICON_SRC" ] && command -v iconutil >/dev/null 2>&1; then
@@ -90,31 +107,43 @@ PL
       iconutil -c icns "$SET" -o "$APPDIR/$APPNAME.app/Contents/Resources/applet.icns" >/dev/null 2>&1
     fi
     touch "$APPDIR/$APPNAME.app"
-    ok "$(t "关掉卡片后，⌘ 空格搜「Agent」就能再打开（$APPDIR/$APPNAME.app）" "After closing the card, ⌘ Space → \"Agent\" opens it again ($APPDIR/$APPNAME.app)")"
+    ok "$(t "开关：$APPDIR/$APPNAME.app —— ⌘ 空格搜「Agent」打开，或把它拖到程序坞" "Switch: $APPDIR/$APPNAME.app — ⌘ Space → \"Agent\", or drag it to the Dock")"
+    if [ "$WAS_RUNNING" = 1 ] || [ "$FIRST" = 1 ]; then
+      open "$APPDIR/$APPNAME.app" >/dev/null 2>&1 && ok "$(t '卡片已打开；点 ✕ 就整个关掉' 'The card is open; click ✕ to close it completely')"
+    fi
+  else
+    warn "$(t "没能生成「Agent 卡片」程序，可以手动运行：\"$ELECTRON\" \"$DEST\"" "Couldn't create the app; run: \"$ELECTRON\" \"$DEST\"")"
   fi
-  if la_start "$LABEL" "$PLIST"; then ok "$(t '卡片已经出现在屏幕右上角；菜单栏里有它的图标，可以隐藏、置顶、退出' 'The card is at the top right of your screen; its menu-bar icon lets you hide it, pin it or quit')"
-  else warn "$(t "没能自动启动，可以手动运行：\"$ELECTRON\" \"$DEST\"" "Couldn't start it automatically; run: \"$ELECTRON\" \"$DEST\"")"; fi
   ;;
 MINGW*|MSYS*|CYGWIN*)
-  STARTUP="$APPDATA/Microsoft/Windows/Start Menu/Programs/Startup"
-  [ -d "$STARTUP" ] || STARTUP="$(cygpath -u "$APPDATA")/Microsoft/Windows/Start Menu/Programs/Startup"
-  VBS="$STARTUP/claude-agent-card.vbs"
+  PROGS="$APPDATA/Microsoft/Windows/Start Menu/Programs"
+  [ -d "$PROGS" ] || PROGS="$(cygpath -u "$APPDATA")/Microsoft/Windows/Start Menu/Programs"
+  STARTUP="$PROGS/Startup"
   WEL="$(cygpath -w "$ELECTRON")"; WDEST="$(cygpath -w "$DEST")"
   [ -f "$VIZ/widget.pid" ] && taskkill //F //PID "$(cat "$VIZ/widget.pid")" >/dev/null 2>&1
-  mkdir -p "$STARTUP"
-  cat > "$VBS" <<VB
-' Agent Card: start hidden at Windows login
+  # 打开卡片的小脚本 + 开始菜单里的「Agent Card」快捷方式 / a launcher script plus an "Agent Card" Start Menu shortcut
+  LAUNCH="$DEST/agent-card.vbs"
+  cat > "$LAUNCH" <<VB
+' Agent Card: open the card
 Set sh = CreateObject("WScript.Shell")
 sh.Environment("PROCESS")("CAT_LANG") = "$L"
 sh.Run """$WEL"" ""$WDEST""", 0, False
 VB
-  wscript.exe "$(cygpath -w "$VBS")" >/dev/null 2>&1 &
-  ok "$(t '卡片已经出现在屏幕右上角；右下角托盘里有它的图标，可以隐藏、置顶、退出' 'The card is at the top right of your screen; its tray icon lets you hide it, pin it or quit')"
+  WLAUNCH="$(cygpath -w "$LAUNCH")"; WLNK="$(cygpath -w "$PROGS")\\Agent Card.lnk"
+  powershell.exe -NoProfile -Command "\$s=(New-Object -ComObject WScript.Shell).CreateShortcut('$WLNK'); \$s.TargetPath='wscript.exe'; \$s.Arguments='\"$WLAUNCH\"'; \$s.IconLocation='$WEL,0'; \$s.Save()" >/dev/null 2>&1 \
+    && ok "$(t '开关：开始菜单里搜「Agent Card」打开卡片' 'Switch: search "Agent Card" in the Start menu to open the card')"
+  if [ -f "$MARK" ]; then mkdir -p "$STARTUP"; cp "$LAUNCH" "$STARTUP/claude-agent-card.vbs"
+    ok "$(t '登录时自动打开：开（你在卡片菜单里勾选过）' 'Open at login: on (you ticked it in the card menu)')"
+  else rm -f "$STARTUP/claude-agent-card.vbs"
+    ok "$(t '登录时不再自动打开（想要的话，托盘图标里勾「登录时自动打开」）' 'Not opened at login (tick "Open at login" in its tray icon if you want that)')"
+  fi
+  if [ "$WAS_RUNNING" = 1 ] || [ "$FIRST" = 1 ]; then wscript.exe "$WLAUNCH" >/dev/null 2>&1 & fi
   ;;
 *)
   warn "$(t "这个系统请手动运行：\"$ELECTRON\" \"$DEST\"" "On this system, run: \"$ELECTRON\" \"$DEST\"")"
   ;;
 esac
+date > "$VIZ/widget.installed"
 echo ""
 echo "$(t '  卸载：' '  Uninstall: ')bash \"$DEST/uninstall.sh\""
 echo ""

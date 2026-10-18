@@ -13,6 +13,8 @@
 SRC="$(cd "$(dirname "$0")" && pwd)"
 VIZ="$HOME/.claude/viz"
 APP="$VIZ/app"
+# 第一次安装才自动在浏览器里打开看板；更新时不打扰 / open the board in the browser only on a first install, not on updates
+FRESH=1; [ -f "$APP/server.js" ] && FRESH=""
 LABEL="local.claude-agent-viz"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 PORT=4321
@@ -157,7 +159,7 @@ echo "$(t '  想先看效果：' '  Try a demo:  ')node \"$APP/server.js\" --dem
 [ -f "$APP/report.js" ] && echo "$(t '  省了多少：  ' '  Savings:     ')node \"$APP/report.js\"$(t '   看看自动选模型帮你省了多少' '   See how much routing saved you')"
 echo "$(t '  卸载：      ' '  Uninstall:   ')bash \"$APP/uninstall.sh\""
 echo ""
-if [ -n "$OKUP" ]; then
+if [ -n "$OKUP" ] && [ -n "$FRESH" ]; then
   case "$(uname -s)" in
     Darwin) open "http://localhost:$PORT" ;;
     MINGW*|MSYS*|CYGWIN*) cmd //c start "" "http://localhost:$PORT" >/dev/null 2>&1 ;;

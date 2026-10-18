@@ -137,12 +137,12 @@ const I18N = {
   zh: { running: '运行中', bg: '后台在跑', need: '等你确认', idle: '等你下一步', ended: '已结束', noTask: '还没有收到任务', now: '正在', thinking: '思考中…',
     waitKids: n => `等 ${n} 个子代理交回`, waitBg: n => `${n} 个后台任务在跑`, approve: '去终端或 Claude App 里确认', sessCount: (n, r) => `${n} 个对话${r ? ` · ${r} 个在跑` : ''}`, qWeek: '本周额度', qAsOf: s => `截至 ${s}`, qAsOfTip: '额度只在 Claude Code 调用模型时更新；在 Claude App 里用掉的，要等下次用 Claude Code 才会算进来', q5h: n => `5 小时 ${n}%`, qReset: s => `${s} 重置`, cacheLeft: m => `缓存 ${m} 分`, cacheCold: '缓存已过期', gate_pass: '测试 ✓', gate_fail: '测试 ✕ 修复中', gate_giveup: '测试 ✕', gate_timeout: '测试超时', gate_skip: '测试跳过', last: '上一步', idle2: '空闲',
     needs: (p, m) => `<b>${p}</b> 在等你确认${m ? '：' + m : ''}`, done: n => `<b>✓ ${n}</b> 个已完成`, why: '为什么：', today: h => `近 ${h} 小时`, saved: n => `少花 ${n}%`,
-    full: '打开完整看板 ↗', empty: '现在没有 Claude Code 在运行', emptySub: '在任意项目里输入 claude，这里会自动出现。', live: '实时', off: '重连中', pin: '总在最前', close: '隐藏',
+    full: '打开完整看板 ↗', empty: '现在没有 Claude Code 在运行', emptySub: '在任意项目里输入 claude，这里会自动出现。', live: '实时', off: '重连中', pin: '总在最前', close: '关闭（释放内存，点「Agent 卡片」再打开）',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: '后台监视', Bash: '后台命令' }, subagent: '子代理', unknown: '模型未知' },
   en: { running: 'Running', bg: 'Background', need: 'Needs you', idle: 'Your turn', ended: 'Ended', noTask: 'No task yet', now: 'Now', thinking: 'Thinking…',
     waitKids: n => `Waiting on ${n} subagent${n > 1 ? 's' : ''}`, waitBg: n => `${n} background task${n > 1 ? 's' : ''} running`, approve: 'Approve in your terminal or the Claude app', sessCount: (n, r) => `${n} sessions${r ? ` · ${r} running` : ''}`, qWeek: 'This week', qAsOf: s => `as of ${s}`, qAsOfTip: 'Plan usage updates only when Claude Code calls a model; usage in the Claude app shows up after your next Claude Code turn', q5h: n => `5h ${n}%`, qReset: s => `resets ${s}`, cacheLeft: m => `cache ${m}m`, cacheCold: 'cache cold', gate_pass: 'tests ✓', gate_fail: 'tests ✕ fixing', gate_giveup: 'tests ✕', gate_timeout: 'tests timed out', gate_skip: 'tests skipped', last: 'Last', idle2: 'Idle',
     needs: (p, m) => `<b>${p}</b> needs your approval${m ? ': ' + m : ''}`, done: n => `<b>✓ ${n}</b> finished`, why: 'Why: ', today: h => `Last ${h}h`, saved: n => `${n}% saved`,
-    full: 'Open full board ↗', empty: 'No Claude Code running', emptySub: 'Run claude in any project and it shows up here.', live: 'Live', off: 'Reconnecting', pin: 'Always on top', close: 'Hide',
+    full: 'Open full board ↗', empty: 'No Claude Code running', emptySub: 'Run claude in any project and it shows up here.', live: 'Live', off: 'Reconnecting', pin: 'Always on top', close: 'Close (frees memory; open "Agent Card" to bring it back)',
     dur: (h, m, s) => h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`, bgName: { Monitor: 'Monitor', Bash: 'Background command' }, subagent: 'Subagent', unknown: 'Unknown model' },
 };
 let LANG = 'zh', state = null, skew = 0, conn = false, idx = 0, pinned = true;
@@ -230,7 +230,7 @@ function render() {
     ${T.saved != null && T.baseline > 0 && T.saved >= .01 ? `<span class="sv">${t('saved', Math.round(T.saved * 100))}</span>` : ''}<a onclick="openFull()">${t('full')}</a></div>`;
   const others = (state.needsYou || []).filter(n => !s || n.id !== s.id);
   const alerts = others.map(n => `<div class="alert" onclick="jump('${esc(n.id)}')"><span class="ic">!</span><span>${t('needs', esc(n.project || '—'), esc(n.msg || ''))}</span></div>`).join('');
-  const ctl = `<div class="ctl"><button class="w ${pinned ? 'on' : ''}" title="${t('pin')}" onclick="togglePin()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M15.5 2.5l6 6-2.2 1.1-3.6 3.6.6 4.8-2 2-4.2-4.2-5.6 5.6-1.4-1.4 5.6-5.6L4.5 9.3l2-2 4.8.6 3.6-3.6z"/></svg></button><button class="w" title="${t('close')}" onclick="W && W.hide()">✕</button></div>`;
+  const ctl = `<div class="ctl"><button class="w ${pinned ? 'on' : ''}" title="${t('pin')}" onclick="togglePin()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M15.5 2.5l6 6-2.2 1.1-3.6 3.6.6 4.8-2 2-4.2-4.2-5.6 5.6-1.4-1.4 5.6-5.6L4.5 9.3l2-2 4.8.6 3.6-3.6z"/></svg></button><button class="w" title="${t('close')}" onclick="W && (W.quit ? W.quit() : W.hide())">✕</button></div>`;
   if (!s) {
     $('#root').innerHTML = `<div class="top"><span class="proj">Agent</span>${ctl}</div>${alerts}<div class="empty"><b>${t('empty')}</b>${t('emptySub')}</div>${foot}`;
     $('#glow').style.background = 'none'; fit(); return;
