@@ -208,6 +208,13 @@ Dashboard settings live in `~/.claude/viz/app/config.json` (port, prices used fo
 - **Drive Claude from your phone** with Claude Code's own [Remote Control](https://code.claude.com/docs/en/remote-control): `/config` → *Enable Remote Control for all sessions*, plus *Push when actions required* for approval alerts. Approvals, questions and pushes are all handled there.
 - **Type `/route`** in the Claude app to see what the router is doing: the same card as in the terminal.
 - **Android home-screen card** — a real widget for Android phones: task, model, sub-agents, cache, tests and cost on the home screen, live while a session is busy. Set up with one command and a QR scan: `bash ~/claude-agent-tools/agent-viz/phone.sh` ([guide](android/README.md)).
+
+**Cloud sessions (Claude Code on the web / app / Projects) on the card too.** The board only sees Claude Code on this computer. Cloud sessions run in Anthropic's containers, so they have to send their state to your card address (run `phone.sh` first):
+
+1. In the claude.ai cloud environment settings (Project settings → Cloud environment → Add cloud environment): add the card hostname (e.g. `agent-card.example.com`) under **Allowed domains**, and two environment variables: `AGENT_CARD_URL=https://agent-card.example.com` and `AGENT_CARD_KEY=<pairing key>` (`phone.sh --qr` shows it).
+2. Put this repo's `.claude/settings.json` and `agent-viz/cloud-report.js` in the repositories you want to see (this repo already has them).
+
+Cloud sessions then show up on the board and the cards as "☁ repo", with the model and running / needs you / your turn as they really are; a cloud session waiting for you stays listed for 6 hours (`cloudIdleHours` in `config.json`). The ↗ on the card opens that cloud session. Nothing arrives while the computer is asleep or the board is off.
 - **Add the board to your home screen** (Safari: Share → Add to Home Screen; Chrome: ⋮ → Add to Home screen) through your Tailscale or Cloudflare address. It opens full-screen on the card; *Open full board* and *‹ Card* switch between the two.
 
 ## Uninstall

@@ -20,6 +20,8 @@
     <string name="st_idle">空闲</string>
     <string name="st_ended">已结束</string>
     <string name="st_none">没有会话</string>
+    <string name="st_offline">电脑离线 · 这是 %s 的数据</string>
+    <string name="sub_last">上次</string>
 
     <plurals name="meta_agents">
         <item quantity="other">%d 个子代理</item>

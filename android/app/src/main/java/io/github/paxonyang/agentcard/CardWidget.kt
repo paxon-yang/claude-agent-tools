@@ -75,6 +75,8 @@ class CardWidget : AppWidgetProvider() {
         const val ACTION_TAP = "io.github.paxonyang.agentcard.TAP"
         const val ACTION_PREV = "io.github.paxonyang.agentcard.PREV"
         const val ACTION_NEXT = "io.github.paxonyang.agentcard.NEXT"
+        /** 上次成功超过这么久、这次又失败，就算离线 / last success longer ago than this and the latest fetch failed: offline */
+        private const val OFFLINE_AFTER_MS = 5 * 60_000L
 
         fun renderAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -140,7 +142,9 @@ class CardWidget : AppWidgetProvider() {
                 rv.setOnClickPendingIntent(R.id.open, settings)
             } else {
                 rv.setOnClickPendingIntent(R.id.card, pi(context, 1, Intent(context, CardWidget::class.java).setAction(ACTION_TAP), false))
-                rv.setOnClickPendingIntent(R.id.open, pi(context, 3, Intent(Intent.ACTION_VIEW, Uri.parse(prefs.boardOrUrl)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true))
+                // 云端会话：↗ 直接打开 claude.ai 上的那个会话，好回去接手 / a cloud session: ↗ opens it on claude.ai, to take over
+                val target = prefs.data()?.session?.link ?: prefs.boardOrUrl
+                rv.setOnClickPendingIntent(R.id.open, pi(context, 3, Intent(Intent.ACTION_VIEW, Uri.parse(target)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), true))
             }
 
             val d = prefs.data()
@@ -170,6 +174,12 @@ class CardWidget : AppWidgetProvider() {
             val nowSec = d.now + sinceFetch
             val s = d.session
             val st = Model.status(s)
+            val clock = { ms: Long -> if (ms <= 0) "—" else DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms)) }
+            // 好几分钟连不上电脑：下面全是上次拿到的旧数据，按"离线"画，不再显示"运行中"、不再走计时器
+            // unreachable for a few minutes: everything below is the last data we got, so draw it as offline, with no live status or timer
+            val offline = err.isNotBlank() && System.currentTimeMillis() - prefs.lastOkAt > OFFLINE_AFTER_MS
+            // 离线或会话已结束时，模型只是"上次用的"，用灰字 / offline or ended: the model is only the last one used, so grey it
+            val dim = offline || st == Status.ENDED || st == Status.NONE
 
             // 状态 / status
             val (label, tint, pulse) = when (st) {
@@ -180,9 +190,9 @@ class CardWidget : AppWidgetProvider() {
                 Status.ENDED -> Triple(R.string.st_ended, R.color.c_label2, null)
                 Status.NONE -> Triple(R.string.st_none, R.color.c_label2, null)
             }
-            dot(rv, pulse)
-            rv.setTextViewText(R.id.status, context.getString(label))
-            rv.setTextColor(R.id.status, color(tint))
+            dot(rv, if (offline) null else pulse)
+            rv.setTextViewText(R.id.status, if (offline) context.getString(R.string.st_offline, clock(prefs.lastOkAt)) else context.getString(label))
+            rv.setTextColor(R.id.status, color(if (offline) R.color.c_red else tint))
             // 几个对话、现在看的是第几个；‹ › 切换（旧版看板没有 order，就只写 +N）
             // how many conversations and which one this is; ‹ › to switch (older boards send no order: just +N)
             val order = d.order
@@ -200,6 +210,7 @@ class CardWidget : AppWidgetProvider() {
 
             // 模型 / model
             rv.setTextViewTextSize(R.id.model, TypedValue.COMPLEX_UNIT_SP, 21f)
+            rv.setTextColor(R.id.model, color(if (dim) R.color.c_label2 else R.color.c_label))
             if (s?.model != null) {
                 rv.setViewVisibility(R.id.glyph, View.VISIBLE)
                 rv.setInt(R.id.glyph, "setBackgroundResource", glyphRes(s.family))
@@ -210,6 +221,7 @@ class CardWidget : AppWidgetProvider() {
                 rv.setTextViewText(R.id.model, context.getString(R.string.app_name))
             }
             val sub = listOfNotNull(
+                if (dim && s?.model != null) context.getString(R.string.sub_last) else null,
                 s?.effort,
                 s?.agentsRunning?.takeIf { it > 0 }?.let { context.getString(R.string.sub_agents, it) },
                 s?.bgRunning?.takeIf { it > 0 }?.let { context.getString(R.string.sub_bg, it) },
@@ -217,7 +229,7 @@ class CardWidget : AppWidgetProvider() {
             rv.setTextViewText(R.id.sub, sub)
             // 这一轮的计时器：自己按秒走 / the turn timer ticks by itself
             val started = s?.taskStartedAt
-            if (s != null && started != null && s.taskEndedAt == null && s.active && st != Status.IDLE) {
+            if (s != null && started != null && s.taskEndedAt == null && s.active && st != Status.IDLE && !offline) {
                 val base = SystemClock.elapsedRealtime() - ((nowSec - started) * 1000).toLong()
                 rv.setChronometer(R.id.timer, base, if (sub.isEmpty()) "%s" else " · %s", true)
                 rv.setViewVisibility(R.id.timer, View.VISIBLE)
@@ -307,8 +319,12 @@ class CardWidget : AppWidgetProvider() {
                     else -> context.getString(R.string.cost_short_plain, t.hours, Model.money(cost))
                 },
             )
-            val clock = { ms: Long -> if (ms <= 0) "—" else DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms)) }
             when {
+                // 离线时顶上已经写了数据是几点的，这里写为什么连不上 / offline: the top says how old the data is, this says why
+                offline -> {
+                    rv.setTextViewText(R.id.updated, errorText(context, err))
+                    rv.setTextColor(R.id.updated, color(R.color.c_red))
+                }
                 err.isNotBlank() -> {
                     rv.setTextViewText(R.id.updated, context.getString(R.string.stale, clock(prefs.lastOkAt)))
                     rv.setTextColor(R.id.updated, color(R.color.c_red))
