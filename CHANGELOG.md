@@ -5,6 +5,7 @@ All notable changes to this project. Versions follow [semver](https://semver.org
 ## [Unreleased]
 
 ### Fixed
+- **Cloud sessions actually reach the board.** Node's built-in `fetch` ignores the cloud container's `HTTPS_PROXY`, so every report failed silently; the hook now runs with `NODE_USE_ENV_PROXY=1`. `node agent-viz/cloud-report.js --check` shows which setup step is missing.
 - **The Android card no longer passes old data off as current.** When the board has been unreachable for more than 5 minutes, the card says "Computer offline · data from 13:10" at the top, stops the pulsing status and the turn timer, and the footer says why it can't connect. When the shown session has ended, its model is greyed and marked "Last used", so it doesn't read as the model in use now.
 
 ### Added

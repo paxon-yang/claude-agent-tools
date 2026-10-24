@@ -211,7 +211,7 @@ Claude Code · 自动选模型省了多少
 1. 在 claude.ai 的云端环境设置里（Project settings → Cloud environment → Add cloud environment）：网络访问把卡片网址（如 `agent-card.你的域名`）加进 **Allowed domains**，环境变量加两行：`AGENT_CARD_URL=https://agent-card.你的域名`、`AGENT_CARD_KEY=配对码`（`phone.sh --qr` 会显示）。
 2. 要被看到的仓库里放上本仓库的 `.claude/settings.json` 和 `agent-viz/cloud-report.js`（本仓库已经带了）。
 
-之后云端会话会以「☁ 仓库名」出现在看板和卡片上，模型、运行中 / 等你确认 / 做完等你，都按云端实际情况显示；停下来等你的云端会话会保留 6 小时（`config.json` 里的 `cloudIdleHours`）。卡片右下角的 ↗ 直接打开那个云端会话。电脑睡眠或看板没开时收不到。
+之后云端会话会以「☁ 仓库名」出现在看板和卡片上，模型、运行中 / 等你确认 / 做完等你，都按云端实际情况显示；停下来等你的云端会话会保留 6 小时（`config.json` 里的 `cloudIdleHours`）。卡片右下角的 ↗ 直接打开那个云端会话。电脑睡眠或看板没开时收不到。没显示的话，在一个新开的云端会话里让 Claude 运行 `NODE_USE_ENV_PROXY=1 node agent-viz/cloud-report.js --check`，它会告诉你哪一步没通。
 - **把看板添加到主屏幕**（Safari：分享 → 添加到主屏幕；Chrome：⋮ → 添加到主屏幕），用你的 Tailscale 或 Cloudflare 地址打开。点开全屏显示卡片，"打开完整看板"和"‹ 卡片"来回切换。
 
 ## 卸载
