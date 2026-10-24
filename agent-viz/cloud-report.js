@@ -14,7 +14,20 @@ const fs = require('fs');
 
 const URL_ = String(process.env.AGENT_CARD_URL || '').trim().replace(/\/+$/, '');
 const KEY = String(process.env.AGENT_CARD_KEY || '').trim();
-if (process.env.CLAUDE_CODE_REMOTE !== 'true' || !/^https:\/\//.test(URL_) || KEY.length < 16) process.exit(0);
+// 自查：在云端会话里运行  NODE_USE_ENV_PROXY=1 node agent-viz/cloud-report.js --check ，看哪一步没通
+// self-check: run  NODE_USE_ENV_PROXY=1 node agent-viz/cloud-report.js --check  in a cloud session to see which step fails
+if (process.argv.includes('--check')) {
+  const say = (ok, msg) => console.log((ok ? '✓ ' : '✗ ') + msg);
+  say(process.env.CLAUDE_CODE_REMOTE === 'true', 'cloud session (CLAUDE_CODE_REMOTE=true)');
+  say(/^https:\/\//.test(URL_), 'AGENT_CARD_URL = ' + (URL_ || '(not set)'));
+  say(KEY.length >= 16, 'AGENT_CARD_KEY ' + (KEY ? `set (${KEY.length} chars)` : '(not set)'));
+  say(process.env.NODE_USE_ENV_PROXY === '1' || !process.env.HTTPS_PROXY, 'NODE_USE_ENV_PROXY=1 (Node fetch ignores HTTPS_PROXY without it)');
+  if (!/^https:\/\//.test(URL_) || !KEY) process.exit(1);
+  fetch(URL_ + '/api/widget', { headers: { 'X-Card-Key': KEY }, signal: AbortSignal.timeout(8000) })
+    .then(r => { say(r.ok, `board answered HTTP ${r.status}` + (r.status === 401 ? ' (pairing key rejected)' : '')); process.exit(r.ok ? 0 : 1); })
+    .catch(e => { say(false, 'cannot reach the board: ' + ((e.cause && (e.cause.code || e.cause.message)) || e.message) + ' (host not in Allowed domains, or the computer/tunnel is off)'); process.exit(1); });
+  return;   // 下面是 hook 用的，自查时不走 / the rest is for the hook, not the check
+} else if (process.env.CLAUDE_CODE_REMOTE !== 'true' || !/^https:\/\//.test(URL_) || KEY.length < 16) process.exit(0);
 
 // 超长文字只保留开头和结尾（和 capture.js 一样）/ keep only the head and tail of long text (as capture.js does)
 function trim(v, depth) {
