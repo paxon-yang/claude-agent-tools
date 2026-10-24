@@ -26,6 +26,8 @@ data class Session(
     val running: List<Run> = emptyList(),
     /** 会话 id（新版看板才有）/ session id (newer boards only) */
     val id: String? = null,
+    /** 云端会话在 claude.ai 上的网址（本机会话没有）/ a cloud session's claude.ai address (none for local sessions) */
+    val link: String? = null,
 )
 
 /** 在跑的子代理或后台任务 / a running sub-agent or background task */
@@ -91,6 +93,7 @@ object Model {
                 cacheUntil = it.num("cacheUntil"),
                 gate = it.str("gate"),
                 reason = it.str("reason"),
+                link = it.str("link")?.takeIf { l -> l.startsWith("https://claude.ai/") },
                 running = buildList {
                     val a = it.optJSONArray("running")
                     if (a != null) for (i in 0 until a.length()) {

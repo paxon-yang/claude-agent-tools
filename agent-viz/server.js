@@ -48,6 +48,7 @@ const LOG = DEMO ? path.join(APP, LANG === 'zh' ? 'demo-events.jsonl' : 'demo-ev
 const CONTEXT_LIMIT = Number(CONFIG.contextLimit || 1000000);
 const IDLE_MIN = Number(CONFIG.collapseAfterMinutes || 30);
 const KEEP_HOURS = Number(CONFIG.keepHours || 24);
+const CLOUD_IDLE_HOURS = Number(CONFIG.cloudIdleHours || 6);
 const ROTATE_MB = Number(CONFIG.rotateAtMB || 50);
 const KEEP_ARCHIVES = Number(CONFIG.keepArchives || 7);
 const REMOTE = CONFIG.remote || 'tailscale';           // 'tailscale'：同时在 Tailscale 地址上开放；'off'：只在本机
@@ -134,6 +135,14 @@ function getSession(d, ts) {
   }
   if (d.cwd && !s.cwd) s.cwd = d.cwd;
   if (d.transcript_path) s.transcript = d.transcript_path;
+  // 云端会话（cloud-report.js 发来的）：模型由云端读好带过来，记录文件在云端读不到
+  // a cloud session (sent by cloud-report.js): the model comes read from the cloud transcript, which the board can't reach
+  if (d.cloud) {
+    s.cloud = true;
+    if (d.cloud.link) s.link = d.cloud.link;
+    if (d.cloud.model) s.actualModel = d.cloud.model;
+    if (d.cloud.effort && !(d.effort && d.effort.level)) s.effort = d.cloud.effort;
+  }
   s.lastTs = Math.max(s.lastTs, ts);
   return s;
 }
@@ -718,7 +727,8 @@ function sessionModel(s) { return s.actualModel || s.model || settings.model || 
 const i0 = (arr, x) => arr.indexOf(x);
 function view(s) {
   const t = now();
-  const active = !s.ended && t - s.lastTs < IDLE_MIN * 60;
+  // 云端会话停下来通常是在等你接手，几小时后回来也要看得到 / a quiet cloud session is usually waiting for you, so keep it for hours
+  const active = !s.ended && t - s.lastTs < (s.cloud ? CLOUD_IDLE_HOURS * 3600 : IDLE_MIN * 60);
   expireAgents(s, t, active);
   const all = [...s.agents.values()].filter(a => !isHelper(a)).sort((x, y) => x.startedAt - y.startedAt);
   // 更早派出、现在还在跑的子代理也要显示 / keep earlier sub-agents that are still running
@@ -732,7 +742,7 @@ function view(s) {
   const bgRunning = bgAll.filter(b => b.status === 'running').length + all.filter(a => a.status === 'running').length;
   const model = sessionModel(s);
   return {
-    id: s.id, project: path.basename(s.cwd || ''), cwd: s.cwd,
+    id: s.id, project: (s.cloud ? '☁ ' : '') + path.basename(s.cwd || ''), cwd: s.cwd, cloud: !!s.cloud, link: s.link || null,
     active, status: active ? (s.status === 'idle' && bgRunning ? 'background' : s.status) : 'ended',
     background: bgShown.map(b => ({ id: b.id, tool: b.tool, label: b.label, description: b.description, owner: b.owner, status: b.status,
       startedAt: b.startedAt, endedAt: b.endedAt, timeoutAt: b.timeoutAt, summary: b.summary })),
@@ -868,7 +878,7 @@ function widgetView(sel) {
   // 先看等你确认的，再看在跑的，再看最近的 / needs-you first, then running, then the latest
   const s = (sel && act.find(x => x.id === sel)) || act.find(x => x.status === 'needs-you') || act.find(x => x.status === 'running' || x.status === 'background') || act[0] || snap.sessions[0] || null;
   const one = s && {
-    id: s.id, project: s.project, status: s.status, active: s.active,
+    id: s.id, project: s.project, status: s.status, active: s.active, cloud: s.cloud, link: s.link,
     task: s.task ? brief(s.task.prompt) : null, taskStartedAt: s.task ? s.task.startedAt : null, taskEndedAt: s.task ? s.task.endedAt || null : null,
     model: s.model || null, family: s.family || null, effort: s.effort || null,
     agentsRunning: s.agents.filter(a => a.status === 'running').length, agentsDone: s.agents.filter(a => a.status !== 'running').length,
@@ -974,6 +984,29 @@ function keyOk(given, want) {
   const a = Buffer.from(String(given || '')), b = Buffer.from(String(want || ''));
   return a.length === b.length && a.length >= 16 && require('crypto').timingSafeEqual(a, b);
 }
+// 云端会话发来的 hook 事件：写进同一个事件日志，和本机事件走同一条路（看板重启后也还在）
+// hook events from cloud sessions: appended to the same event log, so they take the same path as local ones (and survive a restart)
+function takeCloud(req, plain) {
+  if (req.method !== 'POST' || DEMO) return plain(405, 'post only');
+  let body = '', big = false;
+  req.on('data', c => { body += c; if (body.length > 512 * 1024) { big = true; req.destroy(); } });
+  req.on('end', () => {
+    if (big) return;
+    let o; try { o = JSON.parse(body); } catch { return plain(400, 'bad json'); }
+    const d = o && o.data;
+    if (!d || typeof d !== 'object' || typeof d.hook_event_name !== 'string' || !/^[\w-]{8,80}$/.test(String(d.session_id || ''))) return plain(400, 'bad event');
+    const c = o.cloud && typeof o.cloud === 'object' ? o.cloud : {};
+    const link = typeof c.link === 'string' && /^https:\/\/claude\.ai\/code\/session_\w+$/.test(c.link) ? c.link : null;
+    const model = typeof c.model === 'string' && /^[\w.\[\]-]{1,80}$/.test(c.model) ? c.model : null;
+    // 云端的文件路径在这台电脑上没有意义，去掉 / cloud file paths mean nothing on this computer
+    const effort = typeof c.effort === 'string' && /^[a-z]{2,10}$/.test(c.effort) ? c.effort : null;
+    const data = Object.assign({}, d, { transcript_path: undefined, agent_transcript_path: undefined, cloud: { link, model, effort, project: !!c.project } });
+    try {
+      fs.appendFileSync(LOG, JSON.stringify({ ts: now(), data }) + '\n');   // 用看板自己的时钟 / the board's own clock
+    } catch (e) { return plain(500, 'log write failed'); }
+    plain(204, '');
+  });
+}
 function handleCard(req, res, url, cc) {
   const q = new URL(req.url, 'http://x').searchParams;
   const given = req.headers['x-card-key'] || q.get('k') || '';
@@ -982,8 +1015,9 @@ function handleCard(req, res, url, cc) {
     fs.readFile(path.join(APP, 'public', url.slice(1)), (err, buf) => { if (err) return plain(404, ''); res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(buf); });
     return;
   }
-  if (url !== '/api/widget' && url !== '/pair') return plain(404, 'not found');
+  if (url !== '/api/widget' && url !== '/pair' && url !== '/api/cloud') return plain(404, 'not found');
   if (!keyOk(given, cc.key)) return plain(401, 'bad key', { 'X-Agent-Card': 'bad-key' });
+  if (url === '/api/cloud') return takeCloud(req, plain);
   if (url === '/api/widget') {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(widgetView(widgetSel(req))));

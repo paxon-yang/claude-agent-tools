@@ -21,6 +21,8 @@
     <string name="st_idle">Idle</string>
     <string name="st_ended">Ended</string>
     <string name="st_none">No session</string>
+    <string name="st_offline">Computer offline · data from %s</string>
+    <string name="sub_last">Last used</string>
 
     <plurals name="meta_agents">
         <item quantity="one">%d sub-agent</item>
